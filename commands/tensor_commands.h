@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include "tensor/tensor.h"
-#include "ud_functions/ud_function.h"
+#include "../tensor/tensor.h"
+#include "../ud_functions/ud_function.h"
 
 namespace bbts {
 

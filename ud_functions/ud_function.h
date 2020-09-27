@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tensor.h"
+#include "../tensor/tensor.h"
 
 namespace bbts {
 
@@ -49,6 +49,9 @@ struct ud_func_t {
 
   // these are all the implementations of this ud function
   std::vector<ud_impl_type_t> impls;
+
+  // the expression that will tell us the dimension of the output given the input
+  virtual std::vector<tensor_meta_t> get_outputs_meta_for(const std::vector<tensor_meta_t> &inputs_meta) = 0;
 
   // applies the ud function
   virtual void apply(ud_impl_type_t &ud, const std::vector<tensor_t> &input, const std::vector<tensor_t> &output) = 0;
