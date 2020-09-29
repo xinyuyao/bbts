@@ -4,6 +4,9 @@ project(tra_sub_sys_barbatos)
 # set the c++ version
 set(CMAKE_CXX_STANDARD 20)
 
+# set the location for cmake scripts
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/tools/cmake")
+
 # the tensors
 file(GLOB TENSOR_SOURCE "${PROJECT_SOURCE_DIR}/tensor/*.cc")
 add_library(tensor OBJECT ${TENSOR_SOURCE})

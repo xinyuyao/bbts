@@ -2,45 +2,56 @@
 
 #include <vector>
 #include <cstdint>
+#include <functional>
 
 namespace bbts {
 
   // the identifier of the tensor
   using tid_t = int32_t;
 
+  //  the identifier of the tensor format
+  using tfid_t = int32_t;
+
   // holds the meta data of the tensor
   struct tensor_meta_t {
 
-    // the maximum number of indices supported
-    static const size_t MAX_DIM_SIZE = 10;
+    // the meta is 256 by default
+    static const size_t MAX_META_SIZE = 256;
 
-    // the number of dimensions of this tensor
-    int32_t num_dims;
+    // the id of the tensor format, it must me one of the values registered with the system
+    tfid_t fmt_id;
 
     // the indices of the tensor
-    int32_t dims[MAX_DIM_SIZE];
+    char _blob[MAX_META_SIZE];
   };
 
-  // the dense tensor class in our system
+  // the tensor class in our system
   struct tensor_t {
 
-    // the id of this tensor
-    tid_t id;
+    // we can not copy a tensor as it will have the blob after
+    tensor_t(const tensor_t&) = delete;
+    void operator=(const tensor_t&) = delete;
+
+    // we use this to cast the tensor into the actual implementation
+    template<class T>
+    T& as() { return *((T*) this); }
 
     // the meta of the tensor
-    tensor_meta_t meta;
+    tensor_meta_t _meta;
 
     // after this tensor header is all the
-    float data[0];
+    char _blob[0];
+  };
 
-    // returns the number of bytes
-    [[nodiscard]] size_t num_bytes() const;
+  // to register a tensor format these need to be defined
+  struct tensor_creation_fs_t {
 
-    // initializes the tensor to a location
-    static tensor_t & init(void *here, tid_t id, const std::vector<int32_t> &dims);
+    // returns the size of the tensor
+    std::function<size_t(const tensor_meta_t&)> get_size;
 
-    // initializes the tensor with the given meta data
-    static tensor_t & init(void *here, const tensor_meta_t &meta);
+    // initializes the tensor given some meta data to the provided memory, it should not use
+    // any additional memory besides the one provided
+    std::function<tensor_t&(void* here, const tensor_meta_t&)> init_tensor;
 
   };
 }
