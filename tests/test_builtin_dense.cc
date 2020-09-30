@@ -48,16 +48,16 @@ TEST(TestDenseTensor, Init) {
 
   // make the meta
   dense_tensor_meta_t dm{id, 100, 200};
-  auto &m = *((tensor_meta_t *) &dm);
+  auto &m = dm.as<tensor_meta_t>();
 
-  // get how much we need to allocated
+  // get how much we need to allocate
   auto size = factory.get_tensor_size(m);
 
   // the memory
   std::unique_ptr<char[]> a_mem(new char[size]);
   std::unique_ptr<char[]> b_mem(new char[size]);
 
-  // init the three tensors
+  // init the two tensors
   auto &a = factory.init_tensor(a_mem.get(), m).as<dense_tensor_t>();
   auto &b = factory.init_tensor(b_mem.get(), m).as<dense_tensor_t>();
 

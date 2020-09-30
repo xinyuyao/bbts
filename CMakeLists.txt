@@ -11,11 +11,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/tools/cmake")
 file(GLOB TENSOR_SOURCE "${PROJECT_SOURCE_DIR}/tensor/*.cc")
 add_library(tensor OBJECT ${TENSOR_SOURCE})
 
-#file(GLOB UD_SOURCE "${PROJECT_SOURCE_DIR}/ud_functions/*.cc")
-#add_library(ud_functions OBJECT ${UD_SOURCE})
+file(GLOB UD_SOURCE "${PROJECT_SOURCE_DIR}/ud_functions/*.cc")
+add_library(ud_functions OBJECT ${UD_SOURCE})
 
 # link all modules up
-add_library(bbts-common $<TARGET_OBJECTS:tensor>)
+add_library(bbts-common $<TARGET_OBJECTS:tensor>
+                        $<TARGET_OBJECTS:ud_functions>)
 
 # add the tests
 include(tests/Tests.cmake)

@@ -18,6 +18,10 @@ namespace bbts {
     // the meta is 256 by default
     static const size_t MAX_META_SIZE = 256;
 
+    // we use this to cast between meta
+    template<class T>
+    T& as() const { return *((T*) this); }
+
     // the id of the tensor format, it must me one of the values registered with the system
     tfid_t fmt_id;
 
@@ -34,7 +38,7 @@ namespace bbts {
 
     // we use this to cast the tensor into the actual implementation
     template<class T>
-    T& as() { return *((T*) this); }
+    T& as() const { return *((T*) this); }
 
     // the meta of the tensor
     tensor_meta_t _meta;

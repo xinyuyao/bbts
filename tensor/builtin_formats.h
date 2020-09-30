@@ -8,7 +8,7 @@ namespace bbts {
 struct dense_tensor_meta_t : public tensor_meta_t {
 
   // returns the meta data struct
-  auto &m() {
+  auto &m() const {
 
     struct m {
       int32_t num_rows;
@@ -31,7 +31,7 @@ struct dense_tensor_meta_t : public tensor_meta_t {
 struct dense_tensor_t : public tensor_t {
 
   // return the meta data of the dense tensor
-  dense_tensor_meta_t &meta() {
+  dense_tensor_meta_t &meta() const {
     return *((dense_tensor_meta_t*) &_meta);
   }
 
