@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <unordered_map>
+#include <memory>
 #include "tensor.h"
 
 namespace bbts {
@@ -33,5 +34,8 @@ private:
   std::vector<tensor_creation_fs_t> _fmt_fs;
 
 };
+
+// just a nicer way to say tensor factory ptr
+using tensor_factory_ptr_t = std::shared_ptr<tensor_factory_t>;
 
 }

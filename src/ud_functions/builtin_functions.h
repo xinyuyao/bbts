@@ -6,6 +6,8 @@
 
 namespace bbts {
 
+ud_func_ptr_t get_matrix_add_udf();
+
 struct dense_matrix_add_t : public ud_impl_t {
 
   // initializes the function

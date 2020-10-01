@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "../tensor/tensor_factory.h"
-#include "../tensor/builtin_formats.h"
+#include "../src/tensor/tensor_factory.h"
+#include "../src/tensor/builtin_formats.h"
 
 namespace bbts {
 
