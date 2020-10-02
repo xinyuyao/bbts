@@ -1,0 +1,1 @@
+#include "../src/communication/communicator.h"

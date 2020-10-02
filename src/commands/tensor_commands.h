@@ -11,7 +11,6 @@ struct command_t {
   enum op_type_t {
     APPLY,
     MOVE,
-    BROADCAST,
     DELETE
   };
 

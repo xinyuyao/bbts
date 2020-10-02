@@ -23,5 +23,7 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
 
 # add the tests
 include(tests/Tests.cmake)
+include(integration_tests/Integration.cmake)
 
+# the main executable
 add_executable(tra_sub_sys_barbatos src/server/node_main.cc)
