@@ -18,6 +18,7 @@ foreach(file ${files})
 
     # link the stuff we need
     target_link_libraries(${fileName} ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(${fileName} ${MPI_LIBRARIES})
     target_link_libraries(${fileName} bbts-common)
 
     # add the dependencies

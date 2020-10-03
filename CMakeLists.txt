@@ -1,8 +1,18 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.15)
 project(tra_sub_sys_barbatos)
 
 # set the c++ version
 set(CMAKE_CXX_STANDARD 20)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG")
+endif()
+
+# try to find the mpi library
+find_package(MPI REQUIRED)
+if (MPI_FOUND)
+    include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+endif (MPI_FOUND)
 
 # include the third party stuff
 include_directories(third-party)

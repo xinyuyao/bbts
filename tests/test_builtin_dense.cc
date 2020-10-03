@@ -87,7 +87,7 @@ TEST(TestDenseTensor, Init) {
   // check that the values are correct
   for(auto row = 0; row < am.num_rows; ++row) {
     for (auto col = 0; col < am.num_cols; ++col) {
-      EXPECT_LE(abs(a.data()[row * am.num_cols + col] - 3.0f * float(row + col)), 0.0001f);
+      EXPECT_LE(std::abs(a.data()[row * am.num_cols + col] - 3.0f * float(row + col)), 0.0001f);
     }
   }
 
