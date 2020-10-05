@@ -9,6 +9,9 @@ namespace bbts {
   // the identifier of the tensor
   using tid_t = int32_t;
 
+  // a tid reserved for when no tid is associated with any tensor
+  const tid_t TID_NONE = -1;
+
   //  the identifier of the tensor format
   using tfid_t = int32_t;
 

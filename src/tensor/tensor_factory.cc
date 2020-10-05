@@ -15,7 +15,7 @@ bbts::tfid_t bbts::tensor_factory_t::register_fmt(const std::string &_fmt_name,
   return -1;
 }
 
-bbts::tensor_t &bbts::tensor_factory_t::init_tensor(void *here, const bbts::tensor_meta_t &_meta) {
+bbts::tensor_t &bbts::tensor_factory_t::init_tensor(tensor_t *here, const bbts::tensor_meta_t &_meta) {
 
   // find the function to initialize the tensor
   if(_meta.fmt_id < _fmt_fs.size()) {

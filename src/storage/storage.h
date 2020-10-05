@@ -1,0 +1,54 @@
+#pragma once
+
+#include <unordered_map>
+#include <unordered_set>
+#include <memory>
+#include <mutex>
+#include "../tensor/tensor.h"
+
+namespace bbts {
+
+// this class is responsible for memory managment like getting new 
+// memory for tensors, getting already existing tensors and in the future evicting
+// tensors to disk or moving them to GPU
+struct storage_t {
+
+  // information about the stored tensor
+  struct sto_tensor_nfo_t {
+    
+    // if present the address will be not null if evicted
+    tensor_t *address;
+
+    // the size of the tensor in bytes
+    size_t num_bytes;
+  };
+
+  // an existing tensor by tid
+  tensor_t *get_by_tid(tid_t _id);
+
+  // returns a tensor for the tid, the tensor is always not initialized
+  tensor_t *create_tensor(tid_t _id, size_t num_bytes);
+
+  // returns an anonymous tensor, the tensor is always not initialized
+  tensor_t *create_tensor(size_t num_bytes);
+
+  // remove by address true if it succeeds
+  bool remove_by_tensor(tensor_t &_tensor);
+
+  // remove by tid
+  bool remove_by_tid(tid_t _id);
+
+  // the mutex to lock this thing as it is going to be hammered by threads
+  std::mutex _m;
+
+  // all allocated tensors
+  std::unordered_map<tensor_t*, tid_t> _allocated_tensors;
+
+  // maps to the information
+  std::unordered_map<tid_t, sto_tensor_nfo_t> _tensor_nfo;
+};
+
+// we put the storage here
+using storage_ptr_t = std::shared_ptr<storage_t>;
+
+}

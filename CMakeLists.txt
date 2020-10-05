@@ -8,6 +8,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG")
 endif()
 
+# set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+# set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+
 # try to find the mpi library
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
@@ -24,11 +27,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/tools/cmake")
 file(GLOB TENSOR_SOURCE "src/tensor/*.cc")
 add_library(tensor OBJECT ${TENSOR_SOURCE})
 
+file(GLOB TENSOR_SOURCE "src/storage/*.cc")
+add_library(storage OBJECT ${TENSOR_SOURCE})
+
 file(GLOB UD_SOURCE "src/ud_functions/*.cc")
 add_library(ud_functions OBJECT ${UD_SOURCE})
 
 # link all modules up
 add_library(bbts-common $<TARGET_OBJECTS:tensor>
+                        $<TARGET_OBJECTS:storage>
                         $<TARGET_OBJECTS:ud_functions>)
 
 # add the tests

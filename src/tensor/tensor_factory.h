@@ -7,6 +7,8 @@
 
 namespace bbts {
 
+// this class is responsible for registering tensor types
+// handling their size, an initializing them
 class tensor_factory_t {
 public:
 
@@ -23,7 +25,7 @@ public:
   size_t get_tensor_size(const tensor_meta_t& _meta);
 
   // initializes the tensor
-  tensor_t& init_tensor(void* here, const tensor_meta_t& _meta);
+  tensor_t& init_tensor(tensor_t* here, const tensor_meta_t& _meta);
 
 private:
 
