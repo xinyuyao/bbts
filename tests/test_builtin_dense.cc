@@ -58,8 +58,8 @@ TEST(TestDenseTensor, Init) {
   std::unique_ptr<char[]> b_mem(new char[size]);
 
   // init the two tensors
-  auto &a = factory.init_tensor(a_mem.get(), m).as<dense_tensor_t>();
-  auto &b = factory.init_tensor(b_mem.get(), m).as<dense_tensor_t>();
+  auto &a = factory.init_tensor((tensor_t*) a_mem.get(), m).as<dense_tensor_t>();
+  auto &b = factory.init_tensor((tensor_t*) b_mem.get(), m).as<dense_tensor_t>();
 
   // write some values to a
   auto am = a.meta().m();
