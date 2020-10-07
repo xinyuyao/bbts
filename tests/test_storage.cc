@@ -15,7 +15,7 @@ TEST(TestStorage, Test1) {
   // the thraeds that are going to hammer it
   std::vector<std::thread> threads;
 
-  // crate the storage
+  // create the storage
   storage_ptr_t storage = std::make_shared<storage_t>();
 
   // make a tensor factory

@@ -31,6 +31,12 @@ struct ud_impl_t {
     template<size_t n>
     const T &get() const { return *parameters[n]; }
 
+    // sets the parameter
+    template<size_t n>
+    void set(T &_in) {
+      parameters[n] = &_in;
+    }
+
    private:
 
     // holds the input parameters
@@ -77,7 +83,7 @@ struct ud_impl_t {
   virtual size_t get_complexity_hint(const meta_params_t &_in) = 0;
 
   // returns the output meta data
-  virtual void get_out_meta(const meta_params_t &_in, meta_params_t &_out) = 0;
+  virtual void get_out_meta(const meta_params_t &_in, meta_params_t &_out) const = 0;
 };
 
 // define a nice way to say unique_ptr of ud_impl_t

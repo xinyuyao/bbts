@@ -3,6 +3,14 @@
 
 namespace bbts {
 
+storage_t::~storage_t() {
+
+  // go through each allocated tensor and free it
+  for(auto &it : _allocated_tensors) {
+    free(it.first);
+  }
+}
+
 tensor_t *storage_t::get_by_tid(tid_t _id) { 
 
   // lock this thing

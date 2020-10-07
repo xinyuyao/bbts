@@ -13,6 +13,9 @@ namespace bbts {
 // tensors to disk or moving them to GPU
 struct storage_t {
 
+  // destroy the storage and frees all the tensors
+  ~storage_t();
+
   // information about the stored tensor
   struct sto_tensor_nfo_t {
     

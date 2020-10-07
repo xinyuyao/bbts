@@ -41,7 +41,7 @@ size_t bbts::dense_matrix_add_t::get_complexity_hint(const bbts::ud_impl_t::meta
 }
 
 void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::meta_params_t &_in,
-                                            bbts::ud_impl_t::meta_params_t &_out) {
+                                            bbts::ud_impl_t::meta_params_t &_out) const {
 
   // get the input parameters
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();

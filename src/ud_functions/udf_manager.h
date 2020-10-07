@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../tensor/tensor_factory.h"
+#include "../ud_functions/builtin_functions.h"
 
 namespace bbts {
 
