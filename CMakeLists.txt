@@ -23,19 +23,31 @@ include_directories(third-party)
 # set the location for cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/tools/cmake")
 
+# the commands
+file(GLOB COMMANDS_SOURCE "src/operations/*.cc")
+add_library(commands OBJECT ${COMMANDS_SOURCE})
+
 # the tensors
 file(GLOB TENSOR_SOURCE "src/tensor/*.cc")
 add_library(tensor OBJECT ${TENSOR_SOURCE})
 
-file(GLOB TENSOR_SOURCE "src/storage/*.cc")
-add_library(storage OBJECT ${TENSOR_SOURCE})
+# the storage
+file(GLOB STORAGE_SOURCE "src/storage/*.cc")
+add_library(storage OBJECT ${STORAGE_SOURCE})
 
+# the communication
+file(GLOB COMMUNICATION_SOURCE "src/communication/*.cc")
+add_library(communication OBJECT ${COMMUNICATION_SOURCE})
+
+# the ud functions
 file(GLOB UD_SOURCE "src/ud_functions/*.cc")
 add_library(ud_functions OBJECT ${UD_SOURCE})
 
 # link all modules up
 add_library(bbts-common $<TARGET_OBJECTS:tensor>
+                        $<TARGET_OBJECTS:commands>
                         $<TARGET_OBJECTS:storage>
+                        $<TARGET_OBJECTS:communication>
                         $<TARGET_OBJECTS:ud_functions>)
 
 # add the tests

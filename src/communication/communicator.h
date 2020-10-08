@@ -16,8 +16,8 @@ namespace bbts {
 using node_id_t = int32_t;
 
 // identifier for any node
-node_id_t ANY_NODE = MPI_ANY_SOURCE;
-
+const node_id_t ANY_NODE = MPI_ANY_SOURCE;
+ 
 // defines some of the most common message request
 using com_tags = int32_t;
 
@@ -31,23 +31,9 @@ const com_tags SHUTDOWN = 3;
 class mpi_communicator_t {
 public:
 
-  mpi_communicator_t(const node_config_ptr_t &_cfg) {
+  mpi_communicator_t(const node_config_ptr_t &_cfg);
 
-    // initialize the mpi
-    MPI_Init(NULL, NULL);
-
-    // get the number of processes
-    MPI_Comm_size(MPI_COMM_WORLD, &_num_nodes);
-
-    // get the rank of the process
-    MPI_Comm_rank(MPI_COMM_WORLD, &_rank);
-  }
-
-  ~mpi_communicator_t() {
-
-    // shutdown the communicator
-    MPI_Finalize();
-  }
+  ~mpi_communicator_t();
 
   // this is the request to fetch a certain number of tensors
   struct request_t {
@@ -69,58 +55,22 @@ public:
   };
 
   // does the send, method is blocking
-  bool send_sync(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
-
-    // get the number of byte to send and send the request
-    return MPI_Ssend(_bytes, num_bytes, MPI_CHAR, _node, _tag, MPI_COMM_WORLD) == MPI_SUCCESS;
-  }
+  bool send_sync(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
 
   // waits for a request to be available from a particular node
-  auto expect_request_sync(node_id_t _node, com_tags _tag) {
-
-    // wait for a request
-    request_t _req;
-    auto mpi_errno = MPI_Mprobe(_node, (int32_t) _tag, MPI_COMM_WORLD, &_req.message, &_req.status);
-
-    // check for errors
-    if (mpi_errno != MPI_SUCCESS) {        
-        _req.success = false;
-        return _req;
-    }
-
-    // get the size
-    MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
-
-    // set the message type
-    _req.message_tag = (com_tags) _req.status.MPI_TAG;
-
-    // return the request
-    return _req;
-  }
+  request_t expect_request_sync(node_id_t _node, com_tags _tag);
 
   // recieves the request that we got from expect_request_sync
-  auto recieve_request_sync(void *_bytes, request_t &_req) {
-
-    // recieve the stuff
-    return MPI_Mrecv (_bytes, _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) == MPI_SUCCESS;
-  }
+  bool recieve_request_sync(void *_bytes, request_t &_req);
 
   // waits for all the nodes to hit this, should only be used for initialization
-  void barrier() {
-
-    // wait for every node
-    MPI_Barrier(MPI_COMM_WORLD);
-  }
+  void barrier();
 
   // return the rank
-  int32_t get_rank() const {
-    return _rank;
-  }
+  int32_t get_rank() const;
 
   // return the number of nodes
-  int32_t get_num_nodes() const {
-    return _num_nodes;
-  }
+  int32_t get_num_nodes() const;
 
  private:
 
