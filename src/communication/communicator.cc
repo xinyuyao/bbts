@@ -20,24 +20,12 @@ mpi_communicator_t::~mpi_communicator_t() {
   MPI_Finalize();
 }
 
-// this is the request to fetch a certain number of tensors
-struct request_t {
 
-  // the type of the message
-  com_tags message_tag;
-  
-  // the number of bytes
-  int32_t num_bytes;
+bool mpi_communicator_t::recv_sync(void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
 
-  // the status of the message
-  MPI_Status status;
-
-  // the message identifier
-  MPI_Message message;
-
-  // the success 
-  bool success = true;
-};
+  // recive the stuff
+  return MPI_Recv(_bytes, num_bytes, MPI_CHAR, _node, _tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE) == MPI_SUCCESS;
+}
 
 // does the send, method is blocking
 bool mpi_communicator_t::send_sync(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
@@ -46,11 +34,20 @@ bool mpi_communicator_t::send_sync(const void *_bytes, size_t num_bytes, node_id
   return MPI_Ssend(_bytes, num_bytes, MPI_CHAR, _node, _tag, MPI_COMM_WORLD) == MPI_SUCCESS;
 }
 
-// waits for a request to be available from a particular node
-mpi_communicator_t::request_t mpi_communicator_t::expect_request_sync(node_id_t _node, com_tags _tag) {
+mpi_communicator_t::async_request_t mpi_communicator_t::send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
+
+  // initiate an asynchronous send request
+  async_request_t _req;
+  _req.success = MPI_Isend(_bytes, num_bytes, MPI_CHAR, _node, _tag, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+
+  // return the request handle
+  return _req;
+}
+
+mpi_communicator_t::sync_request_t mpi_communicator_t::expect_request_sync(node_id_t _node, com_tags _tag) {
 
   // wait for a request
-  request_t _req;
+  sync_request_t _req;
   auto mpi_errno = MPI_Mprobe(_node, (int32_t) _tag, MPI_COMM_WORLD, &_req.message, &_req.status);
 
   // check for errors
@@ -70,7 +67,7 @@ mpi_communicator_t::request_t mpi_communicator_t::expect_request_sync(node_id_t 
 }
 
 // recieves the request that we got from expect_request_sync
-bool mpi_communicator_t::recieve_request_sync(void *_bytes, request_t &_req) {
+bool mpi_communicator_t::recieve_request_sync(void *_bytes, sync_request_t &_req) {
 
   // recieve the stuff
   return MPI_Mrecv (_bytes, _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) == MPI_SUCCESS;

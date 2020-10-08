@@ -36,7 +36,7 @@ public:
   ~mpi_communicator_t();
 
   // this is the request to fetch a certain number of tensors
-  struct request_t {
+  struct sync_request_t {
 
     // the type of the message
     com_tags message_tag;
@@ -54,14 +54,29 @@ public:
     bool success = true;
   };
 
+  struct async_request_t {
+
+    // the message request identifier
+    MPI_Request request;
+
+    // the success 
+    bool success = true;
+  };
+
+  // recives a blob with the matching tag from a given node, method blocks
+  bool recv_sync(void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
+
   // does the send, method is blocking
   bool send_sync(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
 
+  // send async
+  async_request_t send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
+
   // waits for a request to be available from a particular node
-  request_t expect_request_sync(node_id_t _node, com_tags _tag);
+  sync_request_t expect_request_sync(node_id_t _node, com_tags _tag);
 
   // recieves the request that we got from expect_request_sync
-  bool recieve_request_sync(void *_bytes, request_t &_req);
+  bool recieve_request_sync(void *_bytes, sync_request_t &_req);
 
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();

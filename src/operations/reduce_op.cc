@@ -2,7 +2,6 @@
 
 namespace bbts {
 
-// constructs the reduce operation
 reduce::reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory, 
                bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
                int32_t _root, int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op) : _comm(_comm), 
@@ -14,17 +13,14 @@ reduce::reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory
                                                                                                       _in(_in),
                                                                                                       _reduce_op(_reduce_op) {}
 
-// get the number of nodes
 int32_t reduce::get_num_nodes() const {
   return _nodes.size();
 }
 
-// get local rank
 int32_t reduce::get_local_rank() const {
   return std::distance(_nodes.begin(), std::find(_nodes.begin(), _nodes.end(), _comm.get_rank()));
 }
 
-// get global rank
 int32_t reduce::get_global_rank(int32_t local_rank) const {
   return _nodes[local_rank];
 }
@@ -35,7 +31,7 @@ bbts::tensor_t *reduce::apply() {
   int32_t lroot = 0;
 
   // relative rank
-  int32_t relrank = (get_local_rank() - lroot + get_num_nodes()) % get_num_nodes();
+  int32_t vrank = (get_local_rank() - lroot + get_num_nodes()) % get_num_nodes();
 
   // get the lhs address
   bbts::tensor_t *lhs = &_in;
@@ -55,9 +51,9 @@ bbts::tensor_t *reduce::apply() {
   while (mask < get_num_nodes()) {
 
     // receive 
-    if ((mask & relrank) == 0) {
+    if ((mask & vrank) == 0) {
       
-      source = (relrank | mask);
+      source = (vrank | mask);
       if (source < get_num_nodes()) {
 
         // wait till we get a message from the right node
@@ -119,7 +115,7 @@ bbts::tensor_t *reduce::apply() {
     } else {
 
       // I've received all that I'm going to.  Send my result to my parent
-      source = ((relrank & (~mask)) + lroot) % get_num_nodes();
+      source = ((vrank & (~mask)) + lroot) % get_num_nodes();
 
       // return the size of the tensor
       auto num_bytes = _factory.get_tensor_size(lhs->_meta);
