@@ -69,6 +69,9 @@ public:
   // does the send, method is blocking
   bool send_sync(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
 
+  // wait for async request
+  bool wait_async(async_request_t &_request);
+
   // send async
   async_request_t send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
 
@@ -100,6 +103,6 @@ public:
 };
 
 // the default communicator is the mpi communicator
-using communicator = mpi_communicator_t;
+using communicator_t = mpi_communicator_t;
 
 }  // namespace bbts

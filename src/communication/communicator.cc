@@ -20,7 +20,6 @@ mpi_communicator_t::~mpi_communicator_t() {
   MPI_Finalize();
 }
 
-
 bool mpi_communicator_t::recv_sync(void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
 
   // recive the stuff
@@ -32,6 +31,10 @@ bool mpi_communicator_t::send_sync(const void *_bytes, size_t num_bytes, node_id
 
   // get the number of byte to send and send the request
   return MPI_Ssend(_bytes, num_bytes, MPI_CHAR, _node, _tag, MPI_COMM_WORLD) == MPI_SUCCESS;
+}
+
+bool mpi_communicator_t::wait_async(mpi_communicator_t::async_request_t &_request) {
+  return MPI_Wait(&_request.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS;
 }
 
 mpi_communicator_t::async_request_t mpi_communicator_t::send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
