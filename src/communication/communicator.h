@@ -105,4 +105,4 @@ public:
 // the default communicator is the mpi communicator
 using communicator_t = mpi_communicator_t;
 
-}  // namespace bbts
+}

@@ -3,7 +3,7 @@
 int main(int argc, char **argv) {
 
   // we set the root node to three as we want the results to got there
-  const bbts::node_id_t root_node = 0;
+  const bbts::node_id_t root_node = 2;
 
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc = argc, .argv = argv});
@@ -63,13 +63,14 @@ int main(int argc, char **argv) {
   for(bbts::node_id_t i = 0; i < comm.get_num_nodes(); i += 2) {
     nodes.push_back(i);
   }
+  std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
   // if the rank is even this takes part
   bool success = (am.num_rows * am.num_cols) != 0;
   if(comm.get_rank() % 2 == 0) {
 
     // make a broadcast
-    bbts::broadcast_op bcst(comm, *factory, storage, nodes, 0, 888, &a);
+    bbts::broadcast_op bcst(comm, *factory, storage, nodes, 888, &a);
 
     // execute the broadcast
     auto &bcs = bcst.apply()->as<bbts::dense_tensor_t>();

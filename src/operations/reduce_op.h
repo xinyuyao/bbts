@@ -53,9 +53,6 @@ public:
 
   // the nodes
   const std::vector<bbts::node_id_t> &_nodes;
-  
-  // the root node of the reduce
-  int32_t _root; 
 
   // the tag we use to identify this reduce
   int32_t _tag; 
@@ -69,7 +66,7 @@ public:
   // constructs the reduce operation
   reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory, 
          bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
-         int32_t _root, int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op);
+         int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op);
 
   // get the number of nodes
   int32_t get_num_nodes() const;

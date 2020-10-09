@@ -3,7 +3,7 @@
 int main(int argc, char **argv) {
 
   // we set the root node to three as we want the results to got there
-  const bbts::node_id_t root_node = 3;
+  const bbts::node_id_t root_node = 2;
 
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
@@ -63,12 +63,13 @@ int main(int argc, char **argv) {
     for(bbts::node_id_t i = 0; i < comm.get_num_nodes(); i += 2) {
       nodes.push_back(i);
     }
+    std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
     // craete the reduce
-    auto reduce_op = bbts::reduce(comm, *factory, storage, nodes, 0, 111, a, *ud);
+    auto reduce_op = bbts::reduce(comm, *factory, storage, nodes, 111, a, *ud);
     auto b = reduce_op.apply();
 
-    if(comm.get_rank() == 0) {
+    if(comm.get_rank() == root_node) {
     
       auto &bb = b->as<bbts::dense_tensor_t>();
       for(int i = 0; i < am.num_rows * am.num_cols; ++i) {

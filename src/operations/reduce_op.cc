@@ -4,14 +4,13 @@ namespace bbts {
 
 reduce::reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory, 
                bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
-               int32_t _root, int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op) : _comm(_comm), 
-                                                                                                      _factory(_factory),
-                                                                                                      _storage(_storage),
-                                                                                                      _nodes(_nodes),
-                                                                                                      _root(_root),
-                                                                                                      _tag(_tag),
-                                                                                                      _in(_in),
-                                                                                                      _reduce_op(_reduce_op) {}
+               int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op) : _comm(_comm), 
+                                                                                       _factory(_factory),
+                                                                                       _storage(_storage),
+                                                                                       _nodes(_nodes),
+                                                                                       _tag(_tag),
+                                                                                       _in(_in),
+                                                                                       _reduce_op(_reduce_op) {}
 
 int32_t reduce::get_num_nodes() const {
   return _nodes.size();
@@ -130,44 +129,8 @@ bbts::tensor_t *reduce::apply() {
     mask <<= 1;
   }
 
-  // the result is at the node with rank 0, we need to move it
-  if (_root != 0) {
-
-    // the node with rank 0 sends the node with the root rank recieves
-    if (get_local_rank() == 0) {
-
-      // send it to the root
-      size_t num_bytes = _factory.get_tensor_size(lhs->_meta);
-      if (!_comm.send_sync(lhs, num_bytes, get_global_rank(_root), _tag)) {        
-          std::cout << "Error 3 \n";
-      }
-
-    } else if (get_local_rank() == _root) {
-      
-        // wait for the message
-        auto req = _comm.expect_request_sync(get_global_rank(0), _tag);
-
-        // check if there is an error
-        if (!req.success) {
-          std::cout << "Error 2 \n";
-        }
-
-        // manage the memory
-        if(lhs != &_in) {
-            std::cout << "Got here\n" << std::flush;
-            _storage.remove_by_tensor(*lhs);
-        }
-        lhs = _storage.create_tensor(req.num_bytes);
-
-        // check if there is an error
-        if (!_comm.recieve_request_sync(lhs, req)) {
-          std::cout << "Error 1 \n";
-        }
-    }
-  }
-
   // free the lhs
-  if(get_local_rank() != _root) {
+  if(get_local_rank() != 0) {
     if(lhs != &_in) {
       _storage.remove_by_tensor(*lhs);
     }

@@ -10,14 +10,15 @@
 #include <mpich/mpi.h>
 
 namespace bbts {
-  
+
+// implementation based on the openmpi implementation
 class broadcast_op {
 public:
 
-  // constructs the broadcast operation
+  // constructs the broadcast operation, the root node is assumed to be the first in the _nodes array
   broadcast_op(bbts::communicator_t &_comm,
                bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-               const std::vector<bbts::node_id_t> &_nodes, int32_t _root,
+               const std::vector<bbts::node_id_t> &_nodes,
                int32_t _tag, bbts::tensor_t *_in);
 
   // the mpi communicator we are going to use to perform the communication
@@ -31,9 +32,6 @@ public:
 
   // the nodes
   const std::vector<bbts::node_id_t> &_nodes;
-
-  // the root node of the reduce
-  int32_t _root;
 
   // the tag we use to identify this reduce
   int32_t _tag;

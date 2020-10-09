@@ -4,12 +4,11 @@ namespace bbts {
 
 broadcast_op::broadcast_op(bbts::communicator_t &_comm,
                            bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-                           const std::vector<bbts::node_id_t> &_nodes, int32_t _root,
+                           const std::vector<bbts::node_id_t> &_nodes,
                            int32_t _tag, bbts::tensor_t *_in): _comm(_comm),
                                                                _factory(_factory),
                                                                _storage(_storage),
                                                                _nodes(_nodes),
-                                                               _root(_root),
                                                                _tag(_tag),
                                                                _in(_in) {}
 
@@ -30,7 +29,7 @@ bbts::tensor_t *broadcast_op::apply() {
 
   int size = get_num_nodes();
   int rank = get_local_rank();
-  int vrank = (rank + size - _root) % size;
+  int vrank = (rank + size ) % size;
 
   int dim = opal_cube_dim(size);
   int hibit = opal_hibit(vrank, dim);
@@ -42,7 +41,7 @@ bbts::tensor_t *broadcast_op::apply() {
 
     // figure out the node we need to recieve the data from
     assert(hibit >= 0);
-    int peer = ((vrank & ~(1 << hibit)) + _root) % size;
+    int peer = ((vrank & ~(1 << hibit))) % size;
 
     // try to get the request
     auto req = _comm.expect_request_sync(get_global_rank(peer), _tag);
@@ -71,7 +70,7 @@ bbts::tensor_t *broadcast_op::apply() {
     if (peer < size) {
 
       // figure out where we need to send it
-      peer = (peer + _root) % size;
+      peer = peer % size;
 
       // return the size of the tensor
       auto output_size = _factory.get_tensor_size(_in->_meta);
