@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
 
   // init the communicator with the configuration
-  bbts::mpi_communicator_t comm(config);
+  bbts::communicator_t comm(config);
 
   // check the number of nodes
   if(root_node >= comm.get_num_nodes()) {
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
     // craete the reduce
-    auto reduce_op = bbts::reduce(comm, *factory, storage, nodes, 111, a, *ud);
+    auto reduce_op = bbts::reduce_op(comm, *factory, storage, nodes, 111, a, *ud);
     auto b = reduce_op.apply();
 
     if(comm.get_rank() == root_node) {

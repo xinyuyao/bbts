@@ -9,6 +9,7 @@
 #include "../ud_functions/ud_function.h"
 #include "../server/node.h"
 #include "../tensor/tensor.h"
+#include "../commands/commands.h"
 
 namespace bbts {
 
@@ -81,6 +82,12 @@ public:
   // recieves the request that we got from expect_request_sync
   bool recieve_request_sync(void *_bytes, sync_request_t &_req);
 
+  // initiates the operation on all the specified nodes
+  void op_request(command_id_t _ctid, const std::vector<node_id_t> &_nodes);
+
+  // waits to recieve an operation
+  command_id_t listen_for_op_request();
+
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();
 
@@ -91,6 +98,12 @@ public:
   int32_t get_num_nodes() const;
 
  private:
+
+  // operations communicator
+  MPI_Comm _op_com;
+
+  // the world commmunicator, we use this one for initiating requests
+  MPI_Comm _world_com;
 
   // the rank of my node
   int32_t _rank;

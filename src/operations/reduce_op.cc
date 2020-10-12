@@ -2,7 +2,7 @@
 
 namespace bbts {
 
-reduce::reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory, 
+reduce_op::reduce_op(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, 
                bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
                int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op) : _comm(_comm), 
                                                                                        _factory(_factory),
@@ -12,19 +12,19 @@ reduce::reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory
                                                                                        _in(_in),
                                                                                        _reduce_op(_reduce_op) {}
 
-int32_t reduce::get_num_nodes() const {
+int32_t reduce_op::get_num_nodes() const {
   return _nodes.size();
 }
 
-int32_t reduce::get_local_rank() const {
+int32_t reduce_op::get_local_rank() const {
   return std::distance(_nodes.begin(), std::find(_nodes.begin(), _nodes.end(), _comm.get_rank()));
 }
 
-int32_t reduce::get_global_rank(int32_t local_rank) const {
+int32_t reduce_op::get_global_rank(int32_t local_rank) const {
   return _nodes[local_rank];
 }
 
-bbts::tensor_t *reduce::apply() {
+bbts::tensor_t *reduce_op::apply() {
 
   int32_t mask = 0x1;
   int32_t lroot = 0;

@@ -6,6 +6,9 @@
 
 namespace bbts {
 
+// the id of the operation, this is unique globally across all processes
+using command_id_t = int32_t;
+
 struct command_t {
 
   enum op_type_t {
@@ -14,17 +17,20 @@ struct command_t {
     DELETE
   };
 
+  // the id of the operation
+  command_id_t _id;
+
   // the type of operation
-  op_type_t type;
+  op_type_t _type;
 
   // the input tensors
-  std::vector<tid_t> input_tensors;
+  std::vector<tid_t> _input_tensors;
 
   // the output tensors
-  std::vector<tid_t> output_tensors;
+  std::vector<tid_t> _output_tensors;
 
   // the function we want to execute
-  ud_id_t fun_id = -1;
+  ud_id_t _fun_id = -1;
 };
 
 }

@@ -39,11 +39,11 @@ namespace bbts {
 // In general, we can't use MPI_PACK, because the alignment of that
 // is rather vague, and the data may not be re-usable.  What we actually
 // need is a "squeeze" operation that removes the skips.
-class reduce {
+class reduce_op {
 public:
 
   // the mpi communicator we are going to use to perform the communication
-  bbts::mpi_communicator_t &_comm;
+  bbts::communicator_t &_comm;
 
   // we use the tensor factory to initialize the tensors and calculate the required size
   bbts::tensor_factory_t &_factory; 
@@ -64,7 +64,7 @@ public:
   const bbts::ud_impl_t &_reduce_op;
 
   // constructs the reduce operation
-  reduce(bbts::mpi_communicator_t &_comm, bbts::tensor_factory_t &_factory, 
+  reduce_op(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, 
          bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
          int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op);
 
