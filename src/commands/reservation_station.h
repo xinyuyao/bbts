@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <mutex>
+#include <condition_variable>
 #include <tuple>
 #include <memory>
 #include "../tensor/tensor.h"
@@ -20,6 +21,9 @@ public:
   // have to be queued in the exact order they are coming in
   bool queue_command(command_ptr_t _command) {
 
+    // lock the reservation station
+    std::unique_lock<std::mutex> lk(_m);
+
     if(_command->get_root_node() == _node_id) {
       return _queue_local(std::move(_command));
     }
@@ -31,6 +35,10 @@ public:
   // get the next command, you must use the result of this command as it is a unique ptr
   [[nodiscard]] command_ptr_t get_next_command() {
     
+    // wait until we have something here
+    std::unique_lock<std::mutex> lk(_m);
+    _cv.wait(lk, [&]{return !_execute.empty();});
+
     // pop the unique pointer of the vector
     auto tmp = std::move(_execute.back());
     _execute.pop_back();
@@ -49,7 +57,7 @@ public:
       for(auto &t : _command->_input_tensors) {
 
         // remove the tensor immediately
-        remove_tensor(t.tid);
+        _remove_tensor(t.tid);
 
         // remove the command
         _local_commands.erase(_command->_id);
@@ -84,7 +92,7 @@ public:
         if(0 == (--jt->second.second)) {
           
           // schedule the command for execution
-          _execute.emplace_back(std::move(jt->second.first));
+          _schedule_for_excution(std::move(jt->second.first));
 
           // remove the command
           _local_commands.erase(jt);
@@ -96,6 +104,22 @@ public:
     }
 
     for(auto &in : _command->_input_tensors) {
+
+      // get the tid
+      auto tid = in.tid;
+      auto &s = _tensors[tid];
+
+      // decrement the number of readers
+      s.num_to_read--;
+      assert(s.num_to_read >= 0);
+
+      // if there are no command that is writing to this tensor
+      // reading this tensor and the tensor is scheduled for deletion, delete it here
+      if(s.num_to_read == 0 && !s.writing_tensor && s.scheduled_for_delition) {
+
+        // remove the tensor immediately
+        _remove_tensor(in.tid);
+      }
     }
 
     return true;
@@ -107,6 +131,9 @@ public:
   }
 
   void register_tensor(tid_t _tid) {
+
+    // lock the tensor
+    std::unique_lock<std::mutex> lk(_m);
 
     // get the tensor state if any
     auto &s = _tensors[_tid];
@@ -130,7 +157,7 @@ public:
       if(0 == (--jt->second.second)) {
         
         // schedule the command for execution
-        _execute.emplace_back(std::move(jt->second.first));
+        _schedule_for_excution(std::move(jt->second.first));
 
         // remove the command
         _local_commands.erase(jt);
@@ -208,7 +235,7 @@ private:
         if(s.is_created && s.num_to_read == 0 && !s.writing_tensor) {
           
           // remove the tensor immediately
-          remove_tensor(in.tid);
+          _remove_tensor(in.tid);
         }
         else {
 
@@ -264,20 +291,28 @@ private:
     if(not_present != 0) {
 
       // store the command
-      _local_commands[_command->_id] = { std::move(_command),  not_present };  
+      auto cmd_id = _command->_id;
+      _local_commands[cmd_id] = {std::move(_command),  not_present}; 
     }
     else {
 
       // add the command
-      _execute.emplace_back(std::move(_command));
+      _schedule_for_excution(std::move(_command));
     }
 
     // we are done here
     return true;
   }
 
+  void _schedule_for_excution(command_ptr_t _cmd) {
+
+    // schedule the command for execution
+    _execute.emplace_back(std::move(_cmd));
+    _cv.notify_all();
+  }
+
   // remove the tensor
-  void remove_tensor(tid_t _tid) {
+  void _remove_tensor(tid_t _tid) {
 
     // remove the tensor from the storage
     _storage->remove_by_tid(_tid);
@@ -286,7 +321,7 @@ private:
     _tensors.erase(_tid);
 
     // make sure there are not commands waiting for the delete
-    assert(_commands_waiting_for.find(_tid) != _commands_waiting_for.end());
+    assert(_commands_waiting_for.find(_tid) == _commands_waiting_for.end());
   }
 
   // the state of the tensor
@@ -307,6 +342,9 @@ private:
 
   // the mutex
   std::mutex _m;
+
+  // we use this to wait for commands
+  std::condition_variable _cv;
 
   // the node for which this reservation station is for
   node_id_t _node_id;

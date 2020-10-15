@@ -93,4 +93,8 @@ bool storage_t::remove_by_tid(tid_t _id) {
   return true;
 }
 
+size_t storage_t::get_num_tensors() const {
+  return _tensor_nfo.size();
+}
+
 }

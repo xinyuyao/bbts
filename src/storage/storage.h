@@ -41,6 +41,9 @@ struct storage_t {
   // remove by tid
   bool remove_by_tid(tid_t _id);
 
+  // get the number of tensors in the system
+  size_t get_num_tensors() const;
+
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;
 
