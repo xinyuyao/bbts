@@ -2,7 +2,7 @@
 
 namespace bbts {
 
-broadcast_op::broadcast_op(bbts::communicator_t &_comm,
+broadcast_op_t::broadcast_op_t(bbts::communicator_t &_comm,
                            bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
                            const std::vector<bbts::node_id_t> &_nodes,
                            int32_t _tag, bbts::tensor_t *_in): _comm(_comm),
@@ -12,20 +12,20 @@ broadcast_op::broadcast_op(bbts::communicator_t &_comm,
                                                                _tag(_tag),
                                                                _in(_in) {}
 
-int32_t broadcast_op::get_num_nodes() const {
+int32_t broadcast_op_t::get_num_nodes() const {
   return _nodes.size();
 }
 
-int32_t broadcast_op::get_local_rank() const {
+int32_t broadcast_op_t::get_local_rank() const {
   return std::distance(_nodes.begin(), std::find(_nodes.begin(), _nodes.end(), _comm.get_rank()));
 }
 
-int32_t broadcast_op::get_global_rank(int32_t local_rank) const {
+int32_t broadcast_op_t::get_global_rank(int32_t local_rank) const {
   return _nodes[local_rank];
 }
 
 // runs the broadcast
-bbts::tensor_t *broadcast_op::apply() {
+bbts::tensor_t *broadcast_op_t::apply() {
 
   int size = get_num_nodes();
   int rank = get_local_rank();

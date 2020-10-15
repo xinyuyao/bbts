@@ -12,11 +12,11 @@
 namespace bbts {
 
 // implementation based on the openmpi implementation
-class broadcast_op {
+class broadcast_op_t {
 public:
 
   // constructs the broadcast operation, the root node is assumed to be the first in the _nodes array
-  broadcast_op(bbts::communicator_t &_comm,
+  broadcast_op_t(bbts::communicator_t &_comm,
                bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
                const std::vector<bbts::node_id_t> &_nodes,
                int32_t _tag, bbts::tensor_t *_in);

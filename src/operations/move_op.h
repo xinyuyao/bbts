@@ -8,7 +8,7 @@
 
 namespace bbts {
 
-class move_op {
+class move_op_t {
 public:
 
   // the mpi communicator we are going to use to perform the communication
@@ -33,7 +33,7 @@ public:
   bbts::node_id_t _node;
 
   // constructs the reduce operation
-  move_op(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,  
+  move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,  
           bool _is_sender, bbts::tensor_factory_t &_factory, 
           bbts::storage_t &_storage, bbts::node_id_t _node);
 

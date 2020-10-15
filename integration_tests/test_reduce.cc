@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
     // craete the reduce
-    auto reduce_op = bbts::reduce_op(comm, *factory, storage, nodes, 111, a, *ud);
+    auto reduce_op = bbts::reduce_op_t(comm, *factory, storage, nodes, 111, a, *ud);
     auto b = reduce_op.apply();
 
     if(comm.get_rank() == root_node) {

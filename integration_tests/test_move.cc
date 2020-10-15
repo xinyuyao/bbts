@@ -49,13 +49,13 @@ int main(int argc, char **argv) {
     }
 
     // craete the move
-    auto move = move_op(comm, comm.get_rank(), &a, true, *factory, storage, comm.get_rank() + 1);
+    auto move = move_op_t(comm, comm.get_rank(), &a, true, *factory, storage, comm.get_rank() + 1);
     auto mm = move.apply();
   }
   else {
 
     // create the move
-    auto move = move_op(comm, comm.get_rank() - 1, nullptr, false, *factory, storage, comm.get_rank() - 1);
+    auto move = move_op_t(comm, comm.get_rank() - 1, nullptr, false, *factory, storage, comm.get_rank() - 1);
     auto m = move.apply();
 
     // get the dense tensor

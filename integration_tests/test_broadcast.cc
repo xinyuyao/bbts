@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
   if(comm.get_rank() % 2 == 0) {
 
     // make a broadcast
-    bbts::broadcast_op bcst(comm, *factory, storage, nodes, 888, &a);
+    bbts::broadcast_op_t bcst(comm, *factory, storage, nodes, 888, &a);
 
     // execute the broadcast
     auto &bcs = bcst.apply()->as<bbts::dense_tensor_t>();

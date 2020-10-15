@@ -3,6 +3,9 @@
 #include <memory>
 
 namespace bbts {
+    
+// the type that identifies a node
+using node_id_t = int32_t;
 
 // this structure information on how the node is configured
 struct node_config_t {
@@ -22,6 +25,7 @@ public:
 
 
 };
+
 
 
 }

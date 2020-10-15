@@ -3,7 +3,7 @@
 namespace bbts {
 
   // constructs the reduce operation
-  move_op::move_op(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,  
+  move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,  
           bool _is_sender, bbts::tensor_factory_t &_factory, 
           bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
                                                               _tag(_tag),
@@ -14,7 +14,7 @@ namespace bbts {
                                                               _node(_node) {}
 
   // apply this operation
-  bbts::tensor_t *move_op::apply() {
+  bbts::tensor_t *move_op_t::apply() {
     
     // is this the sender, if so we initiate a send request
     if(_is_sender) {

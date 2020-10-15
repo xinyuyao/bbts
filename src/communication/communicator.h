@@ -13,9 +13,6 @@
 
 namespace bbts {
 
-// the type that identifies a node
-using node_id_t = int32_t;
-
 // identifier for any node
 const node_id_t ANY_NODE = MPI_ANY_SOURCE;
  
