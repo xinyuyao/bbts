@@ -7,7 +7,7 @@
 
 #include <iostream>
 #include <algorithm>
-#include <mpich/mpi.h>
+#include <mpi.h>
 
 namespace bbts {
 

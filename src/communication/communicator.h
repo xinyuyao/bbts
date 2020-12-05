@@ -1,6 +1,6 @@
 #pragma once
 
-#include <mpich/mpi.h>
+#include <mpi.h>
 #include <cstdint>
 #include <unordered_map>
 #include <iostream>

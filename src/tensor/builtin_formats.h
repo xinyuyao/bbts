@@ -1,6 +1,5 @@
 #pragma once
 
-#include <zconf.h>
 #include "tensor.h"
 
 namespace bbts {

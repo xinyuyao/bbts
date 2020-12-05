@@ -2,7 +2,7 @@
 #include "../tensor/builtin_formats.h"
 #include "../storage/storage.h"
 #include "../ud_functions/udf_manager.h"
-#include <mpich/mpi.h>
+#include <mpi.h>
 #include <iostream>
 #include <algorithm>
 

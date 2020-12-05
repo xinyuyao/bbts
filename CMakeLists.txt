@@ -4,6 +4,11 @@ project(tra_sub_sys_barbatos)
 # set the c++ version
 set(CMAKE_CXX_STANDARD 20)
 
+# set the output directories
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG")
 endif()

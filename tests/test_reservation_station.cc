@@ -128,7 +128,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
   EXPECT_EQ(storage->get_num_tensors(), 0);
 }
 
-TEST(TestReservationStation LotOfLocalCommands) {
+TEST(TestReservationStation, LotOfLocalCommands) {
 
 }
 
