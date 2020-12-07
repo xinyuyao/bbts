@@ -4,6 +4,7 @@
 using namespace bbts;
 
 using index_t = std::map<std::tuple<int, int>, int>;
+using multi_index_t = std::map<std::tuple<int, int>, std::vector<int>>;
 
 index_t create_matrix_tensors(bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
                               int n, int split, int my_rank, int num_nodes, int &cur_tid) {
@@ -101,8 +102,8 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
   return std::move(commands);
 }
 
-std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index_t &rhs,
-                                       int my_rank, int num_nodes, int split, int &cur_cmd, int &cur_tid) {
+std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index_t &rhs, multi_index_t &out_idx,
+                                       int my_rank, int split, int &cur_cmd, int &cur_tid) {
 
   // return me that matcher for matrix addition
   auto matcher = udm->get_matcher_for("matrix_mult");
@@ -110,16 +111,20 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
   // get the ud object
   auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false, 0);
 
+  // generate all the commands
   std::vector<command_ptr_t> commands;
   for(int a_row_id = 0; a_row_id < split; ++a_row_id) {
     for (int b_col_id = 0; b_col_id < split; ++b_col_id) {
+
+      // create all the join groups that need to be reduced together
+      auto &tensor_to_reduce = out_idx[{a_row_id, b_col_id}];
       for (int ab_row_col_id = 0; ab_row_col_id < split; ++ab_row_col_id) {
 
         // make the command
         auto cmd = std::make_unique<bbts::command_t>();
         cmd->_type = bbts::command_t::APPLY;
         cmd->_id = cur_cmd++;
-        //cmd->_fun_id = ud->
+        cmd->_fun_id = ud->id;
 
         // get the tids for the left and right
         auto l = lhs[{a_row_id, ab_row_col_id}];
@@ -130,10 +135,11 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
         cmd->_input_tensors.push_back({.tid = r, .node = my_rank});
 
         //set the output
-        cmd->_output_tensors.push_back({.tid = cur_tid++, .node = my_rank});
+        cmd->_output_tensors.push_back({.tid = cur_tid, .node = my_rank});
 
         // store the command
         commands.emplace_back(move(cmd));
+        tensor_to_reduce.push_back(cur_tid++);
       }
     }
   }
@@ -173,12 +179,17 @@ int main(int argc, char **argv) {
 
   // create the broadcast commands
   std::cout << "Creating broadcast commands...\n";
-  int32_t cmd_id = 0;
-  auto bcast_cmds = create_broadcast(a_idx, comm.get_rank(), comm.get_num_nodes(), cmd_id);
+  int32_t cmd_offest = 0;
+  auto bcast_cmds = create_broadcast(a_idx, comm.get_rank(), comm.get_num_nodes(), cmd_offest);
 
   // create the shuffle commands
   std::cout << "Create the shuffle commands...\n";
-  auto shuffle_cmds = create_shuffle(b_idx, comm.get_rank(), comm.get_num_nodes(), cmd_id);
+  auto shuffle_cmds = create_shuffle(b_idx, comm.get_rank(), comm.get_num_nodes(), cmd_offest);
+
+  // create an join commands
+  std::cout << "Creating join commands...\n";
+  multi_index_t join;
+  create_join(udm, a_idx, b_idx, join, comm.get_rank(), comm.get_num_nodes(), cmd_offest, tid_offset);
 
   // create an aggregation commands
   std::cout << "Creating aggregation commands...\n";

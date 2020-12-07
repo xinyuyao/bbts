@@ -87,6 +87,9 @@ public:
       return -1;
     }
 
+    // set the id to the udf
+    _fun->id = id;
+
     // store the function so that it is registered
     _udfs_name_to_id[_fun->ud_name] = id;
     _udfs.emplace_back(std::move(_fun));
@@ -139,6 +142,6 @@ private:
   std::unordered_map<std::string, ud_id_t> _udfs_name_to_id;
 };
 
-using udf_manager_ptr = std::unique_ptr<udf_manager>;
+using udf_manager_ptr = std::shared_ptr<udf_manager>;
 
 }

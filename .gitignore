@@ -4,4 +4,5 @@ cmake-build-debug
 .vscode
 build
 bin/test*
+bin/tra_sub_sys_barbatos
 lib/lib*
