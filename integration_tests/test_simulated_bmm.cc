@@ -101,8 +101,45 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
   return std::move(commands);
 }
 
-std::vector<command_ptr_t> create_aggregation(index_t &idx, int my_rank, int num_nodes, int &cur_cmd) {
-  return {};
+std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index_t &rhs,
+                                       int my_rank, int num_nodes, int split, int &cur_cmd, int &cur_tid) {
+
+  // return me that matcher for matrix addition
+  auto matcher = udm->get_matcher_for("matrix_mult");
+
+  // get the ud object
+  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false, 0);
+
+  std::vector<command_ptr_t> commands;
+  for(int a_row_id = 0; a_row_id < split; ++a_row_id) {
+    for (int b_col_id = 0; b_col_id < split; ++b_col_id) {
+      for (int ab_row_col_id = 0; ab_row_col_id < split; ++ab_row_col_id) {
+
+        // make the command
+        auto cmd = std::make_unique<bbts::command_t>();
+        cmd->_type = bbts::command_t::APPLY;
+        cmd->_id = cur_cmd++;
+        //cmd->_fun_id = ud->
+
+        // get the tids for the left and right
+        auto l = lhs[{a_row_id, ab_row_col_id}];
+        auto r = rhs[{ab_row_col_id, b_col_id}];
+
+        // set the left and right input
+        cmd->_input_tensors.push_back({.tid = l, .node = my_rank});
+        cmd->_input_tensors.push_back({.tid = r, .node = my_rank});
+
+        //set the output
+        cmd->_output_tensors.push_back({.tid = cur_tid++, .node = my_rank});
+
+        // store the command
+        commands.emplace_back(move(cmd));
+      }
+    }
+  }
+
+  // move the commands
+  return std::move(commands);
 }
 
 int main(int argc, char **argv) {
@@ -115,6 +152,9 @@ int main(int argc, char **argv) {
 
   // create the tensor factory
   bbts::tensor_factory_ptr_t tf = std::make_shared<bbts::tensor_factory_t>();
+
+  // crate the udf manager
+  auto udm = std::make_shared<udf_manager>(tf);
 
   // init the communicator with the configuration
   bbts::communicator_t comm(config);

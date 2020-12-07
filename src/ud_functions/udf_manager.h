@@ -139,4 +139,6 @@ private:
   std::unordered_map<std::string, ud_id_t> _udfs_name_to_id;
 };
 
+using udf_manager_ptr = std::unique_ptr<udf_manager>;
+
 }
