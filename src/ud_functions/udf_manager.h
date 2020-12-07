@@ -69,6 +69,12 @@ public:
 
     /// 1.1 add the dense implementation
     register_udf_impl(std::make_unique<dense_matrix_add_t>());
+
+    /// 2. matrix multiplication
+    register_udf(get_matrix_mult_udf());
+
+    /// 2.1 add the dense implementation
+    register_udf_impl(std::make_unique<dense_matrix_mult_t>());
   }
 
   // registers a udf with the system

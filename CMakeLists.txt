@@ -4,6 +4,9 @@ project(tra_sub_sys_barbatos)
 # set the c++ version
 set(CMAKE_CXX_STANDARD 20)
 
+# set the location for cmake scripts
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
+
 # set the output directories
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
@@ -16,6 +19,10 @@ endif()
 set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
+# try to find mkl
+set(BLA_VENDOR Intel10_64lp_seq)
+find_package(BLAS)
+
 # try to find the mpi library
 find_package(MPI REQUIRED)
 if (MPI_FOUND)
@@ -24,9 +31,6 @@ endif (MPI_FOUND)
 
 # include the third party stuff
 include_directories(third-party)
-
-# set the location for cmake scripts
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/tools/cmake")
 
 # the commands
 file(GLOB COMMANDS_SOURCE "src/operations/*.cc")
@@ -54,6 +58,9 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
                         $<TARGET_OBJECTS:storage>
                         $<TARGET_OBJECTS:communication>
                         $<TARGET_OBJECTS:ud_functions>)
+
+# link the mkl library
+target_link_libraries(bbts-common ${BLAS_LIBRARIES})
 
 # add the tests
 include(tests/Tests.cmake)
