@@ -24,7 +24,7 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
   // check if we actually got it
   EXPECT_NE(ud, nullptr);
 
-  // get the id
+  // get the impl_id
   auto id = factory->get_tensor_ftm("dense");
 
   // make the meta

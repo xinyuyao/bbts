@@ -42,7 +42,7 @@ bbts::tensor_t *reduce_op_t::apply() {
   bbts::ud_impl_t::meta_params_t input_meta({nullptr, nullptr});
   bbts::ud_impl_t::meta_params_t output_meta({&out_meta});
 
-  // get the id of the output
+  // get the impl_id of the output
   auto id = _factory.get_tensor_ftm(_reduce_op.outputTypes.front());
 
   // do stuff

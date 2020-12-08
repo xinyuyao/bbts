@@ -10,8 +10,15 @@ namespace bbts {
 using ud_id_t = int32_t;
 
 // uniquely identifies the implementation
-// within the ud function
-using ud_impl_id_t = int32_t;
+using ud_impl_local_t = int32_t;
+struct ud_impl_id_t {
+
+  // the ud function identifier
+  ud_id_t ud_id;
+
+  // identifies the implementation withing the ud function
+  ud_impl_local_t impl_id;
+};
 
 
 struct ud_impl_t {
@@ -50,8 +57,8 @@ struct ud_impl_t {
   // each apply is a call to these
   using ud_impl_callable = std::function<void(const tensor_params_t &_in, tensor_params_t &_out)>;
 
-  // the id of the implementation, this is initialized by the udf manager
-  ud_impl_id_t id;
+  // the impl_id of the implementation, this is initialized by the udf manager
+  ud_impl_id_t impl_id;
 
   // the implementation name of this function this has to be unique
   // for example this could be mkl_matrix_multiplication or stressen_matrix_multiplication
@@ -94,7 +101,7 @@ using ud_impl_ptr_t = std::unique_ptr<ud_impl_t>;
 
 struct ud_func_t {
 
-  // the id of the implementation, this is initialized by the udf manager
+  // the impl_id of the implementation, this is initialized by the udf manager
   ud_id_t id;
 
   // the name of the ud function, this is the same for all the ud functions that create an equivalent result
@@ -120,11 +127,11 @@ struct ud_func_t {
   ud_impl_id_t add_impl(ud_impl_ptr_t _impl) {
 
     // add the implementation to the list of all implementations
-    auto impl_id = impls.size();
-    _impl->id = impl_id;
+    auto impl_id = static_cast<ud_impl_local_t>(impls.size());
+    _impl->impl_id = ud_impl_id_t{.ud_id = id, .impl_id = impl_id};
     impls.emplace_back(std::move(_impl));
 
-    return impl_id;
+    return _impl->impl_id;
   }
 };
 

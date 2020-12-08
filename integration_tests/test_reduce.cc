@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
   // create the storage
   bbts::storage_t storage;
 
-  // get the id
+  // get the impl_id
   auto id = factory->get_tensor_ftm("dense");
 
   // crate the udf manager

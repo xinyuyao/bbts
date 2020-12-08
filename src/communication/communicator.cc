@@ -5,7 +5,11 @@ namespace bbts {
 mpi_communicator_t::mpi_communicator_t(const node_config_ptr_t &_cfg) {
 
   // initialize the mpi
-  MPI_Init(nullptr, nullptr);
+  int32_t provided;
+  MPI_Init_thread(nullptr, nullptr, MPI_THREAD_MULTIPLE, &provided);
+  if (provided != MPI_THREAD_MULTIPLE) {
+    throw std::runtime_error("MPI_THREAD_MULTIPLE not provided");
+  }
 
   // get the number of processes
   MPI_Comm_size(MPI_COMM_WORLD, &_num_nodes);

@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   bool success = true;
   if(comm.get_rank() % 2 == 0) {
 
-    // get the id
+    // get the impl_id
     auto id = factory->get_tensor_ftm("dense");
 
     // make the meta

@@ -25,7 +25,7 @@ namespace bbts {
     template<class T>
     T& as() const { return *((T*) this); }
 
-    // the id of the tensor format, it must me one of the values registered with the system
+    // the impl_id of the tensor format, it must me one of the values registered with the system
     tfid_t fmt_id;
 
     // the indices of the tensor

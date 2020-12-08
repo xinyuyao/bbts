@@ -25,14 +25,14 @@ TEST(TestReservationStation, FewLocalCommands1) {
                                                          ._type = command_t::op_type_t::APPLY, 
                                                          ._input_tensors = {command_t::tid_node_id_t{.tid = 0, .node = 0}},
                                                          ._output_tensors = {command_t::tid_node_id_t{.tid = 2, .node = 0}},
-                                                         ._fun_id = 0})));
+                                                         ._fun_id = {0, 0}})));
 
   // make a command that deletes tensor with tid 0
   EXPECT_TRUE(rs.queue_command(std::make_unique<command_t>(command_t{._id = 1, 
                                                                      ._type = command_t::op_type_t::DELETE, 
                                                                      ._input_tensors = {command_t::tid_node_id_t{.tid = 0, .node = 0}},
                                                                      ._output_tensors = {},
-                                                                     ._fun_id = -1})));
+                                                                     ._fun_id = {0, 0}})));
 
 
   // make a command that runs a reduce
@@ -41,7 +41,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
                                                                      ._input_tensors = {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                                                         command_t::tid_node_id_t{.tid = 2, .node = 0}},
                                                                      ._output_tensors = {command_t::tid_node_id_t{.tid = 3, .node = 0}},
-                                                                     ._fun_id = 0})));
+                                                                     ._fun_id = {0, 0}})));
 
   // make a command that deletes all the tensors except for the tid = 3 tensor
   EXPECT_TRUE(rs.queue_command(std::make_unique<command_t>(command_t{._id = 3, 
@@ -49,7 +49,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
                                                                      ._input_tensors = {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                                                         command_t::tid_node_id_t{.tid = 2, .node = 0}},
                                                                      ._output_tensors = {},
-                                                                     ._fun_id = -1})));
+                                                                     ._fun_id = {0, 0}})));
 
 
   // get the first command to execute
@@ -90,7 +90,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
                                                                      ._type = command_t::op_type_t::APPLY, 
                                                                      ._input_tensors = {command_t::tid_node_id_t{.tid = 0, .node = 0}},
                                                                      ._output_tensors = {command_t::tid_node_id_t{.tid = 2, .node = 0}},
-                                                                     ._fun_id = 0})));
+                                                                     ._fun_id = {0, 0}})));
 
   // make a command that runs a reduce
   EXPECT_TRUE(rs.queue_command(std::make_unique<command_t>(command_t{._id = 2, 
@@ -98,7 +98,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
                                                                      ._input_tensors = {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                                                         command_t::tid_node_id_t{.tid = 2, .node = 0}},
                                                                      ._output_tensors = {command_t::tid_node_id_t{.tid = 3, .node = 0}},
-                                                                     ._fun_id = 0})));
+                                                                     ._fun_id = {0, 0}})));
 
 
 
@@ -123,7 +123,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
                                                                                         command_t::tid_node_id_t{.tid = 2, .node = 0},
                                                                                         command_t::tid_node_id_t{.tid = 3, .node = 0}},
                                                                      ._output_tensors = {},
-                                                                     ._fun_id = -1})));
+                                                                     ._fun_id = {0, 0}})));
   // make sure there is only one tensors
   EXPECT_EQ(storage->get_num_tensors(), 0);
 }

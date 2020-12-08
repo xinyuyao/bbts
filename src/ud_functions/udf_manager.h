@@ -87,14 +87,14 @@ public:
       return -1;
     }
 
-    // set the id to the udf
+    // set the impl_id to the udf
     _fun->id = id;
 
     // store the function so that it is registered
     _udfs_name_to_id[_fun->ud_name] = id;
     _udfs.emplace_back(std::move(_fun));
 
-    // return the id
+    // return the impl_id
     return id;
   }
 
@@ -104,16 +104,16 @@ public:
     // check if udf is registered.
     auto it = _udfs_name_to_id.find(_impl->ud_name);
     if(it == _udfs_name_to_id.end()) {
-      return -1;
+      return {-1, -1};
     }
 
     // check if the number of parameters matches
     if(_impl->inputTypes.size() != _udfs[it->second]->num_in &&
        _impl->outputTypes.size() != _udfs[it->second]->num_out) {
-      return -1;
+      return {-1, -1};
     }
 
-    // return the id
+    // return the impl_id
     return _udfs[it->second]->add_impl(std::move(_impl));
   }
 
@@ -130,6 +130,19 @@ public:
     return std::make_unique<udf_matcher>(_udfs[it->second]->impls);
   }
 
+  // return the implementation
+  ud_impl_t* get_fn_impl(ud_impl_id_t _id) {
+
+     // check if we have the ud function
+    if(_id.ud_id >= _udfs.size() ||
+       _id.impl_id >= _udfs[_id.ud_id]->impls.size()) {
+      return nullptr;
+    }
+
+    // return the function
+    return _udfs[_id.ud_id]->impls[_id.impl_id].get();
+  }
+
 private:
 
   // we use this to grab types from strings
@@ -138,7 +151,7 @@ private:
   // all the registered udfs
   std::vector<ud_func_ptr_t> _udfs;
 
-  // maps the udf name to the id
+  // maps the udf name to the impl_id
   std::unordered_map<std::string, ud_id_t> _udfs_name_to_id;
 };
 

@@ -1,7 +1,10 @@
 #include <map>
+#include <thread>
 #include "../src/operations/move_op.h"
 #include "../src/commands/reservation_station.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "EndlessLoop"
 using namespace bbts;
 
 using index_t = std::map<std::tuple<int, int>, int>;
@@ -16,7 +19,7 @@ index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factor
   // block size
   int block_size = n / split;
 
-  // grab the format id of the dense tensor
+  // grab the format impl_id of the dense tensor
   auto fmt_id = tf->get_tensor_ftm("dense");
 
   // create all the rows an columns we need
@@ -134,7 +137,7 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
         auto cmd = std::make_unique<bbts::command_t>();
         cmd->_type = bbts::command_t::APPLY;
         cmd->_id = cur_cmd++;
-        cmd->_fun_id = ud->id;
+        cmd->_fun_id = ud->impl_id;
 
         // get the tids for the left and right
         auto l = lhs[{a_row_id, ab_row_col_id}];
@@ -175,7 +178,7 @@ std::vector<command_ptr_t> create_agg(udf_manager_ptr &udm, multi_index_t &to_ag
     auto cmd = std::make_unique<bbts::command_t>();
     cmd->_type = bbts::command_t::REDUCE;
     cmd->_id = cur_cmd++;
-    cmd->_fun_id = ud->id;
+    cmd->_fun_id = ud->impl_id;
 
     // set the input tensors we want to reduce
     for(auto tid : to_reduce.second) {
@@ -200,6 +203,9 @@ void schedule_all(bbts::reservation_station_t &rs, std::vector<command_ptr_t> &c
 
 int main(int argc, char **argv) {
 
+  // the number of threads per node
+  const int32_t num_threads = 4;
+
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
 
@@ -213,9 +219,9 @@ int main(int argc, char **argv) {
   auto udm = std::make_shared<udf_manager>(tf);
 
   // init the communicator with the configuration
-  //bbts::communicator_t comm(config);
-  auto my_rank = 1;
-  auto num_nodes = 2;
+  bbts::communicator_t comm(config);
+  auto my_rank = comm.get_rank();
+  auto num_nodes = comm.get_num_nodes();
   
   // create the reservation station
   auto rs = std::make_shared<bbts::reservation_station_t>(my_rank, ts);
@@ -249,7 +255,78 @@ int main(int argc, char **argv) {
   schedule_all(*rs, bcast_cmds);
   schedule_all(*rs, shuffle_cmds);
   schedule_all(*rs, join_cmds);
-  //schedule_all(*rs, agg_cmds);
+  schedule_all(*rs, agg_cmds);
+
+  // kick of a bunch of threads that are going to grab commands
+  std::vector<std::thread> commandExecutors;
+  commandExecutors.reserve(num_threads);
+  for(int32_t t = 0; t < num_threads; ++t) {
+
+    // each thread is grabbing a command
+    commandExecutors.emplace_back([&rs, &ts, &udm]() {
+
+      std::vector<tensor_meta_t> _out_meta_tmp;
+
+      for(;;) {
+
+        // grab the next command
+        auto cmd = rs->get_next_command();
+
+        // are we doing an apply (applies are local so we are cool)
+        if (cmd->_type == bbts::command_t::APPLY) {
+
+          // get the ud function we want to run
+          auto call_me = udm->get_fn_impl(cmd->_fun_id);
+
+          // make the meta for the input
+          std::vector<tensor_meta_t*> inputs_meta;
+          for(auto &in : cmd->_input_tensors) { inputs_meta.push_back(&ts->get_by_tid(in.tid)->_meta);  }
+          bbts::ud_impl_t::meta_params_t input_meta(move(inputs_meta));
+
+          // get the meta for the outputs
+          _out_meta_tmp.resize(cmd->_output_tensors.size());
+          std::vector<tensor_meta_t*> outputs_meta;
+          outputs_meta.reserve(_out_meta_tmp.size());
+
+          // fill them up
+          for(auto &om : _out_meta_tmp) { outputs_meta.push_back(&om);  }
+          bbts::ud_impl_t::meta_params_t out_meta(std::move(outputs_meta));
+
+          // get the meta
+          call_me->get_out_meta(input_meta, out_meta);
+
+          // form all the inputs
+          std::vector<tensor_t*> inputs;
+          for(auto &in : cmd->_input_tensors) { inputs.push_back(ts->get_by_tid(in.tid));  }
+          ud_impl_t::tensor_params_t inputParams = {std::move(inputs)};
+
+          // form the outputs
+          std::vector<tensor_t*> outputs;
+          for(auto &out : cmd->_output_tensors) {
+
+            // get the size of tensor
+            auto num_bytes = tf->get_tensor_size(out)
+
+            outputs.push_back(ts->get_by_tid(out.tid));
+          }
+          ud_impl_t::tensor_params_t outputParams = {std::move(outputs)};
+
+          // apply the function
+          call_me->fn(inputParams, outputParams);
+
+          std::cout << "Executed " << cmd->_type << "\n";
+        }
+
+      }
+
+    });
+  }
+
+  // wait for the threads to finish
+  for(auto &t : commandExecutors) {
+    t.join();
+  }
 
   return 0;
 }
+#pragma clang diagnostic pop

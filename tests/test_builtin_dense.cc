@@ -9,7 +9,7 @@ TEST(TestDenseTensor, FormatRegisted) {
   // create the tensor factory
   tensor_factory_t factory;
 
-  // get the id
+  // get the impl_id
   auto id = factory.get_tensor_ftm("dense");
 
   // it has to find the format
@@ -21,7 +21,7 @@ TEST(TestDenseTensor, GetSize) {
   // create the tensor factory
   tensor_factory_t factory;
 
-  // get the id
+  // get the impl_id
   auto id = factory.get_tensor_ftm("dense");
 
   // check if get size works
@@ -43,7 +43,7 @@ TEST(TestDenseTensor, Init) {
   // create the tensor factory
   tensor_factory_t factory;
 
-  // get the id
+  // get the impl_id
   auto id = factory.get_tensor_ftm("dense");
 
   // make the meta

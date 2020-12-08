@@ -18,7 +18,7 @@ struct dense_tensor_meta_t : public tensor_meta_t {
     return *((m*) _blob);
   }
 
-  // init the tensor with the format id
+  // init the tensor with the format impl_id
   dense_tensor_meta_t(tfid_t _id) : tensor_meta_t{.fmt_id = _id} {}
 
   // init the tensor meta with row and column numbers

@@ -21,7 +21,7 @@ TEST(TestStorage, Test1) {
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
 
-  // grab the format id of the dense tensor 
+  // grab the format impl_id of the dense tensor
   auto fmt_id = tf->get_tensor_ftm("dense");
 
   // make the threads

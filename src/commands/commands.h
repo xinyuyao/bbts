@@ -8,16 +8,16 @@
 
 namespace bbts {
 
-// the id of the operation, this is unique globally across all processes
+// the impl_id of the operation, this is unique globally across all processes
 using command_id_t = int32_t;
 
 struct command_t {
 
   enum op_type_t {
-    APPLY,
-    REDUCE,
-    MOVE,
-    DELETE
+    APPLY = 0,
+    REDUCE = 1,
+    MOVE = 2,
+    DELETE = 3
   };
 
   // specifies exactly what tensor on which node we refer to
@@ -74,7 +74,7 @@ struct command_t {
 
   }
 
-  // the id of the operation
+  // the impl_id of the operation
   command_id_t _id;
 
   // the type of operation
@@ -87,7 +87,7 @@ struct command_t {
   std::vector<tid_node_id_t> _output_tensors;
 
   // the function we want to execute
-  ud_id_t _fun_id = -1;
+  ud_impl_id_t _fun_id = {-1, -1};
 };
 
 // the command

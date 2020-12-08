@@ -348,16 +348,16 @@ private:
     for(auto &in : _command->_input_tensors) {
 
       // see if we already have this tensor, if we don't we need to wait for it
-      auto it = _tensors.find(in.tid);
+      auto &ts = _tensors[in.tid];
 
       // make sure that this tensor was not deleted before this
-      if(it->second.scheduled_for_delition) { return false; }
+      if(ts.scheduled_for_delition) { return false; }
 
       // we are reading this tensor
-      it->second.num_to_read++;
+      ts.num_to_read++;
     
       // if the tensor is not yet created wait for it
-      if(!it->second.is_created) {
+      if(!ts.is_created) {
         
         // add the entry
         _commands_waiting_for.insert({in.tid, _command->_id});
@@ -367,7 +367,7 @@ private:
       }
     }
 
-    // go through the ouput tensors
+    // go through the output tensors
     for(auto &out : _command->_output_tensors) {
       
       // get the tid
