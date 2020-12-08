@@ -38,6 +38,9 @@ struct ud_impl_t {
     template<size_t n>
     const T &get() const { return *parameters[n]; }
 
+    // this gets the parameters at runtime
+    const T &get_by_idx(size_t idx) { return *parameters[idx]; }
+
     // sets the parameter
     template<size_t n>
     void set(T &_in) {
@@ -131,7 +134,7 @@ struct ud_func_t {
     _impl->impl_id = ud_impl_id_t{.ud_id = id, .impl_id = impl_id};
     impls.emplace_back(std::move(_impl));
 
-    return _impl->impl_id;
+    return impls.back()->impl_id;
   }
 };
 

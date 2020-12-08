@@ -7,7 +7,7 @@
 #pragma ide diagnostic ignored "EndlessLoop"
 using namespace bbts;
 
-using index_t = std::map<std::tuple<int, int>, int>;
+using index_t = std::map<std::tuple<int, int>, std::tuple<int, bool>>;
 using multi_index_t = std::map<std::tuple<int, int>, std::vector<int>>;
 
 index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
@@ -24,12 +24,12 @@ index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factor
 
   // create all the rows an columns we need
   auto hash_fn = std::hash<int>();
-  for(int row_id = 0; row_id < split; ++row_id) {
-    for(int col_id = 0; col_id < split; ++col_id) {
+  for (int row_id = 0; row_id < split; ++row_id) {
+    for (int col_id = 0; col_id < split; ++col_id) {
 
       // check if this block is on this node
       auto hash = hash_fn(row_id * split + col_id) % num_nodes;
-      if(hash == my_rank) {
+      if (hash == my_rank) {
 
         // ok it is on this node make a tensor
         // make the meta
@@ -45,8 +45,15 @@ index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factor
         auto &dt = tf->init_tensor(t, dm).as<dense_tensor_t>();
 
         // set the index
-        index[{row_id, col_id}] = cur_tid;
+        index[{row_id, col_id}] = {cur_tid, true};
         rs->register_tensor(cur_tid);
+
+        std::cout << "CREATE(tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid << " , node=" << my_rank
+                  << ")\n";
+      } else {
+
+        // store the index
+        index[{row_id, col_id}] = {cur_tid, false};
       }
 
       // go to the next one
@@ -62,22 +69,30 @@ std::vector<command_ptr_t> create_broadcast(index_t &idx, int my_rank, int num_n
 
   // go through the tuples
   std::vector<command_ptr_t> commands;
-  for(auto &t : idx) {
+  for (auto &t : idx) {
+
+    // unfold the tuple
+    auto[tid, present] = t.second;
+
+    // if the block is not present on this node continue
+    if (!present) {
+      continue;
+    }
 
     // make the command
     auto cmd = std::make_unique<bbts::command_t>();
     cmd->_type = bbts::command_t::MOVE;
     cmd->_id = cur_cmd++;
-    cmd->_input_tensors.push_back({.tid = t.second, .node = my_rank});
+    cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
 
     // go through all the nodes
-    for(int32_t node = 0; node < num_nodes; ++node) {
+    for (int32_t node = 0; node < num_nodes; ++node) {
 
       // skip this node
-      if(node == my_rank) { continue; }
+      if (node == my_rank) { continue; }
 
       // set the output tensor
-      cmd->_output_tensors.push_back({.tid = t.second, .node = my_rank});
+      cmd->_output_tensors.push_back({.tid = tid, .node = my_rank});
     }
 
     // store the command
@@ -91,13 +106,16 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
 
   // go through the tuples
   std::vector<command_ptr_t> commands;
-  for(auto &t : idx) {
+  for (auto &t : idx) {
+
+    // unfold the tuple
+    auto[tid, present] = t.second;
 
     // where we need to move
     int32_t to_node = std::get<0>(t.first) % num_nodes;
 
-    //
-    if(to_node == my_rank) {
+    // if it stays on this node we are cool
+    if (to_node == my_rank) {
       continue;
     }
 
@@ -105,18 +123,21 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
     auto cmd = std::make_unique<bbts::command_t>();
     cmd->_type = bbts::command_t::MOVE;
     cmd->_id = cur_cmd++;
-    cmd->_input_tensors.push_back({.tid = t.second, .node = my_rank});
-    cmd->_output_tensors.push_back({.tid = t.second, .node = to_node});
+    cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
+    cmd->_output_tensors.push_back({.tid = tid, .node = to_node});
 
     // store the command
     commands.emplace_back(std::move(cmd));
+
+    std::cout << "MOVE(tensor=(" << get<0>(t.first) << ", " << get<1>(t.first) << "), tid=" << tid << ", node="
+              << to_node << ")\n";
   }
 
   return std::move(commands);
 }
 
 std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index_t &rhs, multi_index_t &out_idx,
-                                       int my_rank, int split, int &cur_cmd, int &cur_tid) {
+                                       int my_rank, int num_nodes, int split, int &cur_cmd, int &cur_tid) {
 
   // return me that matcher for matrix addition
   auto matcher = udm->get_matcher_for("matrix_mult");
@@ -126,7 +147,14 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
 
   // generate all the commands
   std::vector<command_ptr_t> commands;
-  for(int a_row_id = 0; a_row_id < split; ++a_row_id) {
+  for (int a_row_id = 0; a_row_id < split; ++a_row_id) {
+
+    // check this should be joined here
+    if (a_row_id % num_nodes != my_rank) {
+      continue;
+    }
+
+    // form all the ones we need to join
     for (int b_col_id = 0; b_col_id < split; ++b_col_id) {
 
       // create all the join groups that need to be reduced together
@@ -140,8 +168,12 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
         cmd->_fun_id = ud->impl_id;
 
         // get the tids for the left and right
-        auto l = lhs[{a_row_id, ab_row_col_id}];
-        auto r = rhs[{ab_row_col_id, b_col_id}];
+        auto[l, l_present] = lhs[{a_row_id, ab_row_col_id}];
+        auto[r, r_present] = rhs[{ab_row_col_id, b_col_id}];
+
+        // log this
+        std::cout << "JOIN((" << a_row_id << "," << ab_row_col_id << ")[" << l << "]," << "(" << ab_row_col_id << ","
+                  << b_col_id << ")[" << r << "])\n";
 
         // set the left and right input
         cmd->_input_tensors.push_back({.tid = l, .node = my_rank});
@@ -172,7 +204,7 @@ std::vector<command_ptr_t> create_agg(udf_manager_ptr &udm, multi_index_t &to_ag
 
   // generate all the commands
   std::vector<command_ptr_t> commands;
-  for(auto &to_reduce : to_agg_idx) {
+  for (auto &to_reduce : to_agg_idx) {
 
     // make the command
     auto cmd = std::make_unique<bbts::command_t>();
@@ -181,7 +213,7 @@ std::vector<command_ptr_t> create_agg(udf_manager_ptr &udm, multi_index_t &to_ag
     cmd->_fun_id = ud->impl_id;
 
     // set the input tensors we want to reduce
-    for(auto tid : to_reduce.second) {
+    for (auto tid : to_reduce.second) {
       cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
     }
 
@@ -196,7 +228,7 @@ void schedule_all(bbts::reservation_station_t &rs, std::vector<command_ptr_t> &c
 
   // schedule the commands
   std::cout << "Scheduling " << cmds.size() << "\n";
-  for(auto &c : cmds) {
+  for (auto &c : cmds) {
     rs.queue_command(std::move(c));
   }
 }
@@ -204,7 +236,7 @@ void schedule_all(bbts::reservation_station_t &rs, std::vector<command_ptr_t> &c
 int main(int argc, char **argv) {
 
   // the number of threads per node
-  const int32_t num_threads = 4;
+  const int32_t num_threads = 1;
 
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
@@ -222,29 +254,30 @@ int main(int argc, char **argv) {
   bbts::communicator_t comm(config);
   auto my_rank = comm.get_rank();
   auto num_nodes = comm.get_num_nodes();
-  
+
   // create the reservation station
   auto rs = std::make_shared<bbts::reservation_station_t>(my_rank, ts);
-  
+
   // create two tensors split into num_nodes x num_nodes, we split them by some hash
-  std::cout << "Creating tensors....\n";
   int tid_offset = 0;
+  std::cout << "Creating tensor A....\n";
   auto a_idx = create_matrix_tensors(rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+  std::cout << "Creating tensor B....\n";
   auto b_idx = create_matrix_tensors(rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+
+  // create the shuffle commands
+  int32_t cmd_offest = 0;
+  std::cout << "Create the shuffle commands...\n";
+  auto shuffle_cmds = create_shuffle(a_idx, my_rank, num_nodes, cmd_offest);
 
   // create the broadcast commands
   std::cout << "Creating broadcast commands...\n";
-  int32_t cmd_offest = 0;
-  auto bcast_cmds = create_broadcast(a_idx, my_rank, num_nodes, cmd_offest);
-
-  // create the shuffle commands
-  std::cout << "Create the shuffle commands...\n";
-  auto shuffle_cmds = create_shuffle(b_idx, my_rank, num_nodes, cmd_offest);
+  auto bcast_cmds = create_broadcast(b_idx, my_rank, num_nodes, cmd_offest);
 
   // create an join commands
   std::cout << "Creating join commands...\n";
   multi_index_t join;
-  auto join_cmds = create_join(udm, a_idx, b_idx, join, my_rank, num_nodes, cmd_offest, tid_offset);
+  auto join_cmds = create_join(udm, a_idx, b_idx, join, my_rank, num_nodes, num_nodes, cmd_offest, tid_offset);
 
   // create an aggregation commands
   std::cout << "Creating aggregation commands...\n";
@@ -260,14 +293,14 @@ int main(int argc, char **argv) {
   // kick of a bunch of threads that are going to grab commands
   std::vector<std::thread> commandExecutors;
   commandExecutors.reserve(num_threads);
-  for(int32_t t = 0; t < num_threads; ++t) {
+  for (int32_t t = 0; t < num_threads; ++t) {
 
     // each thread is grabbing a command
-    commandExecutors.emplace_back([&rs, &ts, &udm]() {
+    commandExecutors.emplace_back([&rs, &ts, &udm, &tf]() {
 
       std::vector<tensor_meta_t> _out_meta_tmp;
 
-      for(;;) {
+      for (;;) {
 
         // grab the next command
         auto cmd = rs->get_next_command();
@@ -279,42 +312,45 @@ int main(int argc, char **argv) {
           auto call_me = udm->get_fn_impl(cmd->_fun_id);
 
           // make the meta for the input
-          std::vector<tensor_meta_t*> inputs_meta;
-          for(auto &in : cmd->_input_tensors) { inputs_meta.push_back(&ts->get_by_tid(in.tid)->_meta);  }
+          std::vector<tensor_meta_t *> inputs_meta;
+          for (auto &in : cmd->_input_tensors) { inputs_meta.push_back(&ts->get_by_tid(in.tid)->_meta); }
           bbts::ud_impl_t::meta_params_t input_meta(move(inputs_meta));
 
           // get the meta for the outputs
           _out_meta_tmp.resize(cmd->_output_tensors.size());
-          std::vector<tensor_meta_t*> outputs_meta;
+          std::vector<tensor_meta_t *> outputs_meta;
           outputs_meta.reserve(_out_meta_tmp.size());
 
           // fill them up
-          for(auto &om : _out_meta_tmp) { outputs_meta.push_back(&om);  }
+          for (auto &om : _out_meta_tmp) { outputs_meta.push_back(&om); }
           bbts::ud_impl_t::meta_params_t out_meta(std::move(outputs_meta));
 
           // get the meta
           call_me->get_out_meta(input_meta, out_meta);
 
           // form all the inputs
-          std::vector<tensor_t*> inputs;
-          for(auto &in : cmd->_input_tensors) { inputs.push_back(ts->get_by_tid(in.tid));  }
+          std::vector<tensor_t *> inputs;
+          for (auto &in : cmd->_input_tensors) { inputs.push_back(ts->get_by_tid(in.tid)); }
           ud_impl_t::tensor_params_t inputParams = {std::move(inputs)};
 
           // form the outputs
-          std::vector<tensor_t*> outputs;
-          for(auto &out : cmd->_output_tensors) {
+          std::vector<tensor_t *> outputs;
+          for (int32_t i = 0; i < cmd->_output_tensors.size(); ++i) {
 
             // get the size of tensor
-            auto num_bytes = tf->get_tensor_size(out)
+            auto num_bytes = tf->get_tensor_size(out_meta.get_by_idx(i));
 
-            outputs.push_back(ts->get_by_tid(out.tid));
+            // create the output tensor
+            outputs.push_back(ts->create_tensor(cmd->_output_tensors[i].tid, num_bytes));
           }
           ud_impl_t::tensor_params_t outputParams = {std::move(outputs)};
 
           // apply the function
           call_me->fn(inputParams, outputParams);
 
-          std::cout << "Executed " << cmd->_type << "\n";
+          // retire command
+          std::cout << "Executed Apply for Function (" << cmd->_fun_id.ud_id << ", " << cmd->_fun_id.impl_id << ")\n";
+          rs->retire_command(std::move(cmd));
         }
 
       }
@@ -323,7 +359,7 @@ int main(int argc, char **argv) {
   }
 
   // wait for the threads to finish
-  for(auto &t : commandExecutors) {
+  for (auto &t : commandExecutors) {
     t.join();
   }
 
