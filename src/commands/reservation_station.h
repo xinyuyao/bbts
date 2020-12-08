@@ -461,4 +461,6 @@ private:
   std::unordered_map<tid_t, internal_tensor_state_t> _tensors;
 };
 
+using reservation_station_ptr_t = std::shared_ptr<reservation_station_t>;
+
 }

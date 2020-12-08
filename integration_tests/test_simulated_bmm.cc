@@ -1,12 +1,13 @@
 #include <map>
 #include "../src/operations/move_op.h"
+#include "../src/commands/reservation_station.h"
 
 using namespace bbts;
 
 using index_t = std::map<std::tuple<int, int>, int>;
 using multi_index_t = std::map<std::tuple<int, int>, std::vector<int>>;
 
-index_t create_matrix_tensors(bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
+index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
                               int n, int split, int my_rank, int num_nodes, int &cur_tid) {
 
   // the index
@@ -42,6 +43,7 @@ index_t create_matrix_tensors(bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_
 
         // set the index
         index[{row_id, col_id}] = cur_tid;
+        rs->register_tensor(cur_tid);
       }
 
       // go to the next one
@@ -89,14 +91,22 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
   for(auto &t : idx) {
 
     // where we need to move
-    int32_t toNode = std::get<0>(t.first) % num_nodes;
+    int32_t to_node = std::get<0>(t.first) % num_nodes;
+
+    //
+    if(to_node == my_rank) {
+      continue;
+    }
 
     // make the command
     auto cmd = std::make_unique<bbts::command_t>();
     cmd->_type = bbts::command_t::MOVE;
     cmd->_id = cur_cmd++;
     cmd->_input_tensors.push_back({.tid = t.second, .node = my_rank});
-    cmd->_output_tensors.push_back({.tid = t.second, .node = toNode});
+    cmd->_output_tensors.push_back({.tid = t.second, .node = to_node});
+
+    // store the command
+    commands.emplace_back(std::move(cmd));
   }
 
   return std::move(commands);
@@ -148,6 +158,46 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
   return std::move(commands);
 }
 
+std::vector<command_ptr_t> create_agg(udf_manager_ptr &udm, multi_index_t &to_agg_idx, index_t &out,
+                                      int my_rank, int &cur_cmd, int &cur_tid) {
+
+  // return me that matcher for matrix addition
+  auto matcher = udm->get_matcher_for("matrix_add");
+
+  // get the ud object
+  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false, 0);
+
+  // generate all the commands
+  std::vector<command_ptr_t> commands;
+  for(auto &to_reduce : to_agg_idx) {
+
+    // make the command
+    auto cmd = std::make_unique<bbts::command_t>();
+    cmd->_type = bbts::command_t::REDUCE;
+    cmd->_id = cur_cmd++;
+    cmd->_fun_id = ud->id;
+
+    // set the input tensors we want to reduce
+    for(auto tid : to_reduce.second) {
+      cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
+    }
+
+    cmd->_output_tensors.push_back({.tid = cur_tid++, .node = my_rank});
+    commands.emplace_back(move(cmd));
+  }
+
+  return std::move(commands);
+}
+
+void schedule_all(bbts::reservation_station_t &rs, std::vector<command_ptr_t> &cmds) {
+
+  // schedule the commands
+  std::cout << "Scheduling " << cmds.size() << "\n";
+  for(auto &c : cmds) {
+    rs.queue_command(std::move(c));
+  }
+}
+
 int main(int argc, char **argv) {
 
   // make the configuration
@@ -157,43 +207,49 @@ int main(int argc, char **argv) {
   storage_ptr_t ts = std::make_shared<storage_t>();
 
   // create the tensor factory
-  bbts::tensor_factory_ptr_t tf = std::make_shared<bbts::tensor_factory_t>();
+  auto tf = std::make_shared<bbts::tensor_factory_t>();
 
   // crate the udf manager
   auto udm = std::make_shared<udf_manager>(tf);
 
   // init the communicator with the configuration
-  bbts::communicator_t comm(config);
-
-  // check the number of nodes
-  if(comm.get_num_nodes() % 2 != 0) {
-    std::cerr << "Must use an even number of nodes.\n";
-    return -1;
-  }
-
+  //bbts::communicator_t comm(config);
+  auto my_rank = 1;
+  auto num_nodes = 2;
+  
+  // create the reservation station
+  auto rs = std::make_shared<bbts::reservation_station_t>(my_rank, ts);
+  
   // create two tensors split into num_nodes x num_nodes, we split them by some hash
   std::cout << "Creating tensors....\n";
   int tid_offset = 0;
-  auto a_idx = create_matrix_tensors(tf, ts, 1000, comm.get_num_nodes(), comm.get_rank(), comm.get_num_nodes(), tid_offset);
-  auto b_idx = create_matrix_tensors(tf, ts, 1000, comm.get_num_nodes(), comm.get_rank(), comm.get_num_nodes(), tid_offset);
+  auto a_idx = create_matrix_tensors(rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+  auto b_idx = create_matrix_tensors(rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
 
   // create the broadcast commands
   std::cout << "Creating broadcast commands...\n";
   int32_t cmd_offest = 0;
-  auto bcast_cmds = create_broadcast(a_idx, comm.get_rank(), comm.get_num_nodes(), cmd_offest);
+  auto bcast_cmds = create_broadcast(a_idx, my_rank, num_nodes, cmd_offest);
 
   // create the shuffle commands
   std::cout << "Create the shuffle commands...\n";
-  auto shuffle_cmds = create_shuffle(b_idx, comm.get_rank(), comm.get_num_nodes(), cmd_offest);
+  auto shuffle_cmds = create_shuffle(b_idx, my_rank, num_nodes, cmd_offest);
 
   // create an join commands
   std::cout << "Creating join commands...\n";
   multi_index_t join;
-  create_join(udm, a_idx, b_idx, join, comm.get_rank(), comm.get_num_nodes(), cmd_offest, tid_offset);
+  auto join_cmds = create_join(udm, a_idx, b_idx, join, my_rank, num_nodes, cmd_offest, tid_offset);
 
   // create an aggregation commands
   std::cout << "Creating aggregation commands...\n";
+  index_t final;
+  auto agg_cmds = create_agg(udm, join, final, my_rank, cmd_offest, tid_offset);
 
+  // schedule the commands
+  schedule_all(*rs, bcast_cmds);
+  schedule_all(*rs, shuffle_cmds);
+  schedule_all(*rs, join_cmds);
+  //schedule_all(*rs, agg_cmds);
 
   return 0;
 }
