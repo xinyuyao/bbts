@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
   for (int32_t t = 0; t < num_threads; ++t) {
 
     // each thread is grabbing a command
-    commandExecutors.emplace_back([&rs, &ts, &udm, &tf]() {
+    commandExecutors.emplace_back([&rs, &ts, &udm, &tf, &comm]() {
 
       std::vector<tensor_meta_t> _out_meta_tmp;
 
@@ -358,14 +358,41 @@ int main(int argc, char **argv) {
           std::cout << "Executed Apply for Function (" << cmd->fun_id.ud_id << ", " << cmd->fun_id.impl_id << ")\n";
           rs->retire_command(std::move(cmd));
         }
-        else if(cmd->type == bbts::command_t::MOVE) {
+        // check if it is a point-to-point MOVE
+        else if(cmd->type == bbts::command_t::MOVE && cmd->get_num_outputs() == 1) {
 
-          //comm.send_sync()
+          // send the command
+          auto to_node = cmd->get_output(0).node;
+          comm.op_request(cmd, to_node);
 
+          // get the tensor
+          auto tid = cmd->get_input(0).tid;
+          auto t = ts->get_by_tid(tid);
+
+          // initiate the MOVE
+          auto move = move_op_t(comm, tid, t, true, *tf, *ts, to_node);
+          move.apply();
         }
       }
 
     });
+  }
+
+  while(true) {
+
+    // get the command
+    auto cmd = comm.listen_for_op_request();
+
+    std::cout << "Got command\n";
+
+    // get the node from which we get the tensor from
+    auto from_node = cmd->get_input(0).node;
+    auto tid = cmd->get_input(0).tid;
+
+    // create the move
+    auto move = move_op_t(comm, tid, nullptr, false, *tf, *ts, from_node);
+    auto m = move.apply();
+    std::cout << "Finished command\n";
   }
 
   // wait for the threads to finish

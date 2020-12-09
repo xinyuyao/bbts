@@ -19,11 +19,16 @@ const node_id_t ANY_NODE = MPI_ANY_SOURCE;
 // defines some of the most common message request
 using com_tags = int32_t;
 
+// matches to any tag
+const com_tags ANY_TAG = MPI_ANY_TAG;
+
 // the request to a node to send the sending node the tensors it wants
-const com_tags TENSOR_MOVE = 1;
-const com_tags BCAST_TENSOR = 2;
-const com_tags ANY = MPI_ANY_TAG;
-const com_tags SHUTDOWN = 3;
+const com_tags SEND_CMD_TAG = 1;
+const com_tags SHUTDOWN_TAG = 2;
+
+// this is a special tag that is the first free tag
+// it is appended to every and receive send call
+const com_tags FREE_TAG = 3;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -80,10 +85,10 @@ public:
   bool recieve_request_sync(void *_bytes, sync_request_t &_req);
 
   // initiates the operation on all the specified nodes
-  void op_request(command_id_t _ctid, const std::vector<node_id_t> &_nodes);
+  bool op_request(const command_ptr_t &_ctid, node_id_t _node);
 
   // waits to recieve an operation
-  command_id_t listen_for_op_request();
+  command_ptr_t listen_for_op_request();
 
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();

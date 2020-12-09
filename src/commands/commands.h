@@ -60,7 +60,11 @@ struct command_t {
 
   // is this a delete
   [[nodiscard]] bool is_delete() const { return type == op_type_t::DELETE; }
-  
+
+  // return the number of bytes
+  [[nodiscard]] size_t num_bytes() const { return sizeof(bbts::command_t) +
+                                                  (_num_inputs + _num_outputs) * sizeof(tid_node_id_t); }
+
   // is this a move
   [[nodiscard]] bool is_move() const { return type == op_type_t::MOVE; }
   
