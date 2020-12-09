@@ -106,23 +106,29 @@ private:
   bool _retire_command(command_ptr_t _command) {
 
     // if this is a delete we remove the tensor
-    if (_command->_type == command_t::op_type_t::DELETE) {
+    if (_command->type == command_t::op_type_t::DELETE) {
 
       // remove the tensors
-      for (auto &t : _command->_input_tensors) {
+      for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+        // grab the input tensor
+        auto &t = _command->get_input(idx);
 
         // remove the tensor immediately
         _remove_tensor(t.tid);
 
         // remove the command
-        _local_commands.erase(_command->_id);
+        _local_commands.erase(_command->id);
       }
 
       return true;
     }
 
     // make sure to go through the created tensors
-    for (auto &out : _command->_output_tensors) {
+    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
+
+      // grab the input tensor
+      auto &out = _command->get_output(idx);
 
       // get the tid
       auto tid = out.tid;
@@ -158,7 +164,10 @@ private:
       }
     }
 
-    for (auto &in : _command->_input_tensors) {
+    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+      // grab the input tensor
+      auto &in = _command->get_input(idx);
 
       // get the tid
       auto tid = in.tid;
@@ -178,7 +187,7 @@ private:
     }
 
     // remove the command
-    _local_commands.erase(_command->_id);
+    _local_commands.erase(_command->id);
 
     return true;
   }
@@ -187,14 +196,17 @@ private:
   bool _retire_remote_command(command_ptr_t _command) {
 
     // there are no remote deletes something went wrong
-    assert(_command->_type != command_t::op_type_t::DELETE);
+    assert(_command->type != command_t::op_type_t::DELETE);
 
     // make sure to go through the created tensors
     // this is only going to happen in the case of the MOVE as the move is initiated by the node that has the tensor
-    for (auto &out : _command->_output_tensors) {
+    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
+
+      // grab the input tensor
+      auto &out = _command->get_output(idx);
 
       // check if this is actually a move
-      assert(_command->_type == command_t::op_type_t::MOVE);
+      assert(_command->type == command_t::op_type_t::MOVE);
 
       // get the tid
       auto tid = out.tid;
@@ -238,7 +250,10 @@ private:
     }
 
     // go through the input tensors, and try to figure out if there is some tensor we need to remove
-    for (auto &in : _command->_input_tensors) {
+    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+      // grab the input tensor
+      auto &in = _command->get_input(idx);
 
       // get the tid
       auto tid = in.tid;
@@ -258,7 +273,7 @@ private:
     }
 
     // remove the command
-    _remote_commands.erase(_command->_id);
+    _remote_commands.erase(_command->id);
 
     return true;
   }
@@ -274,7 +289,10 @@ private:
     int32_t not_present = 0;
 
     // the input tensors
-    for(auto &in : _command->_input_tensors) {
+    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+      // grab the input tensor
+      auto &in = _command->get_input(idx);
 
       // see if we already have this tensor, if we don't we need to wait for it
       auto &s = _tensors[in.tid];
@@ -288,7 +306,10 @@ private:
     }
 
     // go through the ouput tensors
-    for(auto &out : _command->_output_tensors) {
+    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
+
+      // grab the input tensor
+      auto &out = _command->get_output(idx);
       
       // get the tid
       auto &s = _tensors[out.tid];
@@ -305,7 +326,7 @@ private:
     if(not_present != 0) {
       
       // store the remote command
-      _remote_commands[_command->_id] = std::move(_command);
+      _remote_commands[_command->id] = std::move(_command);
 
       // we scheduled it
       return true;
@@ -319,7 +340,10 @@ private:
     // if the command is a delete, schedule all the tensors for deletion
     if(_command->is_delete()) {
 
-      for(auto &in : _command->_input_tensors) {
+      for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+        // grab the input tensor
+        auto &in = _command->get_input(idx);
 
         // mark the tensor as scheduled for deletion
         auto &s = _tensors[in.tid];
@@ -345,7 +369,10 @@ private:
     int32_t not_present = 0;
 
     // the input tensors
-    for(auto &in : _command->_input_tensors) {
+    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+      // grab the input tensor
+      auto &in = _command->get_input(idx);
 
       // see if we already have this tensor, if we don't we need to wait for it
       auto &ts = _tensors[in.tid];
@@ -360,7 +387,7 @@ private:
       if(!ts.is_created) {
         
         // add the entry
-        _commands_waiting_for.insert({in.tid, _command->_id});
+        _commands_waiting_for.insert({in.tid, _command->id});
 
         // we have more
         not_present++;
@@ -368,8 +395,11 @@ private:
     }
 
     // go through the output tensors
-    for(auto &out : _command->_output_tensors) {
-      
+    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
+
+      // grab the input tensor
+      auto &out = _command->get_output(idx);
+
       // get the tid
       auto &s = _tensors[out.tid];
 
@@ -384,7 +414,7 @@ private:
     if(not_present != 0) {
 
       // store the command
-      auto cmd_id = _command->_id;
+      auto cmd_id = _command->id;
       _local_commands[cmd_id] = {std::move(_command),  not_present}; 
     }
     else {

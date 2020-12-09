@@ -80,10 +80,10 @@ std::vector<command_ptr_t> create_broadcast(index_t &idx, int my_rank, int num_n
     }
 
     // make the command
-    auto cmd = std::make_unique<bbts::command_t>();
-    cmd->_type = bbts::command_t::MOVE;
-    cmd->_id = cur_cmd++;
-    cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
+    auto cmd = bbts::command_t::create_unique(1, num_nodes);
+    cmd->type = bbts::command_t::MOVE;
+    cmd->id = cur_cmd++;
+    cmd->get_input(0) = {.tid = tid, .node = my_rank};
 
     // go through all the nodes
     for (int32_t node = 0; node < num_nodes; ++node) {
@@ -92,7 +92,7 @@ std::vector<command_ptr_t> create_broadcast(index_t &idx, int my_rank, int num_n
       if (node == my_rank) { continue; }
 
       // set the output tensor
-      cmd->_output_tensors.push_back({.tid = tid, .node = my_rank});
+      cmd->get_output(node) = {.tid = tid, .node = my_rank};
     }
 
     // store the command
@@ -120,11 +120,11 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
     }
 
     // make the command
-    auto cmd = std::make_unique<bbts::command_t>();
-    cmd->_type = bbts::command_t::MOVE;
-    cmd->_id = cur_cmd++;
-    cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
-    cmd->_output_tensors.push_back({.tid = tid, .node = to_node});
+    auto cmd = bbts::command_t::create_unique(1, 1);
+    cmd->type = bbts::command_t::MOVE;
+    cmd->id = cur_cmd++;
+    cmd->get_input(0) = {.tid = tid, .node = my_rank};
+    cmd->get_output(0) = {.tid = tid, .node = to_node};
 
     // store the command
     commands.emplace_back(std::move(cmd));
@@ -162,10 +162,10 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
       for (int ab_row_col_id = 0; ab_row_col_id < split; ++ab_row_col_id) {
 
         // make the command
-        auto cmd = std::make_unique<bbts::command_t>();
-        cmd->_type = bbts::command_t::APPLY;
-        cmd->_id = cur_cmd++;
-        cmd->_fun_id = ud->impl_id;
+        auto cmd = bbts::command_t::create_unique(2, 1);
+        cmd->type = bbts::command_t::APPLY;
+        cmd->id = cur_cmd++;
+        cmd->fun_id = ud->impl_id;
 
         // get the tids for the left and right
         auto[l, l_present] = lhs[{a_row_id, ab_row_col_id}];
@@ -176,11 +176,11 @@ std::vector<command_ptr_t> create_join(udf_manager_ptr &udm, index_t &lhs, index
                   << b_col_id << ")[" << r << "])\n";
 
         // set the left and right input
-        cmd->_input_tensors.push_back({.tid = l, .node = my_rank});
-        cmd->_input_tensors.push_back({.tid = r, .node = my_rank});
+        cmd->get_input(0) = {.tid = l, .node = my_rank};
+        cmd->get_input(1) = {.tid = r, .node = my_rank};
 
         //set the output
-        cmd->_output_tensors.push_back({.tid = cur_tid, .node = my_rank});
+        cmd->get_output(0) = {.tid = cur_tid, .node = my_rank};
 
         // store the command
         commands.emplace_back(move(cmd));
@@ -207,17 +207,17 @@ std::vector<command_ptr_t> create_agg(udf_manager_ptr &udm, multi_index_t &to_ag
   for (auto &to_reduce : to_agg_idx) {
 
     // make the command
-    auto cmd = std::make_unique<bbts::command_t>();
-    cmd->_type = bbts::command_t::REDUCE;
-    cmd->_id = cur_cmd++;
-    cmd->_fun_id = ud->impl_id;
+    auto cmd = bbts::command_t::create_unique(to_reduce.second.size(), 1);
+    cmd->type = bbts::command_t::REDUCE;
+    cmd->id = cur_cmd++;
+    cmd->fun_id = ud->impl_id;
 
     // set the input tensors we want to reduce
-    for (auto tid : to_reduce.second) {
-      cmd->_input_tensors.push_back({.tid = tid, .node = my_rank});
+    for(int i = 0; i < to_reduce.second.size(); ++i) {
+      cmd->get_input(i) = {.tid = to_reduce.second[i], .node = my_rank};
     }
 
-    cmd->_output_tensors.push_back({.tid = cur_tid++, .node = my_rank});
+    cmd->get_output(0) = {.tid = cur_tid++, .node = my_rank};
     commands.emplace_back(move(cmd));
   }
 
@@ -306,18 +306,21 @@ int main(int argc, char **argv) {
         auto cmd = rs->get_next_command();
 
         // are we doing an apply (applies are local so we are cool)
-        if (cmd->_type == bbts::command_t::APPLY) {
+        if (cmd->type == bbts::command_t::APPLY) {
 
           // get the ud function we want to run
-          auto call_me = udm->get_fn_impl(cmd->_fun_id);
+          auto call_me = udm->get_fn_impl(cmd->fun_id);
 
           // make the meta for the input
           std::vector<tensor_meta_t *> inputs_meta;
-          for (auto &in : cmd->_input_tensors) { inputs_meta.push_back(&ts->get_by_tid(in.tid)->_meta); }
+          for(int idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+            auto &in = cmd->get_input(idx);
+            inputs_meta.push_back(&ts->get_by_tid(in.tid)->_meta);
+          }
           bbts::ud_impl_t::meta_params_t input_meta(move(inputs_meta));
 
           // get the meta for the outputs
-          _out_meta_tmp.resize(cmd->_output_tensors.size());
+          _out_meta_tmp.resize(cmd->get_num_outputs());
           std::vector<tensor_meta_t *> outputs_meta;
           outputs_meta.reserve(_out_meta_tmp.size());
 
@@ -330,18 +333,21 @@ int main(int argc, char **argv) {
 
           // form all the inputs
           std::vector<tensor_t *> inputs;
-          for (auto &in : cmd->_input_tensors) { inputs.push_back(ts->get_by_tid(in.tid)); }
+          for(int idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+            auto &in = cmd->get_input(idx);
+            inputs.push_back(ts->get_by_tid(in.tid));
+          }
           ud_impl_t::tensor_params_t inputParams = {std::move(inputs)};
 
           // form the outputs
           std::vector<tensor_t *> outputs;
-          for (int32_t i = 0; i < cmd->_output_tensors.size(); ++i) {
+          for (int32_t i = 0; i < cmd->get_num_outputs(); ++i) {
 
             // get the size of tensor
             auto num_bytes = tf->get_tensor_size(out_meta.get_by_idx(i));
 
             // create the output tensor
-            outputs.push_back(ts->create_tensor(cmd->_output_tensors[i].tid, num_bytes));
+            outputs.push_back(ts->create_tensor(cmd->get_output(i).tid, num_bytes));
           }
           ud_impl_t::tensor_params_t outputParams = {std::move(outputs)};
 
@@ -349,10 +355,14 @@ int main(int argc, char **argv) {
           call_me->fn(inputParams, outputParams);
 
           // retire command
-          std::cout << "Executed Apply for Function (" << cmd->_fun_id.ud_id << ", " << cmd->_fun_id.impl_id << ")\n";
+          std::cout << "Executed Apply for Function (" << cmd->fun_id.ud_id << ", " << cmd->fun_id.impl_id << ")\n";
           rs->retire_command(std::move(cmd));
         }
+        else if(cmd->type == bbts::command_t::MOVE) {
 
+          //comm.send_sync()
+
+        }
       }
 
     });
