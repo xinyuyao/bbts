@@ -324,7 +324,7 @@ private:
 
     // check if we actually had something
     if(not_present != 0) {
-      
+
       // store the remote command
       _remote_commands[_command->id] = std::move(_command);
 

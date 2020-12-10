@@ -10,7 +10,7 @@ using namespace bbts;
 using index_t = std::map<std::tuple<int, int>, std::tuple<int, bool>>;
 using multi_index_t = std::map<std::tuple<int, int>, std::vector<int>>;
 
-index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
+index_t create_matrix_tensors(char matrix, reservation_station_ptr_t &rs, bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
                               int n, int split, int my_rank, int num_nodes, int &cur_tid) {
 
   // the index
@@ -48,7 +48,7 @@ index_t create_matrix_tensors(reservation_station_ptr_t &rs, bbts::tensor_factor
         index[{row_id, col_id}] = {cur_tid, true};
         rs->register_tensor(cur_tid);
 
-        std::cout << "CREATE(tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid << " , node=" << my_rank
+        std::cout << "CREATE(matrix=" << matrix << ", tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid << " , node=" << my_rank
                   << ")\n";
       } else {
 
@@ -114,8 +114,8 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
     // where we need to move
     int32_t to_node = std::get<0>(t.first) % num_nodes;
 
-    // if it stays on this node we are cool
-    if (to_node == my_rank) {
+    // if it stays on this node or is not present we are cool
+    if (to_node == my_rank || !present) {
       continue;
     }
 
@@ -129,8 +129,8 @@ std::vector<command_ptr_t> create_shuffle(index_t &idx, int my_rank, int num_nod
     // store the command
     commands.emplace_back(std::move(cmd));
 
-    std::cout << "MOVE(tensor=(" << get<0>(t.first) << ", " << get<1>(t.first) << "), tid=" << tid << ", node="
-              << to_node << ")\n";
+    std::cout << "MOVE(tensor=(" << get<0>(t.first) << ", " << get<1>(t.first) << "), tid=" << tid << ", to_node="
+              << to_node << ", my_node=" << my_rank << ")\n";
   }
 
   return std::move(commands);
@@ -261,9 +261,9 @@ int main(int argc, char **argv) {
   // create two tensors split into num_nodes x num_nodes, we split them by some hash
   int tid_offset = 0;
   std::cout << "Creating tensor A....\n";
-  auto a_idx = create_matrix_tensors(rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+  auto a_idx = create_matrix_tensors('A' , rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
   std::cout << "Creating tensor B....\n";
-  auto b_idx = create_matrix_tensors(rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+  auto b_idx = create_matrix_tensors('B', rs, tf, ts, 1000, num_nodes, my_rank, num_nodes, tid_offset);
 
   // create the shuffle commands
   int32_t cmd_offest = 0;
@@ -360,6 +360,8 @@ int main(int argc, char **argv) {
         }
         // check if it is a point-to-point MOVE
         else if(cmd->type == bbts::command_t::MOVE && cmd->get_num_outputs() == 1) {
+
+          std::cout << "Sending...\n";
 
           // send the command
           auto to_node = cmd->get_output(0).node;
