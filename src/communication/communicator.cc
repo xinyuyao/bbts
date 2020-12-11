@@ -86,7 +86,7 @@ bool mpi_communicator_t::op_request(const command_ptr_t &cmd, node_id_t _node) {
   return MPI_Ssend(cmd.get(), cmd->num_bytes(), MPI_CHAR, _node, SEND_CMD_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
 }
 
-command_ptr_t mpi_communicator_t::listen_for_op_request() {
+command_ptr_t mpi_communicator_t::expect_op_request() {
 
   // wait for a request
   sync_request_t _req;
@@ -121,6 +121,72 @@ void mpi_communicator_t::barrier() {
 
   // wait for every node
   MPI_Barrier(MPI_COMM_WORLD);
+}
+
+bool mpi_communicator_t::forward_cmd(const command_ptr_t &_cmd) {
+
+  // find all the nodes referenced in the input
+  std::vector<node_id_t> to_sent_to;
+  for(int32_t idx = 0; idx < _cmd->get_num_inputs(); ++idx) {
+    auto node = _cmd->get_input(idx).node;
+    if(node != _rank && std::find(to_sent_to.begin(), to_sent_to.end(), node) == to_sent_to.end()) {
+      to_sent_to.push_back(node);
+    }
+  }
+
+  // find all the nodes referenced in the output
+  for(int32_t idx = 0; idx < _cmd->get_num_outputs(); ++idx) {
+    auto node = _cmd->get_output(idx).node;
+    if(node != _rank && std::find(to_sent_to.begin(), to_sent_to.end(), node) == to_sent_to.end()) {
+      to_sent_to.push_back(node);
+    }
+  }
+
+  // initiate an asynchronous send request
+  std::vector<async_request_t> requests;
+  for(auto node : to_sent_to) {
+    async_request_t _req;
+    _req.success = MPI_Isend(_cmd.get(), _cmd->num_bytes(), MPI_CHAR, node, FORWARD_CMD_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+    requests.push_back(_req);
+  }
+
+  // wait for all the requests to finish
+  bool success = true;
+  for(auto &r : requests) {
+    success = r.success && MPI_Wait(&r.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS && success;
+  }
+
+  return success;
+}
+
+command_ptr_t mpi_communicator_t::expect_cmd() {
+
+  // wait for a request
+  sync_request_t _req;
+  auto mpi_errno = MPI_Mprobe(ANY_NODE, FORWARD_CMD_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+
+  // check for errors
+  if(mpi_errno != MPI_SUCCESS) {
+    return nullptr;
+  }
+
+  // get the size  and set the tag for the request
+  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
+  _req.message_tag = (com_tags) _req.status.MPI_TAG;
+
+  // allocate the memory and receive the command
+  std::unique_ptr<char[]> p(new char[_req.num_bytes]);
+  if(MPI_Mrecv (p.get(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
+    return nullptr;
+  }
+
+  // cast it to the command
+  auto p_rel = p.release();
+  auto p_cmd = (bbts::command_t *)(p_rel);
+  auto d = std::unique_ptr<bbts::command_t, command_deleter_t>(p_cmd);
+
+  // move the command
+  return std::move(d);
 }
 
 // return the rank

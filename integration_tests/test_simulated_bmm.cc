@@ -383,7 +383,7 @@ int main(int argc, char **argv) {
   while(true) {
 
     // get the command
-    auto cmd = comm.listen_for_op_request();
+    auto cmd = comm.expect_op_request();
 
     std::cout << "Got command\n";
 

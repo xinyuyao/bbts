@@ -6,8 +6,8 @@
 #include <iostream>
 
 #include "../tensor/tensor_factory.h"
+#include "../server/node_config.h"
 #include "../ud_functions/ud_function.h"
-#include "../server/node.h"
 #include "../tensor/tensor.h"
 #include "../commands/commands.h"
 
@@ -25,10 +25,11 @@ const com_tags ANY_TAG = MPI_ANY_TAG;
 // the request to a node to send the sending node the tensors it wants
 const com_tags SEND_CMD_TAG = 1;
 const com_tags SHUTDOWN_TAG = 2;
+const com_tags FORWARD_CMD_TAG = 3;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 3;
+const com_tags FREE_TAG = 4;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -88,7 +89,13 @@ public:
   bool op_request(const command_ptr_t &_ctid, node_id_t _node);
 
   // waits to recieve an operation
-  command_ptr_t listen_for_op_request();
+  command_ptr_t expect_op_request();
+
+  // the the command to all relevant nodes
+  bool forward_cmd(const command_ptr_t &_cmd);
+
+  // expect the command
+  command_ptr_t expect_cmd();
 
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();
@@ -119,5 +126,6 @@ public:
 
 // the default communicator is the mpi communicator
 using communicator_t = mpi_communicator_t;
+using communicator_ptr_t = std::shared_ptr<mpi_communicator_t>;
 
 }

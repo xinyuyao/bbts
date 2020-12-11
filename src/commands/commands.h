@@ -2,8 +2,7 @@
 
 #include <vector>
 #include <assert.h> 
-#include "../tensor/tensor.h"
-#include "../server/node.h"
+#include "../server/node_config.h"
 #include "../ud_functions/ud_function.h"
 
 namespace bbts {
