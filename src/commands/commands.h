@@ -70,6 +70,19 @@ struct command_t {
   // is this an apply
   [[nodiscard]] bool is_apply() const { return type == op_type_t::APPLY; }
 
+  [[nodiscard]] bool uses_node(node_id_t _node) const {
+
+    // go and check every tensor if it is located on a node
+    int32_t n = get_num_inputs() + get_num_outputs();
+    for(int32_t idx = 0; idx < n; ++idx) {
+      if(_tensors[idx].node == _node) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // tells us the node that is going to initiate the command
   [[nodiscard]] node_id_t get_root_node() const {
 

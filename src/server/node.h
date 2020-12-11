@@ -32,6 +32,9 @@ public:
 
     // init the udf manager
     _udf_manager = std::make_shared<bbts::udf_manager>(_factory);
+
+    // init the reservation station
+    _res_station = std::make_shared<reservation_station_t>(_comm->get_rank(), _storage);
   }
 
   void run() {
@@ -54,10 +57,13 @@ public:
 protected:
 
   // the configuration of the node
-  bbts::node_config_ptr_t _config;
+  node_config_ptr_t _config;
 
   // the communicator, this is doing all the sending
   communicator_ptr_t _comm;
+
+  // the reservation station
+  reservation_station_ptr_t _res_station;
 
   // this is responsible for forwarding all the commands to the right node and receiving commands
   scheduler_ptr_t _scheduler;

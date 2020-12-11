@@ -24,6 +24,7 @@ public:
 
     std::unique_lock<std::mutex> lk(_m);
 
+    std::cout << "Added\n";
     // store the command
     _cmds_to_bcst.push(std::move(_cmd));
     _cv.notify_one();
@@ -36,6 +37,8 @@ public:
 
       // get the next command
       auto _cmd = _comm->expect_cmd();
+
+      std::cout << "Got\n";
 
       // check if we are done that is if the command is null
       if(_cmd == nullptr) {
@@ -75,7 +78,9 @@ public:
       _comm->forward_cmd(_cmd);
 
       // move it to the reservation station
-      _rs->queue_command(std::move(_cmd));
+      if(_cmd->uses_node(_comm->get_rank())) {
+        _rs->queue_command(std::move(_cmd));
+      }
     }
   }
 
