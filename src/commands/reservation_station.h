@@ -13,9 +13,9 @@ namespace bbts {
 // here we queue all the commands this node needs to execute that we need 
 // to execute in conjunction with other nodes, are kept in the external_commands_queue_t
 class reservation_station_t {
-public:
+ public:
 
-  reservation_station_t(node_id_t _node_id, storage_ptr_t _storage) : _node_id(_node_id), _storage(std::move(_storage)) {}
+  reservation_station_t(node_id_t _node_id, storage_ptr_t _storage) : _my_rank(_node_id), _storage(std::move(_storage)) {}
 
   // queue a command, this command has to be executed in the same thread and the commands
   // have to be queued in the exact order they are coming in
@@ -24,7 +24,7 @@ public:
     // lock the reservation station
     std::unique_lock<std::mutex> lk(_m);
 
-    if(_command->get_root_node() == _node_id) {
+    if(_command->get_root_node() == _my_rank) {
       return _queue_local(std::move(_command));
     }
     else {
@@ -39,7 +39,7 @@ public:
     std::unique_lock<std::mutex> lk(_m);
 
     // check if this is a remote node
-    if(_command->get_root_node() == _node_id) {
+    if(_command->get_root_node() == _my_rank) {
       return _retire_command(std::move(_command));
     }
     else {
@@ -47,9 +47,27 @@ public:
     }
   }
 
+  // a list of node tensor for each node that needs to be notified that a tensor is available.
+  // We get that information by looking at the input tensors of remote commands scheduled here
+  [[nodiscard]] std::vector<std::vector<tid_t>> tensors_available_notification() {
+
+    // lock the tensor
+    std::unique_lock<std::mutex> lk(_m);
+
+    return {};
+  }
+
+  // notify the reservation station that the tensor on an another node became available
+  void notify_available_tensors(node_id_t node, const std::vector<tid_t> &tensors) {
+
+    // lock the tensor
+    std::unique_lock<std::mutex> lk(_m);
+
+  }
+
   // get the next command, you must use the result of this command as it is a unique ptr
   [[nodiscard]] command_ptr_t get_next_command() {
-    
+
     // wait until we have something here
     std::unique_lock<std::mutex> lk(_m);
     _cv.wait(lk, [&]{return !_execute.empty();});
@@ -62,132 +80,80 @@ public:
     return std::move(tmp);
   }
 
+  // register the tensor that was added externally,
+  // that is it was not created through the execution of a command
   void register_tensor(tid_t _tid) {
 
     // lock the tensor
     std::unique_lock<std::mutex> lk(_m);
 
-    // get the tensor state if any
-    auto &s = _tensors[_tid];
-
-    // make sure that it was not created before
-    assert(!s.is_created);
-
-    // we are done writing to the tensor and
-    s.is_created = true;
-    s.writing_tensor = false;
-
-    // go through the commands that are waiting
-    auto cw = _commands_waiting_for.equal_range(_tid);
-    for (auto it = cw.first; it != cw.second;) {
-      
-      // try to find the command
-      auto jt = _local_commands.find(it->second);
-      assert(jt != _local_commands.end());
-
-      // check if we have all the inputs
-      if(0 == (--jt->second.second)) {
-        
-        // schedule the command for execution
-        _schedule_for_excution(std::move(jt->second.first));
-
-        // remove the command
-        _local_commands.erase(jt);
-      }
-
-      // remove the command from the waiting list
-      it = _commands_waiting_for.erase(it);
-    }
   }
 
-private:
+ private:
+
+  bool _queue_remote(command_ptr_t _command) {
+
+    // handle delete
+    if(_command->is_delete()) {
+
+    }
+
+    // count the number of inputs that are not present
+    int32_t num_not_present = 0;
+    for(int32_t i = 0; i < _command->get_num_inputs(); i++) {
+
+      // get the tensor required in the input
+      auto _ts = _command->get_input(i);
+
+      // check if this is a remote tensor or a local tensor
+      if(_ts.node == _my_rank) {
+
+        // if it is a local we need to check if it was created already
+        auto &s = _tensors[_ts.tid];
+
+        // you can not use a tensors scheduled for deletion
+        assert(!s.scheduled_for_delition);
+
+        // if it was not created we need to keep track of that
+        if(!s.is_created) {
+
+          // tensor is not present
+          num_not_present++;
+
+          // mark that this command is waiting
+          _commands_waiting_for[_ts.tid] = _command->id;
+        }
+      }
+      else {
+
+        // ok this is a remote tensor, we need to check if it is present
+        auto &rts = _remote_tensors[_ts.node];
+        auto it = rts.find(_ts.tid);
+
+        // if the tensor is not present or we don't have the most recent info about it
+        // (the command that requested the status is smaller than the id of this command)
+        if(it == rts.end() && it->second < _command->id) {
+
+
+        }
+      }
+    }
+
+    for(int32_t i = 0; i < _command->get_num_outputs(); i++) {
+
+    }
+
+    return false;
+  }
+
+  bool _queue_local(command_ptr_t _command) {
+
+    // we are done here
+    return true;
+  }
 
   // retire the local command
   bool _retire_command(command_ptr_t _command) {
-
-    // if this is a delete we remove the tensor
-    if (_command->type == command_t::op_type_t::DELETE) {
-
-      // remove the tensors
-      for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
-
-        // grab the input tensor
-        auto &t = _command->get_input(idx);
-
-        // remove the tensor immediately
-        _remove_tensor(t.tid);
-
-        // remove the command
-        _local_commands.erase(_command->id);
-      }
-
-      return true;
-    }
-
-    // make sure to go through the created tensors
-    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
-
-      // grab the input tensor
-      auto &out = _command->get_output(idx);
-
-      // get the tid
-      auto tid = out.tid;
-      auto &s = _tensors[tid];
-
-      // make sure that it was not created before
-      assert(!s.is_created);
-
-      // we are done writing to the tensor and
-      s.is_created = true;
-      s.writing_tensor = false;
-
-      // go through the commands that are waiting
-      auto cw = _commands_waiting_for.equal_range(tid);
-      for (auto it = cw.first; it != cw.second;) {
-
-        // try to find the command
-        auto jt = _local_commands.find(it->second);
-        assert(jt != _local_commands.end());
-
-        // check if we have all the inputs
-        if (0 == (--jt->second.second)) {
-
-          // schedule the command for execution
-          _schedule_for_excution(std::move(jt->second.first));
-
-          // remove the command
-          _local_commands.erase(jt);
-        }
-
-        // remove the command from the waiting list
-        it = _commands_waiting_for.erase(it);
-      }
-    }
-
-    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
-
-      // grab the input tensor
-      auto &in = _command->get_input(idx);
-
-      // get the tid
-      auto tid = in.tid;
-      auto &s = _tensors[tid];
-
-      // decrement the number of readers
-      s.num_to_read--;
-      assert(s.num_to_read >= 0);
-
-      // if there are no command that is writing to this tensor
-      // reading this tensor and the tensor is scheduled for deletion, delete it here
-      if (s.num_to_read == 0 && !s.writing_tensor && s.scheduled_for_delition) {
-
-        // remove the tensor immediately
-        _remove_tensor(in.tid);
-      }
-    }
-
-    // remove the command
-    _local_commands.erase(_command->id);
 
     return true;
   }
@@ -195,235 +161,6 @@ private:
   // retire remote the command
   bool _retire_remote_command(command_ptr_t _command) {
 
-    // there are no remote deletes something went wrong
-    assert(_command->type != command_t::op_type_t::DELETE);
-
-    // make sure to go through the created tensors
-    // this is only going to happen in the case of the MOVE as the move is initiated by the node that has the tensor
-    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
-
-      // grab the input tensor
-      auto &out = _command->get_output(idx);
-
-      // check if this is actually a move
-      assert(_command->type == command_t::op_type_t::MOVE);
-
-      // get the tid
-      auto tid = out.tid;
-
-      // if the output is not on this node we are cool
-      if (out.node == _node_id) {
-        continue;
-      }
-
-      // ok the tensor is the on this node
-      auto &s = _tensors[tid];
-
-      // make sure that it was not created before
-      assert(!s.is_created);
-
-      // we are done writing to the tensor and
-      s.is_created = true;
-      s.writing_tensor = false;
-
-      // go through the commands that are waiting
-      auto cw = _commands_waiting_for.equal_range(tid);
-      for (auto it = cw.first; it != cw.second;) {
-
-        // try to find the command
-        auto jt = _local_commands.find(it->second);
-        assert(jt != _local_commands.end());
-
-        // check if we have all the inputs
-        if (0 == (--jt->second.second)) {
-
-          // schedule the command for execution
-          _schedule_for_excution(std::move(jt->second.first));
-
-          // remove the command
-          _local_commands.erase(jt);
-        }
-
-        // remove the command from the waiting list
-        it = _commands_waiting_for.erase(it);
-      }
-    }
-
-    // go through the input tensors, and try to figure out if there is some tensor we need to remove
-    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
-
-      // grab the input tensor
-      auto &in = _command->get_input(idx);
-
-      // get the tid
-      auto tid = in.tid;
-      auto &s = _tensors[tid];
-
-      // decrement the number of readers
-      s.num_to_read--;
-      assert(s.num_to_read >= 0);
-
-      // if there are no command that is writing to this tensor
-      // reading this tensor and the tensor is scheduled for deletion, delete it here
-      if (s.num_to_read == 0 && !s.writing_tensor && s.scheduled_for_delition) {
-
-        // remove the tensor immediately
-        _remove_tensor(in.tid);
-      }
-    }
-
-    // remove the command
-    _remote_commands.erase(_command->id);
-
-    return true;
-  }
-
-  bool _queue_remote(command_ptr_t _command) {
-
-    // you can not schedule remote delete
-    if(_command->is_delete()) {
-      return false;
-    } 
-
-    // counts all the tensors not present
-    int32_t not_present = 0;
-
-    // the input tensors
-    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
-
-      // grab the input tensor
-      auto &in = _command->get_input(idx);
-
-      // see if we already have this tensor, if we don't we need to wait for it
-      auto &s = _tensors[in.tid];
-
-      // make sure that this tensor was not deleted before this
-      if(s.scheduled_for_delition) { return false; }
-
-      // we are reading this tensor
-      s.num_to_read++;
-      not_present++;
-    }
-
-    // go through the ouput tensors
-    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
-
-      // grab the input tensor
-      auto &out = _command->get_output(idx);
-      
-      // get the tid
-      auto &s = _tensors[out.tid];
-
-      // make sure everything is fine
-      if(s.scheduled_for_delition && s.is_created) { return false; }
-
-      // we are writing to this tensor
-      s.writing_tensor = true;
-      not_present++;
-    }
-
-    // check if we actually had something
-    if(not_present != 0) {
-
-      // store the remote command
-      _remote_commands[_command->id] = std::move(_command);
-
-      // we scheduled it
-      return true;
-    }
-    
-    return false;
-  }
-
-  bool _queue_local(command_ptr_t _command) {
-
-    // if the command is a delete, schedule all the tensors for deletion
-    if(_command->is_delete()) {
-
-      for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
-
-        // grab the input tensor
-        auto &in = _command->get_input(idx);
-
-        // mark the tensor as scheduled for deletion
-        auto &s = _tensors[in.tid];
-
-        // if we created the tensor, if not just delete it!
-        if(s.is_created && s.num_to_read == 0 && !s.writing_tensor) {
-          
-          // remove the tensor immediately
-          _remove_tensor(in.tid);
-        }
-        else {
-
-          // ok the tensor is not ready for deletion schedule it
-          s.scheduled_for_delition = true;
-        }
-      }
-
-      // finish delete processed
-      return true;
-    }
-
-    // counts all the tensors not present
-    int32_t not_present = 0;
-
-    // the input tensors
-    for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
-
-      // grab the input tensor
-      auto &in = _command->get_input(idx);
-
-      // see if we already have this tensor, if we don't we need to wait for it
-      auto &ts = _tensors[in.tid];
-
-      // make sure that this tensor was not deleted before this
-      if(ts.scheduled_for_delition) { return false; }
-
-      // we are reading this tensor
-      ts.num_to_read++;
-    
-      // if the tensor is not yet created wait for it
-      if(!ts.is_created) {
-        
-        // add the entry
-        _commands_waiting_for.insert({in.tid, _command->id});
-
-        // we have more
-        not_present++;
-      }
-    }
-
-    // go through the output tensors
-    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
-
-      // grab the input tensor
-      auto &out = _command->get_output(idx);
-
-      // get the tid
-      auto &s = _tensors[out.tid];
-
-      // make sure everything is fine
-      if(s.scheduled_for_delition && s.is_created) { return false; }
-
-      // we are writing to this tensor
-      s.writing_tensor = true;
-    }
-
-    // check if there are some tensors that are not present
-    if(not_present != 0) {
-
-      // store the command
-      auto cmd_id = _command->id;
-      _local_commands[cmd_id] = {std::move(_command),  not_present}; 
-    }
-    else {
-
-      // add the command
-      _schedule_for_excution(std::move(_command));
-    }
-
-    // we are done here
     return true;
   }
 
@@ -437,20 +174,12 @@ private:
   // remove the tensor
   void _remove_tensor(tid_t _tid) {
 
-    // remove the tensor from the storage
-    _storage->remove_by_tid(_tid);
-    
-    // remove the tensor
-    _tensors.erase(_tid);
-
-    // make sure there are not commands waiting for the delete
-    assert(_commands_waiting_for.find(_tid) == _commands_waiting_for.end());
   }
 
   // the state of the tensor
   struct internal_tensor_state_t {
 
-    // the number of commands to read this
+    // the number of commands to read this, includes both the remote and local commands
     int32_t num_to_read = 0;
 
     // the number of commands to write this
@@ -470,10 +199,7 @@ private:
   std::condition_variable _cv;
 
   // the node for which this reservation station is for
-  node_id_t _node_id;
-
-  // the storage
-  storage_ptr_t _storage;
+  node_id_t _my_rank;
 
   // commands ready to execute
   std::vector<command_ptr_t> _execute;
@@ -484,11 +210,18 @@ private:
   // the remote commands
   std::unordered_map<command_id_t, command_ptr_t> _remote_commands;
 
-  // what do these entries require
+  // the local tensors commands are waiting for
   std::unordered_multimap<tid_t, command_id_t> _commands_waiting_for;
 
-  // keeps all the tensors 
+  // keeps all the local tensors
   std::unordered_map<tid_t, internal_tensor_state_t> _tensors;
+
+  // keeps the status of all the remote tensors. If the tensor is present we store the command, that requested
+  // the status for it. All the commands with a lower or equal command id can be executed safely as the tensor can not
+  // be removed unless they are executed.
+  std::vector<std::unordered_map<tid_t, command_t>> _remote_tensors;
+
+
 };
 
 using reservation_station_ptr_t = std::shared_ptr<reservation_station_t>;
