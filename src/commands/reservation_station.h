@@ -142,6 +142,35 @@ class reservation_station_t {
     }
   }
 
+  // returns tensors that are scheduled to be remove from the storage
+  tid_t get_to_remove() {
+
+    // wait until we have something to delete
+    std::unique_lock<std::mutex> lk(_m);
+    _cv.wait(lk, [&]{ return !_to_delete.empty() || _shutdown; });
+
+    // if we have nothing to delete
+    if(_to_delete.empty()) {
+      return -1;
+    }
+
+    // return the tensor we want to delete
+    auto tmp = _to_delete.back(); _to_delete.pop_back();
+    return tmp;
+  }
+
+  void shutdown() {
+
+    // set the flag
+    std::unique_lock<std::mutex> lk(_m);
+    _shutdown = true;
+
+    // notify that we are done
+    _cv.notify_all();
+    _deletion_cv.notify_all();
+    _send_status_cv.notify_all();
+  }
+
  private:
 
   bool _queue_remote(command_ptr_t _command) {
@@ -316,6 +345,12 @@ class reservation_station_t {
       _execute.emplace_back(std::move(_command));
       _cv.notify_all();
     }
+    else {
+
+      // store the number of tensors this command is waiting for
+      auto cmd_id = _command->id;
+      _local_commands[cmd_id] = {std::move(_command),  num_not_present};
+    }
 
     // we are done here
     return true;
@@ -347,7 +382,7 @@ class reservation_station_t {
     for(int32_t i = 0; i < _command->get_num_outputs(); i++) {
 
       // get the tensor required in the output
-      auto out = _command->get_input(i);
+      auto out = _command->get_output(i);
 
       // get the tid
       auto tid = out.tid;
@@ -427,6 +462,14 @@ class reservation_station_t {
   // remove the tensor
   void _remove_tensor(tid_t _tid) {
 
+    // remove the tensor from the storage
+    _to_delete.push_back(_tid);
+
+    // remove the tensor
+    _tensors.erase(_tid);
+
+    // make sure there are not commands waiting for the delete
+    assert(_commands_waiting_for.find(_tid) == _commands_waiting_for.end());
   }
 
   // the state of the tensor
@@ -450,6 +493,9 @@ class reservation_station_t {
 
   // we use this to wait for commands
   std::condition_variable _cv;
+
+  // is it still running
+  bool _shutdown = false;
 
   // the node for which this reservation station is for
   node_id_t _my_rank;
@@ -488,6 +534,12 @@ class reservation_station_t {
 
   // we use this to wait for commands
   std::condition_variable _send_status_cv;
+
+  // deletion cv
+  std::condition_variable _deletion_cv;
+
+  // the tensors we want to delete from storage
+  std::vector<tid_t> _to_delete;
 };
 
 using reservation_station_ptr_t = std::shared_ptr<reservation_station_t>;
