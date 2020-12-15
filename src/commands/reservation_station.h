@@ -145,6 +145,7 @@ class reservation_station_t {
 
           // add it to the send status queue so that we can notify the node
           _send_status_queue[rootNode].push_back({_in.tid, _command->id});
+          _send_status_cv.notify_all();
         }
 
       }
@@ -286,6 +287,90 @@ class reservation_station_t {
   // retire the local command
   bool _retire_command(command_ptr_t _command) {
 
+    // if this is a delete we remove the tensor
+    if (_command->type == command_t::op_type_t::DELETE) {
+
+      // remove the tensors
+      for(int32_t i = 0; i < _command->get_num_inputs(); i++) {
+
+        // get the tensor required in the input
+        auto t = _command->get_input(i);
+
+        // remove the tensor immediately
+        _remove_tensor(t.tid);
+
+        // remove the command
+        _local_commands.erase(_command->id);
+      }
+
+      return true;
+    }
+
+    // make sure to go through the created tensors
+    for(int32_t i = 0; i < _command->get_num_outputs(); i++) {
+
+      // get the tensor required in the output
+      auto out = _command->get_input(i);
+
+      // get the tid
+      auto tid = out.tid;
+      auto &s = _tensors[tid];
+
+      // make sure that it was not created before
+      assert(!s.is_created);
+
+      // we are done writing to the tensor and
+      s.is_created = true;
+      s.writing_tensor = false;
+
+      // go through the commands that are waiting
+      auto cw = _commands_waiting_for.equal_range(tid);
+      for (auto it = cw.first; it != cw.second;) {
+
+        // try to find the command
+        auto jt = _local_commands.find(it->second);
+        assert(jt != _local_commands.end());
+
+          // check if we have all the inputs
+        if (0 == (--jt->second.second)) {
+
+          // schedule the command for execution
+          _schedule_for_excution(std::move(jt->second.first));
+
+          // remove the command
+          _local_commands.erase(jt);
+        }
+
+        // remove the command from the waiting list
+        it = _commands_waiting_for.erase(it);
+      }
+    }
+
+    for(int32_t i = 0; i < _command->get_num_inputs(); i++) {
+
+      // get the tensor required in the input
+      auto in = _command->get_input(i);
+
+      // get the tid
+      auto tid = in.tid;
+      auto &s = _tensors[tid];
+
+      // decrement the number of readers
+      s.num_to_read--;
+      assert(s.num_to_read >= 0);
+
+      // if there are no command that is writing to this tensor
+      // reading this tensor and the tensor is scheduled for deletion, delete it here
+      if (s.num_to_read == 0 && !s.writing_tensor && s.scheduled_for_delition) {
+
+        // remove the tensor immediately
+        _remove_tensor(in.tid);
+      }
+    }
+
+    // remove the command
+    _local_commands.erase(_command->id);
+
     return true;
   }
 
@@ -360,6 +445,9 @@ class reservation_station_t {
 
   // the status commands we need to send
   std::vector<std::vector<std::tuple<tid_t, command_id_t>>> _send_status_queue;
+
+  // we use this to wait for commands
+  std::condition_variable _send_status_cv;
 };
 
 using reservation_station_ptr_t = std::shared_ptr<reservation_station_t>;
