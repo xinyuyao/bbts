@@ -24,12 +24,28 @@ class reservation_station_t {
     // lock the reservation station
     std::unique_lock<std::mutex> lk(_m);
 
+    // make sure the commands are scheduled in order
+    auto cmd_id = _command->id;
+    if(_last_cmd + 1 == cmd_id) {
+      return false;
+    }
+
+    // figure out whether this is a local command or a remote command (started by this machine or a remote machine)
+    bool success;
     if(_command->get_root_node() == _my_rank) {
-      return _queue_local(std::move(_command));
+      success = _queue_local(std::move(_command));
     }
     else {
-      return _queue_remote(std::move(_command));
+      success = _queue_remote(std::move(_command));
     }
+
+    // if we succeeded we need to update the last command
+    if(success) {
+      _last_cmd = cmd_id;
+    }
+
+    // we are done get out of here
+    return success;
   }
 
   // mark that a command is processed
@@ -96,6 +112,97 @@ class reservation_station_t {
     // handle delete
     if(_command->is_delete()) {
 
+      // this is bad a remote delete should never exist... // TODO handle this gracefully
+      return false;
+    }
+
+    // get the node that is going to initiate the execution of this command
+    auto rootNode = _command->get_root_node();
+
+    // count the number of inputs that are not present
+    for(int32_t i = 0; i < _command->get_num_inputs(); i++) {
+
+      // get the tensor required in the input
+      auto _in = _command->get_input(i);
+
+      // check if this input is supposed to be located on this machine
+      if(_in.node == _my_rank) {
+
+        // if it is we need to mark that it is being read and
+        auto &s = _tensors[_in.tid];
+
+        // mark that we are reading this tensor
+        s.num_to_read++;
+
+        // check if it was not crated we need to mark that
+        // we need to notify the remote node once the tensor is created
+        if(!s.is_created) {
+
+          // mark that we need to notify the root node
+          _notify_on_creation[rootNode].insert(_in.tid);
+        }
+        else {
+
+          // add it to the send status queue so that we can notify the node
+          _send_status_queue[rootNode].push_back({_in.tid, _command->id});
+        }
+
+      }
+    }
+
+    // go through the output tensors
+    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
+
+      // grab the output tensor
+      auto &_out = _command->get_output(idx);
+
+      // check if the node
+      if(_out.node == _my_rank) {
+
+        // get the tid
+        auto &s = _tensors[_out.tid];
+
+        // make sure everything is fine TODO I need to recover from this somehow...
+        if(s.scheduled_for_delition && s.is_created) { return false; }
+
+        // we are writing to this tensor
+        s.writing_tensor = true;
+      }
+    }
+
+    return true;
+  }
+
+  bool _queue_local(command_ptr_t _command) {
+
+    // handle delete
+    if(_command->is_delete()) {
+
+      // go through the inputs and eiter remove the tensors directly,
+      // or mark them for deletion if they are going to be used soon
+      for(auto idx = 0; idx < _command->get_num_inputs(); ++idx) {
+
+        // grab the input tensor
+        auto &in = _command->get_input(idx);
+
+        // mark the tensor as scheduled for deletion
+        auto &s = _tensors[in.tid];
+
+        // if we created the tensor, if not just delete it!
+        if(s.is_created && s.num_to_read == 0 && !s.writing_tensor) {
+
+          // remove the tensor immediately
+          _remove_tensor(in.tid);
+        }
+        else {
+
+          // ok the tensor is not ready for deletion schedule it
+          s.scheduled_for_delition = true;
+        }
+      }
+
+      // finish delete processed
+      return true;
     }
 
     // count the number of inputs that are not present
@@ -103,16 +210,19 @@ class reservation_station_t {
     for(int32_t i = 0; i < _command->get_num_inputs(); i++) {
 
       // get the tensor required in the input
-      auto _ts = _command->get_input(i);
+      auto _in = _command->get_input(i);
 
       // check if this is a remote tensor or a local tensor
-      if(_ts.node == _my_rank) {
+      if(_in.node == _my_rank) {
 
         // if it is a local we need to check if it was created already
-        auto &s = _tensors[_ts.tid];
+        auto &s = _tensors[_in.tid];
 
-        // you can not use a tensors scheduled for deletion
-        assert(!s.scheduled_for_delition);
+        // make sure that this tensor was not deleted before this TODO I need to recover from this somehow...
+        if(s.scheduled_for_delition) { return false; }
+
+        // we are reading this tensor
+        s.num_to_read++;
 
         // if it was not created we need to keep track of that
         if(!s.is_created) {
@@ -121,32 +231,53 @@ class reservation_station_t {
           num_not_present++;
 
           // mark that this command is waiting
-          _commands_waiting_for[_ts.tid] = _command->id;
+          _commands_waiting_for.insert({_in.tid, _command->id});
         }
       }
       else {
 
-        // ok this is a remote tensor, we need to check if it is present
-        auto &rts = _remote_tensors[_ts.node];
-        auto it = rts.find(_ts.tid);
+        // ok this is a remote tensor, we need to check if _ts is present
+        auto &_rts = _remote_tensors[_in.node];
+        auto _ts = _rts.find(_in.tid);
 
-        // if the tensor is not present or we don't have the most recent info about it
+        // if the tensor is not present or we don't have the most recent info about _ts
         // (the command that requested the status is smaller than the id of this command)
-        if(it == rts.end() && it->second < _command->id) {
+        if(_ts == _rts.end() && _ts->second < _command->id) {
 
+          // tensor is not present
+          num_not_present++;
 
+          // store the remote command
+          _remote_tensors[_in.node].insert({_in.tid, _command->id});
         }
       }
     }
 
-    for(int32_t i = 0; i < _command->get_num_outputs(); i++) {
+    // go through the output tensors
+    for(auto idx = 0; idx < _command->get_num_outputs(); ++idx) {
 
+      // grab the output tensor
+      auto &_out = _command->get_output(idx);
+
+      // check if the node
+      if(_out.node == _my_rank) {
+
+        // get the tid
+        auto &s = _tensors[_out.tid];
+
+        // make sure everything is fine TODO I need to recover from this somehow...
+        if(s.scheduled_for_delition && s.is_created) { return false; }
+
+        // we are writing to this tensor
+        s.writing_tensor = true;
+      }
     }
 
-    return false;
-  }
-
-  bool _queue_local(command_ptr_t _command) {
+    // if we have all the required tensors we can kick off the command
+    if(num_not_present == 0) {
+      _execute.emplace_back(std::move(_command));
+      _cv.notify_all();
+    }
 
     // we are done here
     return true;
@@ -201,6 +332,9 @@ class reservation_station_t {
   // the node for which this reservation station is for
   node_id_t _my_rank;
 
+  // the id of the last command we have executed
+  command_id_t _last_cmd = -1;
+
   // commands ready to execute
   std::vector<command_ptr_t> _execute;
 
@@ -213,15 +347,19 @@ class reservation_station_t {
   // the local tensors commands are waiting for
   std::unordered_multimap<tid_t, command_id_t> _commands_waiting_for;
 
-  // keeps all the local tensors
+  // keeps all the local tensors and information about them
   std::unordered_map<tid_t, internal_tensor_state_t> _tensors;
 
   // keeps the status of all the remote tensors. If the tensor is present we store the command, that requested
   // the status for it. All the commands with a lower or equal command id can be executed safely as the tensor can not
   // be removed unless they are executed.
-  std::vector<std::unordered_map<tid_t, command_t>> _remote_tensors;
+  std::vector<std::unordered_multimap<tid_t, command_id_t>> _remote_tensors;
 
+  // tensors for which we need to send the status for, once they are created...
+  std::vector<std::unordered_set<tid_t>> _notify_on_creation;
 
+  // the status commands we need to send
+  std::vector<std::vector<std::tuple<tid_t, command_id_t>>> _send_status_queue;
 };
 
 using reservation_station_ptr_t = std::shared_ptr<reservation_station_t>;
