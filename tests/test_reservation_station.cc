@@ -13,7 +13,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
   storage->create_tensor(1, 100);
 
   // create the reservation station
-  reservation_station_t rs(0, storage);
+  reservation_station_t rs(0, 1);
 
   // register the tensor
   rs.register_tensor(0);
@@ -76,7 +76,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
   storage->create_tensor(1, 100);
 
   // create the reservation station
-  reservation_station_t rs(0, storage);
+  reservation_station_t rs(0, 1);
 
   // register the tensor
   rs.register_tensor(0);

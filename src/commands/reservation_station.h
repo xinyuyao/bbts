@@ -15,7 +15,13 @@ namespace bbts {
 class reservation_station_t {
  public:
 
-  reservation_station_t(node_id_t _node_id, storage_ptr_t _storage) : _my_rank(_node_id), _storage(std::move(_storage)) {}
+  reservation_station_t(node_id_t _node_id, int32_t num_nodes) : _my_rank(_node_id), _num_nodes(num_nodes) {
+
+    // make one of these for each node
+    _remote_tensors.resize(num_nodes);
+    _notify_on_creation.resize(num_nodes);
+    _send_status_queue.resize(num_nodes);
+  }
 
   // queue a command, this command has to be executed in the same thread and the commands
   // have to be queued in the exact order they are coming in
@@ -26,7 +32,7 @@ class reservation_station_t {
 
     // make sure the commands are scheduled in order
     auto cmd_id = _command->id;
-    if(_last_cmd + 1 == cmd_id) {
+    if(_last_cmd + 1 != cmd_id) {
       return false;
     }
 
@@ -103,6 +109,37 @@ class reservation_station_t {
     // lock the tensor
     std::unique_lock<std::mutex> lk(_m);
 
+    // get the tensor state if any
+    auto &s = _tensors[_tid];
+
+    // make sure that it was not created before
+    assert(!s.is_created);
+
+    // we are done writing to the tensor and
+    s.is_created = true;
+    s.writing_tensor = false;
+
+    // go through the commands that are waiting
+    auto cw = _commands_waiting_for.equal_range(_tid);
+    for (auto it = cw.first; it != cw.second;) {
+
+      // try to find the command
+      auto jt = _local_commands.find(it->second);
+      assert(jt != _local_commands.end());
+
+      // check if we have all the inputs
+      if(0 == (--jt->second.second)) {
+
+        // schedule the command for execution
+        _schedule_for_excution(std::move(jt->second.first));
+
+        // remove the command
+        _local_commands.erase(jt);
+      }
+
+      // remove the command from the waiting list
+      it = _commands_waiting_for.erase(it);
+    }
   }
 
  private:
@@ -416,6 +453,9 @@ class reservation_station_t {
 
   // the node for which this reservation station is for
   node_id_t _my_rank;
+
+  // the number of nodes in the cluster
+  int32_t _num_nodes;
 
   // the id of the last command we have executed
   command_id_t _last_cmd = -1;
