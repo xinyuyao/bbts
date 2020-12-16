@@ -99,6 +99,11 @@ TEST(TestReservationStation, FewLocalCommands1) {
 
 TEST(TestReservationStation, FewLocalCommands2) {
 
+  // tensors = { (0, 0), (1, 0) }
+  // APPLY (.input = {(0, 0)}, .output = {(2, 0)})
+  // REDUCE (.input = {(1, 0), (2, 0)}, .output = {(3, 0)})
+  // DELETE (.input = {(0, 0), (1, 0), (2, 0), (3, 0)})
+
   // create the storage
   storage_ptr_t storage = std::make_shared<storage_t>();
 
@@ -164,7 +169,71 @@ TEST(TestReservationStation, FewLocalCommands2) {
   EXPECT_EQ(storage->get_num_tensors(), 0);
 }
 
-TEST(TestReservationStation, LotOfLocalCommands) {
+TEST(TestReservationStation, TwoNodesBMM) {
+
+  std::vector<reservation_station_ptr_t> rss;
+
+  //       Tensors for A
+  // | rowID | colID | tid | node |
+  // |   0   |   0   |  0  |  1   |
+  // |   0   |   1   |  1  |  0   |
+  // |   1   |   0   |  2  |  0   |
+  // |   1   |   1   |  3  |  1   |
+
+  rss[1]->register_tensor(0);
+  rss[0]->register_tensor(1);
+  rss[0]->register_tensor(2);
+  rss[1]->register_tensor(3);
+
+
+  //       Tensors for B
+  // | rowID | colID | tid | node |
+  // |   0   |   0   |  4  |  1   |
+  // |   0   |   1   |  5  |  1   |
+  // |   1   |   0   |  6  |  0   |
+  // |   1   |   1   |  7  |  0   |
+
+  rss[1]->register_tensor(4);
+  rss[1]->register_tensor(5);
+  rss[0]->register_tensor(6);
+  rss[0]->register_tensor(7);
+
+
+  std::vector<command_ptr_t> _cmds;
+
+  /// 1.1 shuffle A.rowID
+
+  // MOVE (.input = {(0, 1)}, .output = {(0, 0)})
+  _cmds.emplace_back(command_t::create_unique(0,
+                                              command_t::op_type_t::MOVE,
+                                              {-1, -1},
+                                              {command_t::tid_node_id_t{.tid = 0, .node = 1}},
+                                              {command_t::tid_node_id_t{.tid = 0, .node = 0}}));
+
+  // MOVE (.input = {(0, 2)}, .output = {(1, 2)})
+  _cmds.emplace_back(command_t::create_unique(0,
+                                              command_t::op_type_t::MOVE,
+                                              {-1, -1},
+                                              {command_t::tid_node_id_t{.tid = 2, .node = 0}},
+                                              {command_t::tid_node_id_t{.tid = 2, .node = 1}}));
+
+  /// 1.2 broadcast B
+
+
+
+  // (0, 0) x (0, 0) or as tids {0}
+  // (0, 1) x (1, 0)
+
+
+  // (0, 0) x (0, 0)
+  // (0, 1) x (1, 0)
+
+  // (0, 0) x (0, 0)
+  // (0, 1) x (1, 0)
+
+  // (0, 0) x (0, 0)
+  // (0, 1) x (1, 0)
+
 
 }
 
