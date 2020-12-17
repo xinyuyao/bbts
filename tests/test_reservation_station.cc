@@ -5,15 +5,15 @@
 namespace bbts {
 
 // the reservation station needs a deleter thread
-std::thread create_deleter_thread(reservation_station_ptr_t &_rs, storage_ptr_t &_sto) {
+std::thread create_deleter_thread(reservation_station_ptr_t &_rs, std::unordered_set<tid_t> &_sto) {
 
   // create the thread
-  return std::thread([_rs, _sto]() {
+  return std::thread([_rs, &_sto]() {
 
     // while we have something remove
     tid_t id;
     while((id = _rs->get_to_remove()) != -1) {
-      _sto->remove_by_tid(id);
+      _sto.erase(id);
     }
 
   });
@@ -28,11 +28,11 @@ TEST(TestReservationStation, FewLocalCommands1) {
   // DELETE (.input = {(1, 0), (2, 0)})
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>();
+  std::unordered_set<tid_t> storage;
 
   // create two input tensors
-  storage->create_tensor(0, 100);
-  storage->create_tensor(1, 100);
+  storage.insert(0);
+  storage.insert(1);
 
   // create the reservation station
   auto rs = std::make_shared<reservation_station_t>(0, 1);
@@ -78,12 +78,12 @@ TEST(TestReservationStation, FewLocalCommands1) {
   auto c1 = rs->get_next_command();
 
   // retire the command as we pretend we have executed it
-  storage->create_tensor(2, 100);
+  storage.insert(2);
   EXPECT_TRUE(rs->retire_command(std::move(c1)));
 
   // get the next command
   auto c2 = rs->get_next_command();
-  storage->create_tensor(3, 100);
+  storage.insert(3);
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
   // shutdown the reservation station
@@ -93,7 +93,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
   deleter.join();
 
   // make sure there is only one tensors
-  EXPECT_EQ(storage->get_num_tensors(), 1);
+  EXPECT_EQ(storage.size(), 1);
 }
 
 
@@ -105,11 +105,11 @@ TEST(TestReservationStation, FewLocalCommands2) {
   // DELETE (.input = {(0, 0), (1, 0), (2, 0), (3, 0)})
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>();
+  std::unordered_set<tid_t> storage;
 
   // create two input tensors
-  storage->create_tensor(0, 100);
-  storage->create_tensor(1, 100);
+  storage.insert(0);
+  storage.insert(1);
 
   // create the reservation station
   auto rs = std::make_shared<reservation_station_t>(0, 1);
@@ -141,12 +141,12 @@ TEST(TestReservationStation, FewLocalCommands2) {
   auto c1 = rs->get_next_command();
 
   // retire the command as we pretend we have executed it
-  storage->create_tensor(2, 100);
+  storage.insert(2);
   EXPECT_TRUE(rs->retire_command(std::move(c1)));
 
   // get the next command 
   auto c2 = rs->get_next_command();
-  storage->create_tensor(3, 100);
+  storage.insert(3);
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
   // make a command that deletes all the tensors except for the tid = 3 tensor
@@ -166,12 +166,18 @@ TEST(TestReservationStation, FewLocalCommands2) {
   deleter.join();
 
   // make sure there is only one tensors
-  EXPECT_EQ(storage->get_num_tensors(), 0);
+  EXPECT_EQ(storage.size(), 0);
 }
 
 TEST(TestReservationStation, TwoNodesBMM) {
 
+  // create the storage
+  std::vector<std::unordered_set<tid_t>> sto(2);
+
+  // create the two reservation stations
   std::vector<reservation_station_ptr_t> rss;
+  rss.push_back(std::make_shared<reservation_station_t>(0, 2));
+  rss.push_back(std::make_shared<reservation_station_t>(1, 2));
 
   //       Tensors for A
   // | rowID | colID | tid | node |
@@ -180,11 +186,21 @@ TEST(TestReservationStation, TwoNodesBMM) {
   // |   1   |   0   |  2  |  0   |
   // |   1   |   1   |  3  |  1   |
 
+  // (0, 0)
   rss[1]->register_tensor(0);
-  rss[0]->register_tensor(1);
-  rss[0]->register_tensor(2);
-  rss[1]->register_tensor(3);
+  sto[1].insert(0);
 
+  // (0, 1)
+  rss[0]->register_tensor(1);
+  sto[0].insert(1);
+
+  // (1, 0)
+  rss[0]->register_tensor(2);
+  sto[0].insert(2);
+
+  // (1, 1)
+  rss[1]->register_tensor(3);
+  sto[1].insert(3);
 
   //       Tensors for B
   // | rowID | colID | tid | node |
@@ -193,12 +209,23 @@ TEST(TestReservationStation, TwoNodesBMM) {
   // |   1   |   0   |  6  |  0   |
   // |   1   |   1   |  7  |  0   |
 
+  // (0, 0)
   rss[1]->register_tensor(4);
+  sto[1].insert(4);
+
+  // (1, 0)
   rss[1]->register_tensor(5);
+  sto[1].insert(5);
+
+  // (0, 1)
   rss[0]->register_tensor(6);
+  sto[0].insert(6);
+
+  // (1, 1)
   rss[0]->register_tensor(7);
+  sto[0].insert(7);
 
-
+  // we put the commands we want to schedule here
   std::vector<command_ptr_t> _cmds;
 
   /// 1.1 shuffle A.rowID
@@ -352,6 +379,59 @@ TEST(TestReservationStation, TwoNodesBMM) {
 
 
   /// Remove the intermediate results
+
+  // remove them from node 0
+  _cmds.emplace_back(command_t::create_unique(18,
+                                            command_t::op_type_t::DELETE,
+                                            {0, 0},
+                                            {command_t::tid_node_id_t{.tid = 8, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 9, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 12, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 13, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 0, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 4, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 5, .node = 0}},
+                                                   {}));
+
+  // remove them from node 1
+  _cmds.emplace_back(command_t::create_unique(19,
+                                              command_t::op_type_t::DELETE,
+                                              {0, 0},
+                                              {command_t::tid_node_id_t{.tid = 10, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 11, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 14, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 15, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 2, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 6, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 7, .node = 1}},
+                                                     {}));
+
+  // schedule them all at once
+  for(auto &cmd : _cmds) {
+
+    // if it uses node 0
+    if(cmd->uses_node(0)) {
+      EXPECT_TRUE(rss[0]->queue_command(cmd->clone()));
+    }
+
+    // check if node 1 uses the command
+    if(cmd->uses_node(1)) {
+      EXPECT_TRUE(rss[1]->queue_command(cmd->clone()));
+    }
+  }
+
+  // create the deleters
+  std::vector<std::thread> deleters;
+  deleters.push_back(std::move(create_deleter_thread(rss[0], sto[0])));
+  deleters.push_back(std::move(create_deleter_thread(rss[1], sto[1])));
+
+  // shutdown the rss
+  rss[0]->shutdown();
+  rss[1]->shutdown();
+
+  // wait for the deleters
+  deleters[0].join();
+  deleters[1].join();
 }
 
 }

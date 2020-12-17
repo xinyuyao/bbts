@@ -70,6 +70,7 @@ struct command_t {
   // is this an apply
   [[nodiscard]] bool is_apply() const { return type == op_type_t::APPLY; }
 
+  // check if command uses a particular node
   [[nodiscard]] bool uses_node(node_id_t _node) const {
 
     // go and check every tensor if it is located on a node
@@ -129,6 +130,31 @@ struct command_t {
 
   // the function we want to execute
   ud_impl_id_t fun_id = {-1, -1};
+
+  // clone the command
+  command_ptr_t clone() {
+
+    // create a new command
+    auto tmp = create_unique(_num_inputs, _num_outputs);
+
+    // set the id type and function
+    tmp->id = id;
+    tmp->type = type;
+    tmp->fun_id = fun_id;
+
+    // fill-up the inputs
+    for(auto idx = 0; idx < _num_inputs; idx++) {
+      tmp->get_input(idx) = get_input(idx);
+    }
+
+    // fill-up the outputs
+    for(auto idx = 0; idx < _num_outputs; idx++) {
+      tmp->get_output(idx) = get_output(idx);
+    }
+
+    // return the the clone
+    return std::move(tmp);
+  }
 
   // create the command
   static command_ptr_t create_unique(size_t num_inputs, size_t num_outputs) {

@@ -32,7 +32,7 @@ class reservation_station_t {
 
     // make sure the commands are scheduled in order
     auto cmd_id = _command->id;
-    if(_last_cmd + 1 != cmd_id) {
+    if(_last_cmd >= cmd_id) {
       return false;
     }
 
