@@ -92,7 +92,12 @@ class reservation_station_t {
 
     // wait until we have something here
     std::unique_lock<std::mutex> lk(_m);
-    _cv.wait(lk, [&]{return !_execute.empty();});
+    _cv.wait(lk, [&]{ return !_execute.empty()  || _shutdown; });
+
+    // if we have shutdown return null as we have no command left...
+    if(_shutdown) {
+      return nullptr;
+    }
 
     // pop the unique pointer of the vector
     auto tmp = std::move(_execute.back());
