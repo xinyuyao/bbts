@@ -41,6 +41,16 @@ struct command_t {
     return _tensors[idx];
   }
 
+  // returns all the inputs as vector
+  [[nodiscard]] std::vector<tid_node_id_t> get_inputs() const {
+
+    std::vector<tid_node_id_t> input(get_num_inputs());
+    for(int32_t i = 0; i < input.size(); ++i) {
+      input[i] = get_output(i);
+    }
+    return std::move(input);
+  }
+
   // returns the output tensor
   [[nodiscard]] tid_node_id_t &get_output(int32_t idx) {
     return _tensors[_num_inputs + idx];
@@ -49,6 +59,16 @@ struct command_t {
   // return the output tensor but constant
   [[nodiscard]] const tid_node_id_t &get_output(int32_t idx) const {
     return _tensors[_num_inputs + idx];
+  }
+
+  // returns all the outputs as vector
+  [[nodiscard]] std::vector<tid_node_id_t> get_outputs() const {
+
+    std::vector<tid_node_id_t> output(get_num_outputs());
+    for(int32_t i = 0; i < output.size(); ++i) {
+      output[i] = get_output(i);
+    }
+    return std::move(output);
   }
 
   // return the number of input tensors
@@ -69,6 +89,33 @@ struct command_t {
   
   // is this an apply
   [[nodiscard]] bool is_apply() const { return type == op_type_t::APPLY; }
+
+  // is this a local reduce operator
+  [[nodiscard]] bool is_local_reduce(node_id_t _node_id) const {
+
+    // make sure it is actually a reduce
+    if(type != op_type_t::REDUCE) {
+      return false;
+    }
+
+    // check if the output and all inputs are on the same node
+    for(int32_t idx = 0; idx < (get_num_inputs() + get_num_outputs()); idx++) {
+      if(_tensors[idx].node != _node_id) { return false; }
+    }
+    return true;
+  }
+
+  // is remote reduce
+  [[nodiscard]] bool is_remote_reduce(node_id_t _node_id) const {
+
+    // make sure it is actually a reduce
+    if(type != op_type_t::REDUCE) {
+      return false;
+    }
+
+    // if it is not local it is remote
+    return !is_local_reduce(_node_id);
+  }
 
   // check if command uses a particular node
   [[nodiscard]] bool uses_node(node_id_t _node) const {

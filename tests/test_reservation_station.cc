@@ -6,19 +6,191 @@
 
 namespace bbts {
 
+using _remote_cmd_t = std::tuple<command_ptr_t, std::atomic<bool>*>;
+
 // the reservation station needs a deleter thread
-std::thread create_deleter_thread(reservation_station_ptr_t &_rs, std::unordered_set<tid_t> &_sto) {
+std::thread create_deleter_thread(reservation_station_ptr_t &_rs, std::unordered_set<tid_t> &_sto, int32_t _num_to_del) {
 
   // create the thread
-  return std::thread([_rs, &_sto]() {
+
+  return std::thread([_rs, &_sto, &_num_to_del]() {
 
     // while we have something remove
     tid_t id;
-    while((id = _rs->get_to_remove()) != -1) {
+    auto to_deleted = _num_to_del;
+    while(true) {
+
+      // check if done
+      if(to_deleted == 0) {
+        break;
+      }
+
+      // get the next tensor to remove
+      id = _rs->get_to_remove();
+      if(id == -1) {
+        break;
+      }
+
+      // do some random sleeping
+      usleep(rand() % 1000 + 100);
+
+      // deleted
       _sto.erase(id);
+      std::cout << "Remove tensor : " <<  id << '\n' << std::flush;
+      to_deleted--;
+    }
+  });
+}
+
+std::thread create_remote_processing_thread(int32_t node,
+                                            std::vector<reservation_station_ptr_t> &rss,
+                                            std::vector<std::unordered_set<tid_t>> &sto,
+                                            std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds) {
+
+  // create the thread to pull
+  std::thread t = std::thread([&remote_cmds, node, &rss, &sto]() {
+
+    // process the remote commands
+    while (true) {
+
+      // wait for the command
+      _remote_cmd_t _rc;
+      remote_cmds[node].wait_dequeue(_rc);
+
+      // check if we are done...
+      if(std::get<0>(_rc) == nullptr) {
+        break;
+      }
+
+      // simulate the execution
+      usleep(rand() % 100);
+
+      // we only have remote moves here
+      if(std::get<0>(_rc)->type == command_t::MOVE) {
+
+        // get the output tensor
+        auto [out_tid, out_node] = std::get<0>(_rc)->get_output(0);
+
+        // make sure it is the same node
+        EXPECT_EQ(node, out_node);
+        std::cout << "MOVE from " << out_node << "\n" << std::flush;
+
+        // mark that the tensor is
+        sto[node].insert(out_tid);
+
+        // register the tensor with the reservation station
+        rss[node]->register_tensor(out_tid);
+      }
+
+      // retire the command
+      rss[node]->retire_command(std::move(std::get<0>(_rc)));
+
+      // mark that we are done
+      *std::get<1>(_rc) = true;
     }
 
   });
+
+  return std::move(t);
+}
+
+std::thread create_command_processing_thread(std::vector<reservation_station_ptr_t> &rss,
+                                             std::vector<std::unordered_set<tid_t>> &sto,
+                                             std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds,
+                                             int32_t node) {
+
+  // create the thread to pull
+  std::thread t = std::thread([&rss, &remote_cmds, &sto, node]() {
+
+    while (true) {
+
+      // get the command
+      auto cmd = rss[node]->get_next_command();
+      if(cmd == nullptr) {
+        break;
+      }
+
+      // if we have a move
+      if(cmd->type == command_t::MOVE) {
+
+        // move the
+        std::cout << "MOVE " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
+
+        // get the target node
+        auto target = cmd->get_output(0);
+
+        // we use this to busy wait
+        std::atomic<bool> done{};
+        done = false;
+
+        // push the command
+        _remote_cmd_t c = {cmd->clone(), &done };
+        remote_cmds[target.node].enqueue(c);
+
+        // add some waiting to simulate running the command
+        usleep(rand() % 100);
+
+        // retire the command
+        rss[node]->retire_command(std::move(cmd));
+
+        // wait for the remote command to be done
+        while(!done) {}
+      }
+      else if(cmd->type == command_t::APPLY) {
+
+        std::cout << "APPLY " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
+
+        if(cmd->get_root_node() == node) {
+
+          // store the outputs so we can add it to the storage
+          auto outputs = cmd->get_outputs();
+
+          // retire the command
+          rss[node]->retire_command(std::move(cmd));
+
+          // update all the outputs in the storage
+          for(auto &o : outputs) {
+            sto[node].insert(o.tid);
+          }
+        }
+        else {
+
+          // all applies are local
+          throw std::runtime_error("How did this happen!");
+        }
+      }
+      else if(cmd->type == command_t::DELETE) {
+
+        // this should never happen
+        throw std::runtime_error("We should never get a delete to execute, delete is implicit...");
+      }
+      else if(cmd->type == command_t::REDUCE) {
+
+        // check if the reduce is remote or local
+        if(cmd->is_local_reduce(node)) {
+
+          std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+
+          // store the outputs so we can add it to the storage
+          auto outputs = cmd->get_outputs();
+
+          // retire the command
+          rss[node]->retire_command(std::move(cmd));
+
+          // update all the outputs in the storage
+          for(auto &o : outputs) {
+            sto[node].insert(o.tid);
+          }
+        }
+        else {
+          std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+        }
+      }
+    }
+
+  });
+
+  return std::move(t);
 }
 
 TEST(TestReservationStation, FewLocalCommands1) {
@@ -40,7 +212,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
   auto rs = std::make_shared<reservation_station_t>(0, 1);
 
   // create the deleter thread
-  auto deleter = create_deleter_thread(rs, storage);
+  auto deleter = create_deleter_thread(rs, storage, 2);
 
   // register the tensor
   rs->register_tensor(0);
@@ -117,7 +289,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
   auto rs = std::make_shared<reservation_station_t>(0, 1);
 
   // create the deleter thread
-  auto deleter = create_deleter_thread(rs, storage);
+  auto deleter = create_deleter_thread(rs, storage, 2);
 
   // register the tensor
   rs->register_tensor(0);
@@ -387,26 +559,34 @@ TEST(TestReservationStation, TwoNodesBMM) {
   _cmds.emplace_back(command_t::create_unique(18,
                                             command_t::op_type_t::DELETE,
                                             {0, 0},
-                                            {command_t::tid_node_id_t{.tid = 8, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 9, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 12, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 13, .node = 0},
+                                            {command_t::tid_node_id_t{.tid = 1, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 2, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 6, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 7, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 0, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 4, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 5, .node = 0}},
+                                                    command_t::tid_node_id_t{.tid = 5, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 8, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 9, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 12, .node = 0},
+                                                    command_t::tid_node_id_t{.tid = 13, .node = 0}},
                                                    {}));
 
   // remove them from node 1
   _cmds.emplace_back(command_t::create_unique(19,
                                               command_t::op_type_t::DELETE,
                                               {0, 0},
-                                              {command_t::tid_node_id_t{.tid = 10, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 11, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 14, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 15, .node = 1},
+                                              {command_t::tid_node_id_t{.tid = 0, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 3, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 4, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 5, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 2, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 6, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 7, .node = 1}},
+                                                      command_t::tid_node_id_t{.tid = 7, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 10, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 11, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 14, .node = 1},
+                                                      command_t::tid_node_id_t{.tid = 15, .node = 1}},
                                                      {}));
 
   // schedule them all at once
@@ -424,131 +604,55 @@ TEST(TestReservationStation, TwoNodesBMM) {
   }
 
   // create the queues for commands
-  using _remote_cmd_t = std::tuple<command_ptr_t, std::atomic<bool>*>;
   std::vector<bbts::concurent_queue<_remote_cmd_t>> remote_cmds(2);
 
   // these threads will process the remote move operations
   std::vector<std::thread> _remote_executor_threads;
+  _remote_executor_threads.reserve(2);
   for(node_id_t node = 0; node < 2; ++node) {
 
-    // create the thread to pull
-    std::thread t = std::thread([&remote_cmds, &_remote_executor_threads, node, &rss, &sto]() {
-
-      // process the remote commands
-      while (true) {
-
-        // wait for the command
-        _remote_cmd_t _rc;
-        remote_cmds[node].wait_dequeue(_rc);
-
-        // check if we are done...
-        if(std::get<0>(_rc) == nullptr) {
-          break;
-        }
-
-        // simulate the execution
-        usleep(rand() % 100);
-
-        // we only have remote moves here
-        EXPECT_EQ(std::get<0>(_rc)->type, command_t::MOVE);
-        if(std::get<0>(_rc)->type == command_t::MOVE) {
-
-          // get the output tensor
-          auto [out_tid, out_node] = std::get<0>(_rc)->get_output(0);
-
-          // make sure it is the same node
-          EXPECT_EQ(node, out_node);
-          std::cout << "MOVE\n" << std::flush;
-
-          // mark that the tensor is
-          sto[node].insert(out_tid);
-
-          // register the tensor with the reservation station
-          rss[node]->register_tensor(out_tid);
-        }
-
-        // retire the command
-        rss[node]->retire_command(std::move(std::get<0>(_rc)));
-
-        // mark that we are done
-        *std::get<1>(_rc) = true;
-      }
-
-
-    });
-
     // store the thread
-    _remote_executor_threads.push_back(std::move(t));
+    _remote_executor_threads.push_back(std::move(create_remote_processing_thread(node, rss, sto, remote_cmds)));
   }
 
   // simulator threads
   std::vector<std::thread> _executor_threads;
+  _executor_threads.reserve(2);
   for(node_id_t node = 0; node < 2; ++node) {
 
-    // create the thread to pull
-    std::thread t = std::thread([&rss, &remote_cmds, node]() {
-
-      while (true) {
-
-        // get the command
-        auto cmd = rss[node]->get_next_command();
-
-        // log the command
-        std::cout << "command " << cmd->id << " on node " << node << '\n' << std::flush;
-
-        if(cmd == nullptr) {
-          break;
-        }
-
-        // if we have a move
-        if(cmd->type == command_t::MOVE) {
-
-          // get the target node
-          auto target = cmd->get_output(0);
-
-          // we use this to busy wait
-          std::atomic<bool> done{};
-          done = false;
-
-          // push the command
-          _remote_cmd_t c = { cmd->clone(), &done };
-          remote_cmds[target.node].enqueue(c);
-
-          // add some waiting to simulate running the command
-          usleep(rand() % 100);
-
-          // wait for the remote command to be done
-          while(!done) {}
-        }
-        else if(cmd->type == command_t::APPLY) {
-
-        }
-        else if(cmd->type == command_t::DELETE) {
-
-        }
-        else if(cmd->type == command_t::REDUCE) {
-
-        }
-
-      }
-
-    });
-
-    _executor_threads.push_back(std::move(t));
+    _executor_threads.push_back(std::move(create_command_processing_thread(rss, sto, remote_cmds, node)));
   }
 
   // create the deleters
   std::vector<std::thread> deleters;
-  deleters.push_back(std::move(create_deleter_thread(rss[0], sto[0])));
-  deleters.push_back(std::move(create_deleter_thread(rss[1], sto[1])));
-
-  // shutdown the rss
-  //rss[0]->shutdown();
-  //rss[1]->shutdown();
+  deleters.push_back(std::move(create_deleter_thread(rss[0], sto[0], 11)));
+  deleters.push_back(std::move(create_deleter_thread(rss[1], sto[1], 11)));
 
   // wait for the deleters
   deleters[0].join();
   deleters[1].join();
+
+  // shutdown the rss
+  rss[0]->shutdown();
+  rss[1]->shutdown();
+
+  _remote_cmd_t c = {nullptr, nullptr};
+  remote_cmds[0].enqueue(c);
+  remote_cmds[1].enqueue(c);
+
+  // wait for remote executors to finish
+  for(auto &t : _remote_executor_threads) {
+    t.join();
+  }
+
+  // wait for the executors
+  for(auto &t : _executor_threads) {
+    t.join();
+  }
+
+  // make sure there are exactly two for the reduce...
+  EXPECT_EQ(sto[0].size(), 2);
+  EXPECT_EQ(sto[1].size(), 2);
 }
 
 }

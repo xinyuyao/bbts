@@ -389,6 +389,11 @@ class reservation_station_t {
       // get the tensor required in the output
       auto out = _command->get_output(i);
 
+      // if this tensor is not on our node we don't do anything
+      if(out.node != _my_rank) {
+        continue;
+      }
+
       // get the tid
       auto tid = out.tid;
       auto &s = _tensors[tid];
@@ -427,6 +432,11 @@ class reservation_station_t {
 
       // get the tensor required in the input
       auto in = _command->get_input(i);
+
+      // if this tensor is not on our node we don't do anything
+      if(in.node != _my_rank) {
+        continue;
+      }
 
       // get the tid
       auto tid = in.tid;
