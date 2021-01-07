@@ -46,7 +46,7 @@ struct command_t {
 
     std::vector<tid_node_id_t> input(get_num_inputs());
     for(int32_t i = 0; i < input.size(); ++i) {
-      input[i] = get_output(i);
+      input[i] = get_input(i);
     }
     return std::move(input);
   }

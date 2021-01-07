@@ -25,6 +25,7 @@ TEST(TestStorage, Test1) {
   auto fmt_id = tf->get_tensor_ftm("dense");
 
   // make the threads
+  threads.reserve(num_threads);
   for(int t = 0; t < num_threads; ++t) {
 
     // run a bunch of threads
