@@ -8,8 +8,30 @@ namespace bbts {
 
 using _remote_cmd_t = std::tuple<command_ptr_t, std::atomic<bool>*>;
 
+struct fake_storage_t {
+
+  void insert(tid_t tid) {
+
+    std::unique_lock<std::mutex> lck(_m);
+    _sto.insert(tid);
+  }
+
+  void remove(tid_t tid) {
+    std::unique_lock<std::mutex> lck(_m);
+    _sto.erase(tid);
+  }
+
+  size_t num_tensors() const {
+    return _sto.size();
+  }
+
+  std::mutex _m;
+
+  std::unordered_set<tid_t> _sto;
+};
+
 // the reservation station needs a deleter thread
-std::thread create_deleter_thread(reservation_station_ptr_t &_rs, std::unordered_set<tid_t> &_sto, int32_t _num_to_del) {
+std::thread create_deleter_thread(reservation_station_ptr_t &_rs, fake_storage_t &_sto, int32_t _num_to_del) {
 
   // create the thread
 
@@ -35,7 +57,7 @@ std::thread create_deleter_thread(reservation_station_ptr_t &_rs, std::unordered
       usleep(rand() % 1000 + 100);
 
       // deleted
-      _sto.erase(id);
+      _sto.remove(id);
       std::cout << "Remove tensor : " <<  id << '\n' << std::flush;
       to_deleted--;
     }
@@ -44,7 +66,7 @@ std::thread create_deleter_thread(reservation_station_ptr_t &_rs, std::unordered
 
 std::thread create_remote_processing_thread(int32_t node,
                                             std::vector<reservation_station_ptr_t> &rss,
-                                            std::vector<std::unordered_set<tid_t>> &sto,
+                                            std::vector<fake_storage_t> &sto,
                                             std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds) {
 
   // create the thread to pull
@@ -149,7 +171,7 @@ std::thread tensor_notifier(int32_t my_node,
 }
 
 std::thread create_command_processing_thread(std::vector<reservation_station_ptr_t> &rss,
-                                             std::vector<std::unordered_set<tid_t>> &sto,
+                                             std::vector<fake_storage_t> &sto,
                                              std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds,
                                              int32_t node) {
 
@@ -301,7 +323,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
   // DELETE (.input = {(1, 0), (2, 0)})
 
   // create the storage
-  std::unordered_set<tid_t> storage;
+  fake_storage_t storage;
 
   // create two input tensors
   storage.insert(0);
@@ -366,7 +388,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
   rs->shutdown();
 
   // make sure there is only one tensors
-  EXPECT_EQ(storage.size(), 1);
+  EXPECT_EQ(storage.num_tensors(), 1);
 }
 
 
@@ -378,7 +400,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
   // DELETE (.input = {(0, 0), (1, 0), (2, 0), (3, 0)})
 
   // create the storage
-  std::unordered_set<tid_t> storage;
+  fake_storage_t storage;
 
   // create two input tensors
   storage.insert(0);
@@ -439,14 +461,14 @@ TEST(TestReservationStation, FewLocalCommands2) {
   deleter.join();
 
   // make sure there is only one tensors
-  EXPECT_EQ(storage.size(), 0);
+  EXPECT_EQ(storage.num_tensors(), 0);
 }
 
 
 TEST(TestReservationStation, TwoNodesBMM) {
 
   // create the storage
-  std::vector<std::unordered_set<tid_t>> sto(2);
+  std::vector<fake_storage_t> sto(2);
 
   // create the two reservation stations
   std::vector<reservation_station_ptr_t> rss;
@@ -750,14 +772,14 @@ TEST(TestReservationStation, TwoNodesBMM) {
   }
 
   // make sure there are exactly two for the reduce...
-  EXPECT_EQ(sto[0].size(), 2);
-  EXPECT_EQ(sto[1].size(), 2);
+  EXPECT_EQ(sto[0].num_tensors(), 2);
+  EXPECT_EQ(sto[1].num_tensors(), 2);
 }
 
 TEST(TestReservationStation, TwoNodesCMM) {
 
   // create the storage
-  std::vector<std::unordered_set<tid_t>> sto(2);
+  std::vector<fake_storage_t> sto(2);
 
   std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> remote_notifications(2);
 
@@ -1081,14 +1103,14 @@ TEST(TestReservationStation, TwoNodesCMM) {
   }
 
   // make sure there are exactly two for the reduce...
-  EXPECT_EQ(sto[0].size(), 0);
-  EXPECT_EQ(sto[1].size(), 0);
+  EXPECT_EQ(sto[0].num_tensors(), 0);
+  EXPECT_EQ(sto[1].num_tensors(), 0);
 }
 
 std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> init_matrix(size_t split,
                                                                                  size_t num_nodes,
                                                                                  tid_t &cur_tid,
-                                                                                 std::vector<std::unordered_set<tid_t>> &sto,
+                                                                                 std::vector<fake_storage_t> &sto,
                                                                                  std::vector<reservation_station_ptr_t> &rss,
                                                                                  std::vector<std::vector<int32_t>> &to_del) {
 
@@ -1172,7 +1194,7 @@ TEST(TestReservationStation, NNodesCMM) {
 
   // create the storage
   std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> remote_notifications(num_nodes);
-  std::vector<std::unordered_set<tid_t>> sto(num_nodes);
+  std::vector<fake_storage_t> sto(num_nodes);
 
   // create the two reservation stations
   std::vector<reservation_station_ptr_t> rss(num_nodes);
@@ -1225,7 +1247,6 @@ TEST(TestReservationStation, NNodesCMM) {
   }
 
   // create the aggregate
-  std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>> agg;
   for(int32_t rowID = 0; rowID < split; ++rowID) {
     for(int32_t colID = 0; colID < split; ++colID) {
 
@@ -1254,7 +1275,6 @@ TEST(TestReservationStation, NNodesCMM) {
   }
 
   // prepare the removes
-
   for(int32_t node = 0; node < num_nodes; ++node) {
 
 
@@ -1371,7 +1391,7 @@ TEST(TestReservationStation, NNodesCMM) {
 
   size_t num = 0;
   for(node_id_t node = 0; node < num_nodes; ++node) {
-    num += sto[node].size();
+    num += sto[node].num_tensors();
   }
 
   EXPECT_EQ(num, split * split);
