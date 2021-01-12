@@ -1249,7 +1249,6 @@ TEST(TestReservationStation, NNodesCMM) {
                                                   inputs,
                                                   {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
 
-      to_del[target_node].push_back(cur_tid);
       cur_tid++;
     }
   }
@@ -1370,6 +1369,12 @@ TEST(TestReservationStation, NNodesCMM) {
     t.join();
   }
 
+  size_t num = 0;
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    num += sto[node].size();
+  }
+
+  EXPECT_EQ(num, split * split);
 }
 
 }
