@@ -80,7 +80,7 @@ std::thread create_remote_processing_thread(int32_t node,
       }
       else if(std::get<0>(_rc)->type == command_t::REDUCE) {
 
-        std::cout << "REDUCE from \n" << std::flush;
+        // std::cout << "REDUCE from \n" << std::flush;
       }
 
       // retire the command
@@ -223,7 +223,7 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
         // check if the reduce is remote or local
         if(cmd->is_local_reduce(node)) {
 
-          std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+          // std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
 
           // store the outputs so we can add it to the storage
           auto outputs = cmd->get_outputs();
@@ -1083,6 +1083,293 @@ TEST(TestReservationStation, TwoNodesCMM) {
   // make sure there are exactly two for the reduce...
   EXPECT_EQ(sto[0].size(), 0);
   EXPECT_EQ(sto[1].size(), 0);
+}
+
+std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> init_matrix(size_t split,
+                                                                                 size_t num_nodes,
+                                                                                 tid_t &cur_tid,
+                                                                                 std::vector<std::unordered_set<tid_t>> &sto,
+                                                                                 std::vector<reservation_station_ptr_t> &rss,
+                                                                                 std::vector<std::vector<int32_t>> &to_del) {
+
+  std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> mat_a;
+  for(int32_t rowID = 0; rowID < split; ++rowID) {
+    for(int32_t colID = 0; colID < split; ++colID) {
+
+      // get the node
+      node_id_t node = rand() % num_nodes;
+      mat_a[ { rowID, colID } ] = { node, cur_tid };
+
+      if(cur_tid == 250) {
+        std::cout << "bla\n";
+      }
+      // register the tensor
+      rss[node]->register_tensor(cur_tid);
+      sto[node].insert(cur_tid);
+
+      // mark that we need to delete it later
+      to_del[node].push_back(cur_tid);
+
+      // go to the next tid
+      cur_tid++;
+    }
+  }
+
+  return std::move(mat_a);
+}
+
+template<class fun>
+void create_shuffle(size_t num_nodes,
+                    size_t split,
+                    command_id_t &cur_cmd,
+                    fun fn,
+                    std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> &mat_locs,
+                    std::vector<command_ptr_t> &_cmds,
+                    std::vector<std::vector<int32_t>> &to_del) {
+
+
+  // do the shuffle
+  for(int32_t rowID = 0; rowID < split; ++rowID) {
+    for (int32_t colID = 0; colID < split; ++colID) {
+
+      // get the tid and the node of this block
+      auto &[node, tid] = mat_locs[ { rowID, colID } ];
+
+      // no need to move here
+      auto target_node = (node_id_t) fn(rowID, colID, num_nodes);
+      if(node == target_node) {
+        continue;
+      }
+
+      if(tid == 250) {
+        std::cout << "bla\n";
+      }
+
+      // move it
+      _cmds.emplace_back(command_t::create_unique(cur_cmd++,
+                                                  command_t::op_type_t::MOVE,
+                                                  {-1, -1},
+                                                  {command_t::tid_node_id_t{.tid = tid, .node = node}},
+                                                  {command_t::tid_node_id_t{.tid = tid, .node = target_node}}));
+
+
+      // mark that we need to delete it later
+      to_del[target_node].push_back(tid);
+    }
+  }
+}
+
+TEST(TestReservationStation, NNodesCMM) {
+
+  size_t num_nodes = 5;
+  size_t split = 25;
+
+  command_id_t cur_cmd = 0;
+  tid_t cur_tid = 0;
+
+  // all the tensors that we need to delete
+  std::vector<std::vector<int32_t>> to_del(num_nodes);
+
+  // create the storage
+  std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> remote_notifications(num_nodes);
+  std::vector<std::unordered_set<tid_t>> sto(num_nodes);
+
+  // create the two reservation stations
+  std::vector<reservation_station_ptr_t> rss(num_nodes);
+  for(auto node = 0; node < num_nodes; ++node) {
+    rss[node] = std::make_shared<reservation_station_t>(node, num_nodes);
+  }
+
+  // init the two matrices
+  auto a_mat = init_matrix(split, num_nodes, cur_tid, sto, rss, to_del);
+  auto b_mat = init_matrix(split, num_nodes, cur_tid, sto, rss, to_del);
+
+  // we put the commands we want to schedule here
+  std::vector<command_ptr_t> _cmds;
+
+  // do the shuffle for a
+  create_shuffle(num_nodes, split, cur_cmd,
+                 [](int32_t rowID, int32_t colID, size_t num_nodes) { return  colID % num_nodes; }, a_mat,_cmds, to_del);
+
+  // do the shuffle for b
+  create_shuffle(num_nodes, split, cur_cmd,
+                 [](int32_t rowID, int32_t colID, size_t num_nodes) { return  rowID % num_nodes; }, b_mat,_cmds, to_del);
+
+  // create all the multiply commands
+  std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>> multiplies;
+  for(int32_t i = 0; i < split; ++i) {
+    for(int32_t j = 0; j < split; ++j) {
+      for(int32_t k = 0; k < split; ++k) {
+
+        // get the tid and the node
+        auto [a_node, a_tid] = a_mat[ { i, k } ];
+        auto [b_node, b_tid] = b_mat[ { k, j } ];
+
+        // get the target node
+        auto target_node = (node_id_t) (k % num_nodes);
+
+        // add the command
+        _cmds.emplace_back(command_t::create_unique(cur_cmd++,
+                                                    command_t::op_type_t::APPLY,
+                                                    { 0, 0 },
+                                                    { command_t::tid_node_id_t{ .tid = a_tid, .node = target_node },
+                                                             command_t::tid_node_id_t{ .tid = b_tid, .node = target_node } },
+                                                    { command_t::tid_node_id_t{.tid = cur_tid, .node = target_node} }));
+
+
+        to_del[target_node].push_back(cur_tid);
+        multiplies[{i, j}].push_back({ cur_tid, target_node });
+        cur_tid++;
+      }
+    }
+  }
+
+  // create the aggregate
+  std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>> agg;
+  for(int32_t rowID = 0; rowID < split; ++rowID) {
+    for(int32_t colID = 0; colID < split; ++colID) {
+
+      // all the multiplied tensors
+      auto &muls = multiplies[ { rowID, colID } ];
+
+      // get the target node
+      auto target_node = (node_id_t) ((rowID + colID * split) % num_nodes);
+
+      // figure out the inputs
+      std::vector<bbts::command_t::tid_node_id_t> inputs;
+      for(auto &mul : muls) {
+        auto &[tid, node] = mul;
+        inputs.push_back({.tid = tid, .node = node});
+      }
+
+      // create the reduce command
+      _cmds.emplace_back(command_t::create_unique(cur_cmd++,
+                                                  command_t::op_type_t::REDUCE,
+                                                  {0, 0},
+                                                  inputs,
+                                                  {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
+
+      to_del[target_node].push_back(cur_tid);
+      cur_tid++;
+    }
+  }
+
+  // prepare the removes
+
+  for(int32_t node = 0; node < num_nodes; ++node) {
+
+
+    // store the number we need to delete
+    std::vector<bbts::command_t::tid_node_id_t> _inputs;
+    _inputs.reserve(to_del[node].size());
+    for(auto t : to_del[node]) {
+      _inputs.push_back(command_t::tid_node_id_t{.tid = t, .node = node});
+    }
+
+    // remove them from node
+    _cmds.emplace_back(command_t::create_unique(cur_cmd++,
+                                                command_t::op_type_t::DELETE,
+                                                {0, 0},
+                                                _inputs,
+                                                {}));
+  }
+
+  // schedule them all at once
+  for(auto & _cmd : _cmds) {
+
+    // if it uses node 0
+    for(int32_t node = 0; node < num_nodes; ++node) {
+      if (_cmd->uses_node(node)) {
+        EXPECT_TRUE(rss[node]->queue_command(_cmd->clone()));
+      }
+    }
+  }
+
+  // create the queues for commands
+  std::vector<bbts::concurent_queue<_remote_cmd_t>> remote_cmds(num_nodes);
+
+  // these threads will process the remote move operations
+  std::vector<std::thread> _remote_executor_threads;
+  _remote_executor_threads.reserve(num_nodes);
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+
+    // store the thread
+    _remote_executor_threads.push_back(std::move(create_remote_processing_thread(node, rss, sto, remote_cmds)));
+  }
+
+  // simulator threads
+  std::vector<std::thread> _executor_threads;
+  _executor_threads.reserve(num_nodes);
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    _executor_threads.push_back(std::move(create_command_processing_thread(rss, sto, remote_cmds, node)));
+  }
+
+  //
+  std::vector<std::thread> _notifier_threads;
+  _notifier_threads.reserve(num_nodes);
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    for(node_id_t out_node = 0; out_node < num_nodes; ++out_node) {
+      _notifier_threads.push_back(std::move(remote_tensor_notification_sender(node,
+                                                                              out_node,
+                                                                              rss,
+                                                                              remote_notifications)));
+    }
+  }
+
+  //
+  std::vector<std::thread> _notification_handler_threads;
+  _notification_handler_threads.reserve(num_nodes);
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
+  }
+
+  // create the deleters
+  std::vector<std::thread> deleters;
+  deleters.reserve(num_nodes);
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    deleters.push_back(std::move(create_deleter_thread(rss[node], sto[node], to_del[node].size())));
+  }
+
+  // wait for the deleters
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    deleters[node].join();
+  }
+
+  // shutdown the rss
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    rss[node]->shutdown();
+  }
+
+  _remote_cmd_t c = {nullptr, nullptr};
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    remote_cmds[node].enqueue(c);
+  }
+
+  std::pair<std::vector<tid_t>, int32_t> d = {{}, -1};
+  for(node_id_t node = 0; node < num_nodes; ++node) {
+    remote_notifications[node].enqueue(d);
+  }
+
+  // wait for remote executors to finish
+  for(auto &t : _remote_executor_threads) {
+    t.join();
+  }
+
+  // wait for the executors
+  for(auto &t : _executor_threads) {
+    t.join();
+  }
+
+  // wait for the executors
+  for(auto &t : _notifier_threads) {
+    t.join();
+  }
+
+  // wait for the executors
+  for(auto &t : _notification_handler_threads) {
+    t.join();
+  }
+
 }
 
 }
