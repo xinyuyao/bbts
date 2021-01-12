@@ -311,7 +311,7 @@ TEST(TestReservationStation, FewLocalCommands1) {
   auto rs = std::make_shared<reservation_station_t>(0, 1);
 
   // create the deleter thread
-  auto deleter = create_deleter_thread(rs, storage, 2);
+  auto deleter = create_deleter_thread(rs, storage, 3);
 
   // register the tensor
   rs->register_tensor(0);
@@ -359,11 +359,11 @@ TEST(TestReservationStation, FewLocalCommands1) {
   storage.insert(3);
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
-  // shutdown the reservation station
-  rs->shutdown();
-
   // wait for stuff to finish
   deleter.join();
+
+  // shutdown the reservation station
+  rs->shutdown();
 
   // make sure there is only one tensors
   EXPECT_EQ(storage.size(), 1);
@@ -388,7 +388,7 @@ TEST(TestReservationStation, FewLocalCommands2) {
   auto rs = std::make_shared<reservation_station_t>(0, 1);
 
   // create the deleter thread
-  auto deleter = create_deleter_thread(rs, storage, 2);
+  auto deleter = create_deleter_thread(rs, storage, 4);
 
   // register the tensor
   rs->register_tensor(0);

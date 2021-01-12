@@ -34,8 +34,12 @@ endif (MPI_FOUND)
 include_directories(third-party)
 
 # the commands
-file(GLOB COMMANDS_SOURCE "src/operations/*.cc")
+file(GLOB COMMANDS_SOURCE "src/commands/*.cc")
 add_library(commands OBJECT ${COMMANDS_SOURCE})
+
+# the operations
+file(GLOB OPERATIONS_SOURCE "src/operations/*.cc")
+add_library(operations OBJECT ${OPERATIONS_SOURCE})
 
 # the tensors
 file(GLOB TENSOR_SOURCE "src/tensor/*.cc")
@@ -56,6 +60,7 @@ add_library(ud_functions OBJECT ${UD_SOURCE})
 # link all modules up
 add_library(bbts-common $<TARGET_OBJECTS:tensor>
                         $<TARGET_OBJECTS:commands>
+                        $<TARGET_OBJECTS:operations>
                         $<TARGET_OBJECTS:storage>
                         $<TARGET_OBJECTS:communication>
                         $<TARGET_OBJECTS:ud_functions>)
