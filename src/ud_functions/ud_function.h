@@ -30,6 +30,19 @@ struct ud_impl_t {
     // the input parameters
     ud_impl_params_t(std::vector<T*> in_param) : parameters(std::move(in_param)) {}
 
+    // copy the input parameters
+    ud_impl_params_t(std::vector<T> &in_param) {
+
+      // fill up the parameters
+      parameters.reserve(in_param.size());
+      for(auto &p : in_param) {
+        parameters.push_back(&p);
+      }
+    }
+
+    // just with empty parameters
+    ud_impl_params_t(size_t num_params) : parameters(num_params) {}
+
     // this is for the output parameters
     template<size_t n>
     T &get() { return *parameters[n]; }
@@ -44,6 +57,11 @@ struct ud_impl_t {
     // sets the parameter
     template<size_t n>
     void set(T &_in) {
+      parameters[n] = &_in;
+    }
+
+    // set the parameter on index
+    void set(size_t n, T &_in) {
       parameters[n] = &_in;
     }
 

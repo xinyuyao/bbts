@@ -52,7 +52,7 @@ void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::meta_params_t
   auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
 
   // set the new values
-  m_out = {m_a.num_rows, m_a.num_cols};
+  m_out = { m_a.num_rows, m_a.num_cols };
 }
 
 void bbts::dense_matrix_add_t::add(const bbts::ud_impl_t::tensor_params_t &_in,
