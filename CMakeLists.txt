@@ -4,6 +4,9 @@ project(tra_sub_sys_barbatos)
 # set the c++ version
 set(CMAKE_CXX_STANDARD 20)
 
+# set the output directory
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  "${PROJECT_SOURCE_DIR}/bin")
+
 # set the location for cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 

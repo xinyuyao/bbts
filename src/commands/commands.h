@@ -22,7 +22,8 @@ struct command_t {
     APPLY = 0,
     REDUCE = 1,
     MOVE = 2,
-    DELETE = 3
+    DELETE = 3,
+    SHUTDOWN = 4 // special command to shutdown the server
   };
 
   // specifies exactly what tensor on which node we refer to
@@ -85,8 +86,11 @@ struct command_t {
                                                   (_num_inputs + _num_outputs) * sizeof(tid_node_id_t); }
 
   // is this a move
-  [[nodiscard]] bool is_move() const { return type == op_type_t::MOVE; }
-  
+  [[nodiscard]] bool is_move() const { return type == op_type_t::MOVE && _num_outputs == 1; }
+
+  // is this a broadcast
+  [[nodiscard]] bool is_broadcast() const { return type == op_type_t::MOVE && _num_outputs != 1; }
+
   // is this an apply
   [[nodiscard]] bool is_apply() const { return type == op_type_t::APPLY; }
 

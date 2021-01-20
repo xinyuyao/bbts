@@ -138,7 +138,7 @@ void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::meta_params_
   // get the output parameters
   auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
 
-  // set the new values
+  // set the output
   m_out = {m_a.num_rows, m_b.num_cols};
 }
 

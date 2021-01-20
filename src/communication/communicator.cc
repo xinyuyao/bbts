@@ -80,10 +80,40 @@ bool mpi_communicator_t::recieve_request_sync(void *_bytes, sync_request_t &_req
   return MPI_Mrecv (_bytes, _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) == MPI_SUCCESS;
 }
 
-bool mpi_communicator_t::op_request(const command_ptr_t &cmd, node_id_t _node) {
+bool mpi_communicator_t::op_request(const command_ptr_t &_cmd) {
 
-  // send the command
-  return MPI_Ssend(cmd.get(), cmd->num_bytes(), MPI_CHAR, _node, SEND_CMD_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
+  // find all the nodes referenced in the input
+  std::vector<node_id_t> to_sent_to;
+  for(int32_t idx = 0; idx < _cmd->get_num_inputs(); ++idx) {
+    auto node = _cmd->get_input(idx).node;
+    if(node != _rank && std::find(to_sent_to.begin(), to_sent_to.end(), node) == to_sent_to.end()) {
+      to_sent_to.push_back(node);
+    }
+  }
+
+  // find all the nodes referenced in the output
+  for(int32_t idx = 0; idx < _cmd->get_num_outputs(); ++idx) {
+    auto node = _cmd->get_output(idx).node;
+    if(node != _rank && std::find(to_sent_to.begin(), to_sent_to.end(), node) == to_sent_to.end()) {
+      to_sent_to.push_back(node);
+    }
+  }
+
+  // initiate an asynchronous send request
+  std::vector<async_request_t> requests;
+  for(auto node : to_sent_to) {
+    async_request_t _req;
+    _req.success = MPI_Isend(_cmd.get(), _cmd->num_bytes(), MPI_CHAR, node, SEND_CMD_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+    requests.push_back(_req);
+  }
+
+  // wait for all the requests to finish
+  bool success = true;
+  for(auto &r : requests) {
+    success = r.success && MPI_Wait(&r.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS && success;
+  }
+
+  return success;
 }
 
 command_ptr_t mpi_communicator_t::expect_op_request() {

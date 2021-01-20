@@ -86,7 +86,7 @@ public:
   bool recieve_request_sync(void *_bytes, sync_request_t &_req);
 
   // initiates the operation on all the specified nodes
-  bool op_request(const command_ptr_t &_ctid, node_id_t _node);
+  bool op_request(const command_ptr_t &_cmd);
 
   // waits to recieve an operation
   command_ptr_t expect_op_request();

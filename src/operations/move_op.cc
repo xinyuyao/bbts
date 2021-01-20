@@ -3,15 +3,16 @@
 namespace bbts {
 
   // constructs the reduce operation
-  move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,  
-          bool _is_sender, bbts::tensor_factory_t &_factory, 
-          bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
-                                                              _tag(_tag),
-                                                              _tensor(_tensor),
-                                                              _is_sender(_is_sender),
-                                                              _factory(_factory),
-                                                              _storage(_storage),
-                                                              _node(_node) {}
+  move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,
+                       tid_t _tid, bool _is_sender, bbts::tensor_factory_t &_factory,
+                       bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
+                                                                           _tag(_tag),
+                                                                           _tensor(_tensor),
+                                                                           _tid(_tid),
+                                                                           _is_sender(_is_sender),
+                                                                           _factory(_factory),
+                                                                           _storage(_storage),
+                                                                           _node(_node) {}
 
   // apply this operation
   bbts::tensor_t *move_op_t::apply() {
@@ -38,7 +39,7 @@ namespace bbts {
       }
 
       // allocate a buffer for the tensor
-      _tensor = _storage.create_tensor(req.num_bytes);
+      _tensor = _storage.create_tensor(_tid, req.num_bytes);
 
       // recieve the request and check if there is an error
       if (!_comm.recieve_request_sync(_tensor, req)) {

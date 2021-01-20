@@ -302,14 +302,15 @@ std::thread create_deleter_thread(reservation_station_ptr_t &_rs, bbts::storage_
   });
 }
 
-std::thread create_command_processing_thread(reservation_station_ptr_t &rs,
+std::thread create_command_processing_thread(const communicator_ptr_t& comm,
+                                             reservation_station_ptr_t &rs,
                                              udf_manager_ptr &udm,
                                              bbts::storage_ptr_t &ts,
                                              bbts::tensor_factory_ptr_t &tf,
                                              int32_t node) {
 
   // create the thread to pull
-  std::thread t = std::thread([rs, ts, node, udm, tf]() {
+  std::thread t = std::thread([comm, rs, ts, node, udm, tf]() {
 
     while (true) {
 
@@ -325,6 +326,32 @@ std::thread create_command_processing_thread(reservation_station_ptr_t &rs,
         // move the
         std::cout << "MOVE " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
 
+        // forward the command to the right nodes
+        if(!comm->op_request(cmd)) {
+          throw std::runtime_error("Failed to forward the command.");
+        }
+
+        // it is a point to point move
+        if(cmd->is_move()) {
+
+          // get the tensor we want to sent
+          auto t = ts->get_by_tid(cmd->get_input(0).tid);
+
+          // create the move operation
+          move_op_t op(*comm, cmd->id, t, cmd->get_input(0).tid, true, *tf, *ts, cmd->get_output(0).node);
+
+          // do the apply
+          op.apply();
+        }
+        // it is a broadcast
+        else {
+
+          std::cout << "BROADCAST\n";
+        }
+
+        // retire the command so it knows that we have processed the tensors
+        rs->retire_command(std::move(cmd));
+
       } else if (cmd->type == command_t::APPLY) {
 
         std::cout << "APPLY " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
@@ -339,8 +366,9 @@ std::thread create_command_processing_thread(reservation_station_ptr_t &rs,
         for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
           // store it
-          auto tm = &ts->get_by_tid(cmd->get_input(idx).tid)->_meta;
-          input_meta_params.set(idx, *tm);
+          auto t = ts->get_by_tid(cmd->get_input(idx).tid);
+          assert(t != nullptr);
+          input_meta_params.set(idx, t->_meta);
         }
 
         // figure out the output parameters
@@ -404,6 +432,58 @@ std::thread create_command_processing_thread(reservation_station_ptr_t &rs,
   return std::move(t);
 }
 
+std::thread expect_remote_command(bbts::storage_ptr_t &ts,
+                                  bbts::tensor_factory_ptr_t &tf,
+                                  reservation_station_ptr_t &rs,
+                                  const bbts::communicator_ptr_t &comm) {
+
+  // create the thread
+  std::thread t = std::thread([comm, ts, tf, rs]() {
+
+    // while we
+    while (true) {
+
+      // get the remote command
+      auto cmd = comm->expect_op_request();
+
+      // if this is a shutdown just finish immediately
+      if(cmd->type == bbts::command_t::MOVE) {
+
+        // check if this is the move
+        if(cmd->is_move()) {
+
+          // create the move operation
+          move_op_t op(*comm, cmd->id, nullptr, cmd->get_input(0).tid, false, *tf, *ts, cmd->get_input(0).node);
+
+          // do the apply
+          op.apply();
+
+          // retire the command
+          rs->retire_command(std::move(cmd));
+        }
+        // check if this is a broadcast
+        else {
+
+        }
+
+      }
+      else if(cmd->type == bbts::command_t::REDUCE) {
+
+      }
+      else if(cmd->type == bbts::command_t::SHUTDOWN) {
+        break;
+      }
+      else {
+
+        // throw the runtime error
+        throw std::runtime_error("This is bad can not process a command of type " + std::to_string(cmd->type));
+      }
+    }
+  });
+
+  return std::move(t);
+}
+
 int main(int argc, char **argv) {
 
   // the number of threads per node
@@ -423,9 +503,9 @@ int main(int argc, char **argv) {
   auto udm = std::make_shared<udf_manager>(tf);
 
   // init the communicator with the configuration
-  bbts::communicator_t comm(config);
-  auto my_rank = comm.get_rank();
-  auto num_nodes = comm.get_num_nodes();
+  bbts::communicator_ptr_t comm = std::make_shared<bbts::communicator_t>(config);
+  auto my_rank = comm->get_rank();
+  auto num_nodes = comm->get_num_nodes();
 
   // create the reservation station
   auto rs = std::make_shared<bbts::reservation_station_t>(my_rank, num_nodes);
@@ -450,7 +530,7 @@ int main(int argc, char **argv) {
   }
 
   // now that we have scheduled all wait
-  comm.barrier();
+  comm->barrier();
 
   // kick off the deleter thread
   auto deleter = create_deleter_thread(rs, ts);
@@ -459,15 +539,22 @@ int main(int argc, char **argv) {
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(num_nodes);
   for (node_id_t node = 0; node < num_nodes; ++node) {
-    _notification_handler_threads.push_back(std::move(create_command_processing_thread(rs,
+    _notification_handler_threads.push_back(std::move(create_command_processing_thread(comm,
+                                                                                       rs,
                                                                                        udm,
                                                                                        ts,
                                                                                        tf,
-                                                                                       comm.get_num_nodes())));
+                                                                                       comm->get_num_nodes())));
   }
+
+  // this kicks off and handles remove commands (MOVE and REDUCE)
+  auto command_expect = expect_remote_command(ts, tf, rs, comm);
 
   // wait for the deleter to finish
   deleter.join();
+
+  // wait for expect co
+  command_expect.join();
 
   return 0;
 }
