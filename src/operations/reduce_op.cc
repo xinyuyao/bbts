@@ -2,15 +2,16 @@
 
 namespace bbts {
 
-reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, 
-               bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
-               int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op) : _comm(_comm), 
-                                                                                       _factory(_factory),
-                                                                                       _storage(_storage),
-                                                                                       _nodes(_nodes),
-                                                                                       _tag(_tag),
-                                                                                       _in(_in),
-                                                                                       _reduce_op(_reduce_op) {}
+reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
+                         const std::vector<bbts::node_id_t> &_nodes, int32_t _tag,
+                         bbts::tensor_t &_in, bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op) : _comm(_comm),
+                                                                                                         _factory(_factory),
+                                                                                                         _storage(_storage),
+                                                                                                         _nodes(_nodes),
+                                                                                                         _tag(_tag),
+                                                                                                         _out_tid(_out_tid),
+                                                                                                         _in(_in),
+                                                                                                         _reduce_op(_reduce_op) {}
 
 int32_t reduce_op_t::get_num_nodes() const {
   return _nodes.size();
@@ -36,7 +37,7 @@ bbts::tensor_t *reduce_op_t::apply() {
   bbts::tensor_t *lhs = &_in;
 
   // make empty input parameter
-  bbts::tensor_meta_t out_meta;
+  bbts::tensor_meta_t out_meta{};
   bbts::ud_impl_t::tensor_params_t input_tensors({nullptr, nullptr});
   bbts::ud_impl_t::tensor_params_t output_tensor({nullptr});
   bbts::ud_impl_t::meta_params_t input_meta({nullptr, nullptr});
@@ -135,6 +136,11 @@ bbts::tensor_t *reduce_op_t::apply() {
       _storage.remove_by_tensor(*lhs);
     }
     lhs = nullptr;
+  }
+  else {
+
+    // assign a tid to the result of the aggregation
+    _storage.assign_tid(*lhs, _out_tid);
   }
 
   // return the reduced tensor

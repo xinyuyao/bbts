@@ -63,10 +63,13 @@ public:
   // the reduce operation
   const bbts::ud_impl_t &_reduce_op;
 
+  // the output tid
+  bbts::tid_t _out_tid;
+
   // constructs the reduce operation
-  reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, 
-         bbts::storage_t &_storage, const std::vector<bbts::node_id_t> &_nodes,
-         int32_t _tag, bbts::tensor_t &_in, const bbts::ud_impl_t &_reduce_op);
+  reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
+              const std::vector<bbts::node_id_t> &_nodes, int32_t _tag,
+              bbts::tensor_t &_in, bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
 
   // get the number of nodes
   int32_t get_num_nodes() const;

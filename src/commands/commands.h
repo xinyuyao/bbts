@@ -94,6 +94,44 @@ struct command_t {
   // is this an apply
   [[nodiscard]] bool is_apply() const { return type == op_type_t::APPLY; }
 
+  // get all the nodes included in the reduce
+  [[nodiscard]] std::vector<bbts::node_id_t> get_reduce_nodes() {
+
+    // try to get all the nodes involved
+    std::vector<bbts::node_id_t> nodes;
+
+    // the output is at the root (reduce only has one output)
+    nodes.push_back(get_output(0).node);
+
+    // fill in the other nodes
+    for(int32_t idx = 0; idx < (get_num_inputs() + get_num_outputs()); idx++) {
+
+      // try to find the node
+      auto node = _tensors[idx].node;
+      if(std::find(nodes.begin(), nodes.end(), node) !=  nodes.end()) {
+        continue;
+      }
+
+      // store it if it could not be found
+      nodes.push_back(node);
+    }
+
+    return std::move(nodes);
+  }
+
+  [[nodiscard]] tid_node_id_t get_reduce_input(node_id_t _node_id) {
+
+    // try to find an input for this node
+    for(size_t i = 0; i < get_num_inputs(); ++i) {
+      auto in = get_input(i);
+      if(in.node == _node_id) {
+        return in;
+      }
+    }
+
+    return {-1, -1};
+  }
+
   // is this a local reduce operator
   [[nodiscard]] bool is_local_reduce(node_id_t _node_id) const {
 

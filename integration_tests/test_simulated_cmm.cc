@@ -2,6 +2,7 @@
 #include <thread>
 #include <atomic>
 #include "../src/operations/move_op.h"
+#include "../src/operations/reduce_op.h"
 #include "../src/commands/reservation_station.h"
 
 #pragma clang diagnostic push
@@ -306,11 +307,10 @@ std::thread create_command_processing_thread(const communicator_ptr_t& comm,
                                              reservation_station_ptr_t &rs,
                                              udf_manager_ptr &udm,
                                              bbts::storage_ptr_t &ts,
-                                             bbts::tensor_factory_ptr_t &tf,
-                                             int32_t node) {
+                                             bbts::tensor_factory_ptr_t &tf) {
 
   // create the thread to pull
-  std::thread t = std::thread([comm, rs, ts, node, udm, tf]() {
+  std::thread t = std::thread([comm, rs, ts, udm, tf]() {
 
     while (true) {
 
@@ -324,7 +324,7 @@ std::thread create_command_processing_thread(const communicator_ptr_t& comm,
       if (cmd->type == command_t::MOVE) {
 
         // move the
-        std::cout << "MOVE " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
+        std::cout << "MOVE " << cmd->id << " on my_node : " << comm->get_rank() << " Executed...\n" << std::flush;
 
         // forward the command to the right nodes
         if(!comm->op_request(cmd)) {
@@ -354,7 +354,7 @@ std::thread create_command_processing_thread(const communicator_ptr_t& comm,
 
       } else if (cmd->type == command_t::APPLY) {
 
-        std::cout << "APPLY " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
+        std::cout << "APPLY " << cmd->id << " on my_node : " << comm->get_rank() << " Executed...\n" << std::flush;
 
         // return me that matcher for matrix addition
         auto ud = udm->get_fn_impl(cmd->fun_id);
@@ -398,6 +398,12 @@ std::thread create_command_processing_thread(const communicator_ptr_t& comm,
 
           // store it
           auto t = ts->create_tensor(cmd->get_output(idx).tid, ts_size);
+
+          // get the type of the output
+          auto &type = ud->outputTypes[idx];
+          t->_meta.fmt_id = tf->get_tensor_ftm(type);
+
+          // set the output param
           output_params.set(idx, *t);
         }
 
@@ -417,14 +423,39 @@ std::thread create_command_processing_thread(const communicator_ptr_t& comm,
       } else if (cmd->type == command_t::REDUCE) {
 
         // check if the reduce is remote or local
-        if (cmd->is_local_reduce(node)) {
+        if (cmd->is_local_reduce(comm->get_rank())) {
 
-          std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+          std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << comm->get_rank() << '\n' << std::flush;
 
         } else {
 
-          std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+          //std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << comm->get_rank() << '\n' << std::flush;
+
+          // forward the command to the right nodes
+          if(!comm->op_request(cmd)) {
+            throw std::runtime_error("Failed to forward reduce command.");
+          }
+
+          // get the nodes involved
+          auto nodes = cmd->get_reduce_nodes();
+
+          // return me that matcher for matrix addition
+          auto ud = udm->get_fn_impl(cmd->fun_id);
+
+          // get the source tensor
+          auto t = ts->get_by_tid(cmd->get_reduce_input(comm->get_rank()).tid);
+
+          // create the move operation
+          reduce_op_t op(*comm, *tf, *ts, nodes, cmd->id, *t, cmd->get_output(0).tid, *ud);
+
+          // do the apply
+          op.apply();
         }
+
+        // retire the command so it knows that we have processed the tensors
+        rs->retire_command(std::move(cmd));
+
+        std::cout << "REMOTE_REDUCE PROCESSED on node " << comm->get_rank() << '\n' << std::flush;
       }
     }
   });
@@ -434,11 +465,12 @@ std::thread create_command_processing_thread(const communicator_ptr_t& comm,
 
 std::thread expect_remote_command(bbts::storage_ptr_t &ts,
                                   bbts::tensor_factory_ptr_t &tf,
+                                  udf_manager_ptr &udm,
                                   reservation_station_ptr_t &rs,
                                   const bbts::communicator_ptr_t &comm) {
 
   // create the thread
-  std::thread t = std::thread([comm, ts, tf, rs]() {
+  std::thread t = std::thread([comm, ts, tf, rs, udm]() {
 
     // while we
     while (true) {
@@ -452,14 +484,21 @@ std::thread expect_remote_command(bbts::storage_ptr_t &ts,
         // check if this is the move
         if(cmd->is_move()) {
 
-          // create the move operation
-          move_op_t op(*comm, cmd->id, nullptr, cmd->get_input(0).tid, false, *tf, *ts, cmd->get_input(0).node);
+          // kick off a thread to process the request
+          std::thread child = std::thread([comm, c = std::move(cmd), rs, tf, ts]() mutable {
 
-          // do the apply
-          op.apply();
+            // create the move operation
+            move_op_t op(*comm, c->id, nullptr, c->get_input(0).tid, false, *tf, *ts, c->get_input(0).node);
 
-          // retire the command
-          rs->retire_command(std::move(cmd));
+            // do the apply
+            op.apply();
+
+            // retire the command
+            rs->retire_command(std::move(c));
+          });
+
+          // detach the thread
+          child.detach();
         }
         // check if this is a broadcast
         else {
@@ -469,6 +508,31 @@ std::thread expect_remote_command(bbts::storage_ptr_t &ts,
       }
       else if(cmd->type == bbts::command_t::REDUCE) {
 
+        // kick off a thread to process the request
+        std::thread child = std::thread([comm, c = std::move(cmd), rs, tf, ts, udm]() mutable {
+
+          // get the nodes involved
+          auto nodes = c->get_reduce_nodes();
+
+          // return me that matcher for matrix addition
+          auto ud = udm->get_fn_impl(c->fun_id);
+
+          // get the source tensor
+          auto t = ts->get_by_tid(c->get_reduce_input(comm->get_rank()).tid);
+          assert(t != nullptr);
+
+          // create the move operation
+          reduce_op_t op(*comm, *tf, *ts, nodes, c->id, *t, c->get_output(0).tid, *ud);
+
+          // do the apply
+          op.apply();
+
+          // retire the command
+          rs->retire_command(std::move(c));
+        });
+
+        // detach the thread
+        child.detach();
       }
       else if(cmd->type == bbts::command_t::SHUTDOWN) {
         break;
@@ -542,7 +606,7 @@ int main(int argc, char **argv) {
 
   // the number of threads per node
   const int32_t num_threads = 1;
-  const size_t split = 2;
+  const size_t split = 32;
 
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
@@ -597,12 +661,11 @@ int main(int argc, char **argv) {
                                                                                        rs,
                                                                                        udm,
                                                                                        ts,
-                                                                                       tf,
-                                                                                       comm->get_num_nodes())));
+                                                                                       tf)));
   }
 
   // this kicks off and handles remove commands (MOVE and REDUCE)
-  auto command_expect = expect_remote_command(ts, tf, rs, comm);
+  auto command_expect = expect_remote_command(ts, tf, udm, rs, comm);
 
   auto tsn_thread = tensor_notifier(rs, comm);
 
@@ -610,12 +673,12 @@ int main(int argc, char **argv) {
   remote_notification_sender.reserve(num_nodes);
   for(node_id_t node = 0; node < comm->get_num_nodes(); ++node) {
 
-    //
+    // no need to notify self so skip that
     if(node == comm->get_rank()) {
       continue;
     }
 
-    //
+    // create the notifier thread
     remote_notification_sender.push_back(remote_tensor_notification_sender(comm, node, rs));
   }
 

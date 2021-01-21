@@ -38,6 +38,9 @@ struct storage_t {
   // remove by address true if it succeeds
   bool remove_by_tensor(tensor_t &_tensor);
 
+  // assign a tid to an anonymous tensor
+  bool assign_tid(tensor_t &_tensor, tid_t _tid);
+
   // remove by tid
   bool remove_by_tid(tid_t _id);
 
@@ -48,7 +51,7 @@ struct storage_t {
   std::mutex _m;
 
   // all allocated tensors
-  std::unordered_map<tensor_t*, tid_t> _allocated_tensors;
+  std::unordered_map<tensor_t*, std::tuple<tid_t, size_t>> _allocated_tensors;
 
   // maps to the information
   std::unordered_map<tid_t, sto_tensor_nfo_t> _tensor_nfo;
