@@ -55,7 +55,7 @@ bbts::tensor_t *broadcast_op_t::apply() {
     _in = _storage.create_tensor(req.num_bytes);
 
     // recieve the request and check if there is an error
-    if (!_comm.recieve_request_sync(_in, req)) {
+    if (!_comm.receive_request_sync(_in, req)) {
       std::cout << "Error 2\n";
     }
   }

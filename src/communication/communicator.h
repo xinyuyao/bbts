@@ -26,10 +26,11 @@ const com_tags ANY_TAG = MPI_ANY_TAG;
 const com_tags SEND_CMD_TAG = 1;
 const com_tags SHUTDOWN_TAG = 2;
 const com_tags FORWARD_CMD_TAG = 3;
+const com_tags NOTIFY_TENSOR_TAG = 4;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 4;
+const com_tags FREE_TAG = 5;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -76,6 +77,12 @@ public:
   // wait for async request
   bool wait_async(async_request_t &_request);
 
+  // notify a node that tensors were created
+  bool tensors_created_notification(node_id_t out_node, const std::vector<bbts::tid_t> &tensor);
+
+  // wait to receive a notification
+  std::tuple<node_id_t, std::vector<bbts::tid_t>> receive_tensor_created_notification();
+
   // send async
   async_request_t send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
 
@@ -83,7 +90,7 @@ public:
   sync_request_t expect_request_sync(node_id_t _node, com_tags _tag);
 
   // recieves the request that we got from expect_request_sync
-  bool recieve_request_sync(void *_bytes, sync_request_t &_req);
+  bool receive_request_sync(void *_bytes, sync_request_t &_req);
 
   // initiates the operation on all the specified nodes
   bool op_request(const command_ptr_t &_cmd);

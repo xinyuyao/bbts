@@ -41,6 +41,33 @@ bool mpi_communicator_t::wait_async(mpi_communicator_t::async_request_t &_reques
   return MPI_Wait(&_request.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS;
 }
 
+bool mpi_communicator_t::tensors_created_notification(node_id_t out_node, const std::vector<bbts::tid_t> &tensor) {
+  return MPI_Ssend(tensor.data(), (int32_t) (tensor.size() * sizeof(bbts::tid_t)), MPI_CHAR, out_node, NOTIFY_TENSOR_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
+}
+
+std::tuple<node_id_t, std::vector<bbts::tid_t>> mpi_communicator_t::receive_tensor_created_notification() {
+
+  // wait for a request
+  sync_request_t _req;
+  auto mpi_errno = MPI_Mprobe(ANY_NODE, NOTIFY_TENSOR_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+
+  // check for errors
+  if(mpi_errno != MPI_SUCCESS) {
+    return {-1, {} };
+  }
+
+  // get the size  and set the tag for the request
+  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
+
+  // allocate the memory and receive the command
+  std::vector<bbts::tid_t> p(_req.num_bytes / sizeof(bbts::tid_t));
+  if(MPI_Mrecv (p.data(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
+    return {-1, {}};;
+  }
+
+  return { _req.status.MPI_SOURCE, std::move(p) };
+}
+
 mpi_communicator_t::async_request_t mpi_communicator_t::send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
 
   // initiate an asynchronous send request
@@ -55,7 +82,7 @@ mpi_communicator_t::sync_request_t mpi_communicator_t::expect_request_sync(node_
 
   // wait for a request
   sync_request_t _req;
-  auto mpi_errno = MPI_Mprobe(_node, _tag  + FREE_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+  auto mpi_errno = MPI_Mprobe(_node, _tag + FREE_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
 
   // check for errors
   if (mpi_errno != MPI_SUCCESS) {        
@@ -74,7 +101,7 @@ mpi_communicator_t::sync_request_t mpi_communicator_t::expect_request_sync(node_
 }
 
 // recieves the request that we got from expect_request_sync
-bool mpi_communicator_t::recieve_request_sync(void *_bytes, sync_request_t &_req) {
+bool mpi_communicator_t::receive_request_sync(void *_bytes, sync_request_t &_req) {
 
   // recieve the stuff
   return MPI_Mrecv (_bytes, _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) == MPI_SUCCESS;
@@ -228,5 +255,6 @@ int32_t mpi_communicator_t::get_rank() const {
 int32_t mpi_communicator_t::get_num_nodes() const {
   return _num_nodes;
 }
+
 
 }

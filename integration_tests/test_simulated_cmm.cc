@@ -484,6 +484,60 @@ std::thread expect_remote_command(bbts::storage_ptr_t &ts,
   return std::move(t);
 }
 
+std::thread remote_tensor_notification_sender(const bbts::communicator_ptr_t &comm,
+                                              node_id_t out_node,
+                                              const reservation_station_ptr_t &rs) {
+
+  // create the thread
+  std::thread t = std::thread([out_node, rs, comm]() {
+
+    while (true) {
+
+      // get tensors to notify the other node
+      bool is_done;
+      auto tensors = rs->tensors_to_notify_node(out_node, is_done);
+      std::cout << "Notifying\n";
+
+      // if it is node break out
+      if (is_done) {
+        break;
+      }
+
+      // add the remote commands
+      if(!comm->tensors_created_notification(out_node, tensors)) {
+        throw std::runtime_error("Could not set the tensor notification");
+      }
+    }
+
+  });
+
+  return std::move(t);
+}
+
+std::thread tensor_notifier(reservation_station_ptr_t &rs,
+                            const bbts::communicator_ptr_t &comm) {
+  // create the thread
+  std::thread t = std::thread([rs, comm]() {
+
+    while (true) {
+
+      // wait for the command
+      auto [node, tensors] = comm->receive_tensor_created_notification();
+      std::cout << "Recv notification\n";
+
+      // check if we are done...
+      if (node == -1) {
+        break;
+      }
+
+      // notify that the tensors became available
+      rs->notify_available_tensors(node, tensors);
+    }
+  });
+
+  return std::move(t);
+}
+
 int main(int argc, char **argv) {
 
   // the number of threads per node
@@ -549,6 +603,21 @@ int main(int argc, char **argv) {
 
   // this kicks off and handles remove commands (MOVE and REDUCE)
   auto command_expect = expect_remote_command(ts, tf, rs, comm);
+
+  auto tsn_thread = tensor_notifier(rs, comm);
+
+  std::vector<std::thread> remote_notification_sender;
+  remote_notification_sender.reserve(num_nodes);
+  for(node_id_t node = 0; node < comm->get_num_nodes(); ++node) {
+
+    //
+    if(node == comm->get_rank()) {
+      continue;
+    }
+
+    //
+    remote_notification_sender.push_back(remote_tensor_notification_sender(comm, node, rs));
+  }
 
   // wait for the deleter to finish
   deleter.join();

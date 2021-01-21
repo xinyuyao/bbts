@@ -70,7 +70,7 @@ bbts::tensor_t *reduce_op_t::apply() {
         auto rhs = _storage.create_tensor(req.num_bytes);
 
         // recieve the request and check if there is an error
-        if (!_comm.recieve_request_sync(rhs, req)) {
+        if (!_comm.receive_request_sync(rhs, req)) {
           std::cout << "Error 5\n";
         }
 

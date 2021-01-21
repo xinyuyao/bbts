@@ -42,7 +42,7 @@ namespace bbts {
       _tensor = _storage.create_tensor(_tid, req.num_bytes);
 
       // recieve the request and check if there is an error
-      if (!_comm.recieve_request_sync(_tensor, req)) {
+      if (!_comm.receive_request_sync(_tensor, req)) {
         std::cout << "Error 3\n";
       }
     }
