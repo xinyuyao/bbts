@@ -1,9 +1,10 @@
 #include <map>
 #include <thread>
-#include <atomic>
 #include "../src/operations/move_op.h"
 #include "../src/operations/reduce_op.h"
 #include "../src/commands/reservation_station.h"
+#include "../src/commands/tensor_notifier.h"
+#include "../src/commands/command_runner.h"
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
@@ -281,322 +282,56 @@ std::vector<command_ptr_t> generate_commands(size_t num_nodes,
 }
 
 // the reservation station needs a deleter thread
-std::thread create_deleter_thread(reservation_station_ptr_t &_rs, bbts::storage_ptr_t &_sto) {
+std::thread create_deleter_thread(const command_runner_ptr_t &crx) {
 
   // create the thread
-  return std::thread([_rs, _sto]() {
+  return std::thread([crx]() {
 
-    // while we have something remove
-    tid_t id;
-    while (true) {
-
-      // get the next tensor to remove
-      id = _rs->get_to_remove();
-      if (id == -1) {
-        break;
-      }
-
-      // deleted
-      _sto->remove_by_tid(id);
-      std::cout << "Remove tensor : " << id << '\n' << std::flush;
-    }
+    crx->run_deleter();
   });
 }
 
-std::thread create_command_processing_thread(const communicator_ptr_t& comm,
-                                             reservation_station_ptr_t &rs,
-                                             udf_manager_ptr &udm,
-                                             bbts::storage_ptr_t &ts,
-                                             bbts::tensor_factory_ptr_t &tf) {
+std::thread create_command_processing_thread(const command_runner_ptr_t &crx) {
 
   // create the thread to pull
-  std::thread t = std::thread([comm, rs, ts, udm, tf]() {
+  std::thread t = std::thread([crx]() {
 
-    while (true) {
-
-      // get the command
-      auto cmd = rs->get_next_command();
-      if (cmd == nullptr) {
-        break;
-      }
-
-      // if we have a move
-      if (cmd->type == command_t::MOVE) {
-
-        // move the
-        std::cout << "MOVE " << cmd->id << " on my_node : " << comm->get_rank() << " Executed...\n" << std::flush;
-
-        // forward the command to the right nodes
-        if(!comm->op_request(cmd)) {
-          throw std::runtime_error("Failed to forward the command.");
-        }
-
-        // it is a point to point move
-        if(cmd->is_move()) {
-
-          // get the tensor we want to sent
-          auto t = ts->get_by_tid(cmd->get_input(0).tid);
-
-          // create the move operation
-          move_op_t op(*comm, cmd->id, t, cmd->get_input(0).tid, true, *tf, *ts, cmd->get_output(0).node);
-
-          // do the apply
-          op.apply();
-        }
-        // it is a broadcast
-        else {
-
-          std::cout << "BROADCAST\n";
-        }
-
-        // retire the command so it knows that we have processed the tensors
-        rs->retire_command(std::move(cmd));
-
-      } else if (cmd->type == command_t::APPLY) {
-
-        std::cout << "APPLY " << cmd->id << " on my_node : " << comm->get_rank() << " Executed...\n" << std::flush;
-
-        // return me that matcher for matrix addition
-        auto ud = udm->get_fn_impl(cmd->fun_id);
-
-        /// 1. Figure out the meta data for the output
-
-        // make the input meta parameters
-        ud_impl_t::meta_params_t input_meta_params(cmd->get_num_inputs());
-        for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
-
-          // store it
-          auto t = ts->get_by_tid(cmd->get_input(idx).tid);
-          assert(t != nullptr);
-          input_meta_params.set(idx, t->_meta);
-        }
-
-        // figure out the output parameters
-        std::vector<tensor_meta_t> parameters(cmd->get_num_outputs());
-        ud_impl_t::meta_params_t output_meta_params(parameters);
-
-        // get the output meta
-        ud->get_out_meta(input_meta_params, output_meta_params);
-
-        /// 2. Prepare the output parameters
-
-        // make the input parameters
-        ud_impl_t::tensor_params_t input_params(cmd->get_num_inputs());
-        for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
-
-          // store it
-          auto t = ts->get_by_tid(cmd->get_input(idx).tid);
-          input_params.set(idx, *t);
-        }
-
-        // setup the output parameters
-        ud_impl_t::tensor_params_t output_params(cmd->get_num_outputs());
-        for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
-
-          // the size of the tensor
-          auto ts_size = tf->get_tensor_size(output_meta_params.get_by_idx(idx));
-
-          // store it
-          auto t = ts->create_tensor(cmd->get_output(idx).tid, ts_size);
-
-          // get the type of the output
-          auto &type = ud->outputTypes[idx];
-          t->_meta.fmt_id = tf->get_tensor_ftm(type);
-
-          // set the output param
-          output_params.set(idx, *t);
-        }
-
-        /// 3. Run the actual UD Function
-
-        // apply the ud function
-        ud->fn(input_params, output_params);
-
-        // retire the command so it knows that we have processed the tensors
-        rs->retire_command(std::move(cmd));
-
-      } else if (cmd->type == command_t::DELETE) {
-
-        // this should never happen
-        throw std::runtime_error("We should never get a delete to execute, delete is implicit...");
-
-      } else if (cmd->type == command_t::REDUCE) {
-
-        // check if the reduce is remote or local
-        if (cmd->is_local_reduce(comm->get_rank())) {
-
-          std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << comm->get_rank() << '\n' << std::flush;
-
-        } else {
-
-          //std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << comm->get_rank() << '\n' << std::flush;
-
-          // forward the command to the right nodes
-          if(!comm->op_request(cmd)) {
-            throw std::runtime_error("Failed to forward reduce command.");
-          }
-
-          // get the nodes involved
-          auto nodes = cmd->get_reduce_nodes();
-
-          // return me that matcher for matrix addition
-          auto ud = udm->get_fn_impl(cmd->fun_id);
-
-          // get the source tensor
-          auto t = ts->get_by_tid(cmd->get_reduce_input(comm->get_rank()).tid);
-
-          // create the move operation
-          reduce_op_t op(*comm, *tf, *ts, nodes, cmd->id, *t, cmd->get_output(0).tid, *ud);
-
-          // do the apply
-          op.apply();
-        }
-
-        // retire the command so it knows that we have processed the tensors
-        rs->retire_command(std::move(cmd));
-
-        std::cout << "REMOTE_REDUCE PROCESSED on node " << comm->get_rank() << '\n' << std::flush;
-      }
-    }
+    crx->local_command_runner();
   });
 
   return std::move(t);
 }
 
-std::thread expect_remote_command(bbts::storage_ptr_t &ts,
-                                  bbts::tensor_factory_ptr_t &tf,
-                                  udf_manager_ptr &udm,
-                                  reservation_station_ptr_t &rs,
-                                  const bbts::communicator_ptr_t &comm) {
+std::thread expect_remote_command(const command_runner_ptr_t &crx) {
 
   // create the thread
-  std::thread t = std::thread([comm, ts, tf, rs, udm]() {
+  std::thread t = std::thread([crx]() {
 
-    // while we
-    while (true) {
-
-      // get the remote command
-      auto cmd = comm->expect_op_request();
-
-      // if this is a shutdown just finish immediately
-      if(cmd->type == bbts::command_t::MOVE) {
-
-        // check if this is the move
-        if(cmd->is_move()) {
-
-          // kick off a thread to process the request
-          std::thread child = std::thread([comm, c = std::move(cmd), rs, tf, ts]() mutable {
-
-            // create the move operation
-            move_op_t op(*comm, c->id, nullptr, c->get_input(0).tid, false, *tf, *ts, c->get_input(0).node);
-
-            // do the apply
-            op.apply();
-
-            // retire the command
-            rs->retire_command(std::move(c));
-          });
-
-          // detach the thread
-          child.detach();
-        }
-        // check if this is a broadcast
-        else {
-
-        }
-
-      }
-      else if(cmd->type == bbts::command_t::REDUCE) {
-
-        // kick off a thread to process the request
-        std::thread child = std::thread([comm, c = std::move(cmd), rs, tf, ts, udm]() mutable {
-
-          // get the nodes involved
-          auto nodes = c->get_reduce_nodes();
-
-          // return me that matcher for matrix addition
-          auto ud = udm->get_fn_impl(c->fun_id);
-
-          // get the source tensor
-          auto t = ts->get_by_tid(c->get_reduce_input(comm->get_rank()).tid);
-          assert(t != nullptr);
-
-          // create the move operation
-          reduce_op_t op(*comm, *tf, *ts, nodes, c->id, *t, c->get_output(0).tid, *ud);
-
-          // do the apply
-          op.apply();
-
-          // retire the command
-          rs->retire_command(std::move(c));
-        });
-
-        // detach the thread
-        child.detach();
-      }
-      else if(cmd->type == bbts::command_t::SHUTDOWN) {
-        break;
-      }
-      else {
-
-        // throw the runtime error
-        throw std::runtime_error("This is bad can not process a command of type " + std::to_string(cmd->type));
-      }
-    }
+    crx->remote_command_handler();
   });
 
   return std::move(t);
 }
 
-std::thread remote_tensor_notification_sender(const bbts::communicator_ptr_t &comm,
-                                              node_id_t out_node,
-                                              const reservation_station_ptr_t &rs) {
+std::thread remote_tensor_notification_sender(const bbts::tensor_notifier_ptr_t &tnf, node_id_t out_node) {
 
   // create the thread
-  std::thread t = std::thread([out_node, rs, comm]() {
+  std::thread t = std::thread([out_node, tnf]() {
 
-    while (true) {
-
-      // get tensors to notify the other node
-      bool is_done;
-      auto tensors = rs->tensors_to_notify_node(out_node, is_done);
-      std::cout << "Notifying\n";
-
-      // if it is node break out
-      if (is_done) {
-        break;
-      }
-
-      // add the remote commands
-      if(!comm->tensors_created_notification(out_node, tensors)) {
-        throw std::runtime_error("Could not set the tensor notification");
-      }
-    }
-
+    // this will send notifications to out node
+    tnf->run_notification_sender_for_node(out_node);
   });
 
   return std::move(t);
 }
 
-std::thread tensor_notifier(reservation_station_ptr_t &rs,
-                            const bbts::communicator_ptr_t &comm) {
+std::thread tensor_notifier(const bbts::tensor_notifier_ptr_t &tnf) {
+
   // create the thread
-  std::thread t = std::thread([rs, comm]() {
+  std::thread t = std::thread([tnf]() {
 
-    while (true) {
-
-      // wait for the command
-      auto [node, tensors] = comm->receive_tensor_created_notification();
-      std::cout << "Recv notification\n";
-
-      // check if we are done...
-      if (node == -1) {
-        break;
-      }
-
-      // notify that the tensors became available
-      rs->notify_available_tensors(node, tensors);
-    }
+    // run the handler for the notifications
+    tnf->run_notification_handler();
   });
 
   return std::move(t);
@@ -605,7 +340,7 @@ std::thread tensor_notifier(reservation_station_ptr_t &rs,
 int main(int argc, char **argv) {
 
   // the number of threads per node
-  const int32_t num_threads = 1;
+  const int32_t num_threads = 8;
   const size_t split = 32;
 
   // make the configuration
@@ -650,25 +385,29 @@ int main(int argc, char **argv) {
   // now that we have scheduled all wait
   comm->barrier();
 
+  // this runs commands
+  auto crx = std::make_shared<command_runner_t>(ts, tf, udm, rs, comm);
+
+  // the tensor notifier
+  auto tnf = std::make_shared<bbts::tensor_notifier_t>(comm, rs);
+
   // kick off the deleter thread
-  auto deleter = create_deleter_thread(rs, ts);
+  auto deleter = create_deleter_thread(crx);
 
   // executors
-  std::vector<std::thread> _notification_handler_threads;
-  _notification_handler_threads.reserve(num_nodes);
-  for (node_id_t node = 0; node < num_nodes; ++node) {
-    _notification_handler_threads.push_back(std::move(create_command_processing_thread(comm,
-                                                                                       rs,
-                                                                                       udm,
-                                                                                       ts,
-                                                                                       tf)));
+  std::vector<std::thread> command_processing_threads;
+  command_processing_threads.reserve(num_nodes);
+  for (node_id_t t = 0; t < num_threads; ++t) {
+    command_processing_threads.push_back(std::move(create_command_processing_thread(crx)));
   }
 
   // this kicks off and handles remove commands (MOVE and REDUCE)
-  auto command_expect = expect_remote_command(ts, tf, udm, rs, comm);
+  auto command_expect = expect_remote_command(crx);
 
-  auto tsn_thread = tensor_notifier(rs, comm);
+  // this will get all the notifications about tensors
+  auto tsn_thread = tensor_notifier(tnf);
 
+  // kick off the
   std::vector<std::thread> remote_notification_sender;
   remote_notification_sender.reserve(num_nodes);
   for(node_id_t node = 0; node < comm->get_num_nodes(); ++node) {
@@ -679,7 +418,7 @@ int main(int argc, char **argv) {
     }
 
     // create the notifier thread
-    remote_notification_sender.push_back(remote_tensor_notification_sender(comm, node, rs));
+    remote_notification_sender.push_back(remote_tensor_notification_sender(tnf, node));
   }
 
   // wait for the deleter to finish

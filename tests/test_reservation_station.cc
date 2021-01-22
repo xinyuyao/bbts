@@ -1058,7 +1058,7 @@ TEST(TestReservationStation, TwoNodesCMM) {
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(2);
   for(node_id_t node = 0; node < 2; ++node) {
-    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
+    _notification_handler_threads.push_back(std::move(tensor_notifier_t(node, rss, remote_notifications)));
   }
 
   // create the deleters
@@ -1339,7 +1339,7 @@ TEST(TestReservationStation, NNodesCMM) {
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(num_nodes);
   for(node_id_t node = 0; node < num_nodes; ++node) {
-    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
+    _notification_handler_threads.push_back(std::move(tensor_notifier_t(node, rss, remote_notifications)));
   }
 
   // create the deleters

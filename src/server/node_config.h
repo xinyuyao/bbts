@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 namespace bbts {
 
 // the type that identifies a node
