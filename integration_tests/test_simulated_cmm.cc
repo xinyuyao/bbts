@@ -7,19 +7,13 @@
 #include "../src/commands/command_runner.h"
 #include "../src/server/node.h"
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
 using namespace bbts;
 
 using index_t = std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>>;
 using to_agg_index_t = std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>>;
 
 // creates the matrix tensors on this node
-index_t create_matrix_tensors(char matrix,
-                              bbts::node_t &node,
-                              int n,
-                              int split,
-                              int &cur_tid) {
+index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split, int &cur_tid) {
 
   // the index
   index_t index;
@@ -295,7 +289,7 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 32;
+  const size_t split = 4;
   int32_t tid_offset = 0;
 
   std::cout << "Creating tensor A....\n";

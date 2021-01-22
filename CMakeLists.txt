@@ -47,6 +47,10 @@ add_library(tensor OBJECT ${TENSOR_SOURCE})
 file(GLOB STORAGE_SOURCE "src/storage/*.cc")
 add_library(storage OBJECT ${STORAGE_SOURCE})
 
+# the server
+file(GLOB SERVER_SOURCE "src/server/*.cc")
+add_library(server OBJECT ${SERVER_SOURCE})
+
 # the communication
 file(GLOB COMMUNICATION_SOURCE "src/communication/*.cc")
 add_library(communication OBJECT ${COMMUNICATION_SOURCE})
@@ -61,6 +65,7 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
                         $<TARGET_OBJECTS:operations>
                         $<TARGET_OBJECTS:storage>
                         $<TARGET_OBJECTS:communication>
+                        $<TARGET_OBJECTS:server>
                         $<TARGET_OBJECTS:ud_functions>)
 
 # link the mkl library
