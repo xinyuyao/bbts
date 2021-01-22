@@ -16,6 +16,9 @@ struct node_config_t {
 
   // the arguments as string pointers
   char **argv;
+
+  // the number of threads we are running
+  size_t num_threads = 8;
 };
 
 // a nice way to reference the configuration ptr

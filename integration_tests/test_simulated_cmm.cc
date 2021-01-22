@@ -5,6 +5,7 @@
 #include "../src/commands/reservation_station.h"
 #include "../src/commands/tensor_notifier.h"
 #include "../src/commands/command_runner.h"
+#include "../src/server/node.h"
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
@@ -15,13 +16,9 @@ using to_agg_index_t = std::map<std::tuple<int32_t, int32_t>, std::vector<std::t
 
 // creates the matrix tensors on this node
 index_t create_matrix_tensors(char matrix,
-                              reservation_station_ptr_t &rs,
-                              bbts::tensor_factory_ptr_t &tf,
-                              bbts::storage_ptr_t &ts,
+                              bbts::node_t &node,
                               int n,
                               int split,
-                              int my_rank,
-                              int num_nodes,
                               int &cur_tid) {
 
   // the index
@@ -31,7 +28,10 @@ index_t create_matrix_tensors(char matrix,
   int block_size = n / split;
 
   // grab the format impl_id of the dense tensor
-  auto fmt_id = tf->get_tensor_ftm("dense");
+  auto fmt_id = node._factory->get_tensor_ftm("dense");
+
+  // get the rank
+  auto my_rank = node._comm->get_rank();
 
   // create all the rows an columns we need
   auto hash_fn = std::hash<int>();
@@ -39,7 +39,7 @@ index_t create_matrix_tensors(char matrix,
     for (int col_id = 0; col_id < split; ++col_id) {
 
       // check if this block is on this node
-      auto target_node = hash_fn(row_id * split + col_id) % num_nodes;
+      auto target_node = hash_fn(row_id * split + col_id) % node.get_num_nodes();
       if (target_node == my_rank) {
 
         // ok it is on this node make a tensor
@@ -47,17 +47,17 @@ index_t create_matrix_tensors(char matrix,
         dense_tensor_meta_t dm{fmt_id, block_size, block_size};
 
         // get the size of the tensor we need to crate
-        auto tensor_size = tf->get_tensor_size(dm);
+        auto tensor_size = node._factory->get_tensor_size(dm);
 
         // crate the tensor
-        auto t = ts->create_tensor(cur_tid, tensor_size);
+        auto t = node._storage->create_tensor(cur_tid, tensor_size);
 
         // init the tensor
-        auto &dt = tf->init_tensor(t, dm).as<dense_tensor_t>();
+        auto &dt = node._factory->init_tensor(t, dm).as<dense_tensor_t>();
 
         // set the index
         index[{row_id, col_id}] = {target_node, cur_tid};
-        rs->register_tensor(cur_tid);
+        node._res_station->register_tensor(cur_tid);
 
         std::cout << "CREATE(matrix=" << matrix << ", tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid
                   << " , node=" << my_rank
@@ -235,16 +235,19 @@ void create_delete(size_t num_nodes,
   }
 }
 
-std::vector<command_ptr_t> generate_commands(size_t num_nodes,
-                                             size_t split,
+std::vector<command_ptr_t> generate_commands(size_t split,
                                              index_t a_mat,
                                              index_t b_mat,
                                              int32_t &tid_offset,
-                                             const udf_manager_ptr &udm) {
+                                             bbts::node_t &node) {
 
   // we put the commands we want to schedule here
   std::vector<command_ptr_t> _cmds;
   command_id_t cur_cmd = 0;
+
+  // the number of nodes
+  auto num_nodes = node.get_num_nodes();
+  auto udm = node._udf_manager;
 
   // all the tensors that we need to delete
   std::vector<std::vector<int32_t>> to_del(num_nodes);
@@ -281,151 +284,36 @@ std::vector<command_ptr_t> generate_commands(size_t num_nodes,
   return std::move(_cmds);
 }
 
-// the reservation station needs a deleter thread
-std::thread create_deleter_thread(const command_runner_ptr_t &crx) {
-
-  // create the thread
-  return std::thread([crx]() {
-
-    crx->run_deleter();
-  });
-}
-
-std::thread create_command_processing_thread(const command_runner_ptr_t &crx) {
-
-  // create the thread to pull
-  std::thread t = std::thread([crx]() {
-
-    crx->local_command_runner();
-  });
-
-  return std::move(t);
-}
-
-std::thread expect_remote_command(const command_runner_ptr_t &crx) {
-
-  // create the thread
-  std::thread t = std::thread([crx]() {
-
-    crx->remote_command_handler();
-  });
-
-  return std::move(t);
-}
-
-std::thread remote_tensor_notification_sender(const bbts::tensor_notifier_ptr_t &tnf, node_id_t out_node) {
-
-  // create the thread
-  std::thread t = std::thread([out_node, tnf]() {
-
-    // this will send notifications to out node
-    tnf->run_notification_sender_for_node(out_node);
-  });
-
-  return std::move(t);
-}
-
-std::thread tensor_notifier(const bbts::tensor_notifier_ptr_t &tnf) {
-
-  // create the thread
-  std::thread t = std::thread([tnf]() {
-
-    // run the handler for the notifications
-    tnf->run_notification_handler();
-  });
-
-  return std::move(t);
-}
-
 int main(int argc, char **argv) {
 
-  // the number of threads per node
-  const int32_t num_threads = 8;
-  const size_t split = 32;
-
   // make the configuration
-  auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
+  auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv, .num_threads = 8});
 
-  // create the storage
-  storage_ptr_t ts = std::make_shared<storage_t>();
+  // create the node
+  bbts::node_t node(config);
 
-  // create the tensor factory
-  auto tf = std::make_shared<bbts::tensor_factory_t>();
+  // init the node
+  node.init();
 
-  // crate the udf manager
-  auto udm = std::make_shared<udf_manager>(tf);
-
-  // init the communicator with the configuration
-  bbts::communicator_ptr_t comm = std::make_shared<bbts::communicator_t>(config);
-  auto my_rank = comm->get_rank();
-  auto num_nodes = comm->get_num_nodes();
-
-  // create the reservation station
-  auto rs = std::make_shared<bbts::reservation_station_t>(my_rank, num_nodes);
-
-  // create two tensors split into num_nodes x num_nodes, we split them by some hash
+  const size_t split = 32;
   int32_t tid_offset = 0;
+
   std::cout << "Creating tensor A....\n";
-  auto a_idx = create_matrix_tensors('A', rs, tf, ts, 1000, split, my_rank, num_nodes, tid_offset);
+  auto a_idx = create_matrix_tensors('A', node, 1000, split, tid_offset);
   std::cout << "Creating tensor B....\n";
-  auto b_idx = create_matrix_tensors('B', rs, tf, ts, 1000, split, my_rank, num_nodes, tid_offset);
+  auto b_idx = create_matrix_tensors('B', node, 1000, split, tid_offset);
 
   // generate all the commands
-  auto cmds = generate_commands(num_nodes, split, a_idx, b_idx, tid_offset, udm);
+  auto cmds = generate_commands(split, a_idx, b_idx, tid_offset, node);
 
-  // schedule them all at once
-  for (auto &_cmd : cmds) {
+  // load the commands
+  node.load_commands(cmds);
 
-    // if it uses the node
-    if (_cmd->uses_node(my_rank)) {
-      rs->queue_command(_cmd->clone());
-    }
-  }
+  // sync everything
+  node.sync();
 
-  // now that we have scheduled all wait
-  comm->barrier();
-
-  // this runs commands
-  auto crx = std::make_shared<command_runner_t>(ts, tf, udm, rs, comm);
-
-  // the tensor notifier
-  auto tnf = std::make_shared<bbts::tensor_notifier_t>(comm, rs);
-
-  // kick off the deleter thread
-  auto deleter = create_deleter_thread(crx);
-
-  // executors
-  std::vector<std::thread> command_processing_threads;
-  command_processing_threads.reserve(num_nodes);
-  for (node_id_t t = 0; t < num_threads; ++t) {
-    command_processing_threads.push_back(std::move(create_command_processing_thread(crx)));
-  }
-
-  // this kicks off and handles remove commands (MOVE and REDUCE)
-  auto command_expect = expect_remote_command(crx);
-
-  // this will get all the notifications about tensors
-  auto tsn_thread = tensor_notifier(tnf);
-
-  // kick off the
-  std::vector<std::thread> remote_notification_sender;
-  remote_notification_sender.reserve(num_nodes);
-  for(node_id_t node = 0; node < comm->get_num_nodes(); ++node) {
-
-    // no need to notify self so skip that
-    if(node == comm->get_rank()) {
-      continue;
-    }
-
-    // create the notifier thread
-    remote_notification_sender.push_back(remote_tensor_notification_sender(tnf, node));
-  }
-
-  // wait for the deleter to finish
-  deleter.join();
-
-  // wait for expect co
-  command_expect.join();
+  // kick of all the stuff
+  node.run();
 
   return 0;
 }
