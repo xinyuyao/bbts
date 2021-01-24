@@ -66,11 +66,11 @@ int main(int argc, char **argv) {
     std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
     // craete the reduce
-    auto reduce_op = bbts::reduce_op_t(comm, *factory, storage, nodes, 111, a, *ud);
+    auto reduce_op = bbts::reduce_op_t(comm, *factory, storage, bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size() }, 111, a, 0, *ud);
     auto b = reduce_op.apply();
 
     if(comm.get_rank() == root_node) {
-    
+
       auto &bb = b->as<bbts::dense_tensor_t>();
       for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
           

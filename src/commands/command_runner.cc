@@ -137,7 +137,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // get the nodes involved
-        auto nodes = cmd->get_reduce_nodes();
+        auto nodes = cmd->get_nodes();
 
         // return me that matcher for matrix addition
         auto ud = _udm->get_fn_impl(cmd->fun_id);
@@ -202,7 +202,7 @@ void bbts::command_runner_t::remote_command_handler() {
       std::thread child = std::thread([this, c = std::move(cmd)]() mutable {
 
         // get the nodes involved
-        auto nodes = c->get_reduce_nodes();
+        auto nodes = c->get_nodes();
 
         // return me that matcher for matrix addition
         auto ud = _udm->get_fn_impl(c->fun_id);

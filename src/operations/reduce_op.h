@@ -52,7 +52,7 @@ public:
   bbts::storage_t &_storage;
 
   // the nodes
-  const std::vector<bbts::node_id_t> &_nodes;
+  bbts::command_t::node_list_t _nodes;
 
   // the tag we use to identify this reduce
   int32_t _tag; 
@@ -68,7 +68,7 @@ public:
 
   // constructs the reduce operation
   reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-              const std::vector<bbts::node_id_t> &_nodes, int32_t _tag,
+              const bbts::command_t::node_list_t &_nodes, int32_t _tag,
               bbts::tensor_t &_in, bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
 
   // get the number of nodes

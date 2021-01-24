@@ -221,13 +221,13 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
           // store the outputs so we can add it to the storage
           auto outputs = cmd->get_outputs();
 
-          // retire the command
-          rss[node]->retire_command(std::move(cmd));
-
           // update all the outputs in the storage
           for(auto &o : outputs) {
             sto[node].insert(o.tid);
           }
+
+          // retire the command
+          rss[node]->retire_command(std::move(cmd));
         }
         else {
 
@@ -250,13 +250,13 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
           // store the outputs so we can add it to the storage
           auto outputs = cmd->get_outputs();
 
-          // retire the command
-          rss[node]->retire_command(std::move(cmd));
-
           // update all the outputs in the storage
           for(auto &o : outputs) {
             sto[node].insert(o.tid);
           }
+
+          // retire the command
+          rss[node]->retire_command(std::move(cmd));
         }
         else {
 
@@ -314,6 +314,24 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
   return std::move(t);
 }
 
+TEST(TestReservationStation, FewLocalCommands0) {
+
+  auto cmd = command_t::create_apply(0,
+                                     {0, 0},
+                                     {},
+                                     {command_t::tid_node_id_t{.tid = 0, .node = 0}},
+                                     {command_t::tid_node_id_t{.tid = 2, .node = 0},
+                                          command_t::tid_node_id_t{.tid = 3, .node = 0}});
+
+  auto cmd2 = cmd->clone();
+
+  auto inputs = cmd2->get_outputs();
+  for(auto in : inputs) {
+    std::cout << in.tid << "\n";
+  }
+
+}
+
 TEST(TestReservationStation, FewLocalCommands1) {
 
   // tensors = { (0, 0), (1, 0) }
@@ -340,34 +358,28 @@ TEST(TestReservationStation, FewLocalCommands1) {
   rs->register_tensor(1);
 
   // make a command that applies something to tensor 0
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(0,
-                                       command_t::op_type_t::APPLY,
-                                       {0, 0},
-                                       {command_t::tid_node_id_t{.tid = 0, .node = 0}},
-                                       {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_apply(0,
+                                                        {0, 0},
+                                                        {},
+                                                        {command_t::tid_node_id_t{.tid = 0, .node = 0}},
+                                                        {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
   // make a command that deletes tensor with tid 0
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(1,
-                                                                command_t::op_type_t::DELETE,
-                                                                {0, 0},
-                                                                {command_t::tid_node_id_t{.tid = 0, .node = 0}},
-                                                                {})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_delete(1,
+                                                                 {command_t::tid_node_id_t{.tid = 0, .node = 0}})));
 
   // make a command that runs a reduce
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(2,
-                                                                command_t::op_type_t::REDUCE,
+  EXPECT_TRUE(rs->queue_command(command_t::create_reduce(2,
                                                                 {0, 0},
+                                                                {},
                                                                 {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                                  command_t::tid_node_id_t{.tid = 2, .node = 0}},
                                                                 {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
 
   // make a command that deletes all the tensors except for the tid = 3 tensor
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(3,
-                                                                command_t::op_type_t::DELETE,
-                                                                {0, 0},
-                                                                {command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                                 command_t::tid_node_id_t{.tid = 2, .node = 0}},
-                                                                {})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_delete(3,
+                                                                 {command_t::tid_node_id_t{.tid = 1, .node = 0},
+                                                                  command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
   // get the first command to execute
   auto c1 = rs->get_next_command();
@@ -417,16 +429,16 @@ TEST(TestReservationStation, FewLocalCommands2) {
   rs->register_tensor(1);
 
   // make a command that applies something to tensor 0
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(0,
-                                                                command_t::op_type_t::APPLY,
+  EXPECT_TRUE(rs->queue_command(command_t::create_apply(0,
                                                                 {0, 0},
+                                                                {},
                                                                 {command_t::tid_node_id_t{.tid = 0, .node = 0}},
                                                                 {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
   // make a command that runs a reduce
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(1,
-                                                                command_t::op_type_t::REDUCE,
+  EXPECT_TRUE(rs->queue_command(command_t::create_reduce(1,
                                                                 {0, 0},
+                                                                {},
                                                                 {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                                  command_t::tid_node_id_t{.tid = 2, .node = 0}},
                                                                 {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
@@ -445,14 +457,11 @@ TEST(TestReservationStation, FewLocalCommands2) {
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
   // make a command that deletes all the tensors except for the tid = 3 tensor
-  EXPECT_TRUE(rs->queue_command(command_t::create_unique(2,
-                                                        command_t::op_type_t::DELETE,
-                                                        {0, 0},
-                                                        {command_t::tid_node_id_t{.tid = 0, .node = 0},
+  EXPECT_TRUE(rs->queue_command(command_t::create_delete(2,
+                                                         {command_t::tid_node_id_t{.tid = 0, .node = 0},
                                                          command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                          command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                                         command_t::tid_node_id_t{.tid = 3, .node = 0}},
-                                                        {})));
+                                                         command_t::tid_node_id_t{.tid = 3, .node = 0}})));
 
   // shutdown the reservation station
   rs->shutdown();
@@ -527,113 +536,101 @@ TEST(TestReservationStation, TwoNodesBMM) {
   /// 1.1 shuffle A.rowID
 
   // MOVE (.input = {(0, 1)}, .output = {(0, 0)})
-  _cmds.emplace_back(command_t::create_unique(0,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 0}}));
+  _cmds.emplace_back(command_t::create_move(0,
+                                            command_t::tid_node_id_t{.tid = 0, .node = 1},
+                                            command_t::tid_node_id_t{.tid = 0, .node = 0}));
 
   // MOVE (.input = {(0, 2)}, .output = {(1, 2)})
-  _cmds.emplace_back(command_t::create_unique(1,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 2, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 2, .node = 1}}));
+  _cmds.emplace_back(command_t::create_move(1,
+                                            command_t::tid_node_id_t{.tid = 2, .node = 0},
+                                            command_t::tid_node_id_t{.tid = 2, .node = 1}));
 
   /// 1.2 broadcast B
 
   // MOVE (.input = {(4, 1)}, .output = {(4, 0)})
-  _cmds.emplace_back(command_t::create_unique(2,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 4, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 4, .node = 0}}));
+  _cmds.emplace_back(command_t::create_move(2,
+                                            command_t::tid_node_id_t{.tid = 4, .node = 1},
+                                            command_t::tid_node_id_t{.tid = 4, .node = 0}));
 
 
   // MOVE (.input = {(5, 1)}, .output = {(5, 0)})
-  _cmds.emplace_back(command_t::create_unique(3,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 5, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 5, .node = 0}}));
+  _cmds.emplace_back(command_t::create_move(3,
+                                            command_t::tid_node_id_t{.tid = 5, .node = 1},
+                                            command_t::tid_node_id_t{.tid = 5, .node = 0}));
 
   // MOVE (.input = {(6, 0)}, .output = {(6, 1)})
-  _cmds.emplace_back(command_t::create_unique(4,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 6, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 6, .node = 1}}));
+  _cmds.emplace_back(command_t::create_move(4,
+                                            command_t::tid_node_id_t{.tid = 6, .node = 0},
+                                            command_t::tid_node_id_t{.tid = 6, .node = 1}));
 
   // MOVE (.input = {(7, 0)}, .output = {(7, 1)})
-  _cmds.emplace_back(command_t::create_unique(5,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 7, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 7, .node = 1}}));
+  _cmds.emplace_back(command_t::create_move(5,
+                                            command_t::tid_node_id_t{.tid = 7, .node = 0},
+                                            command_t::tid_node_id_t{.tid = 7, .node = 1}));
 
   /// 2.1 Do the multiply
 
   // (0, 0) x (0, 0) - APPLY (.input = {(0, 0), (4, 0)}, .output = {(8, 0)})
-  _cmds.emplace_back(command_t::create_unique(6,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(6,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 0, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 4, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 8, .node = 0}}));
 
 
   // (0, 1) x (1, 0) - APPLY (.input = {(1, 0), (6, 0)}, .output = {(9, 0)})
-  _cmds.emplace_back(command_t::create_unique(7,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(7,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 6, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 9, .node = 0}}));
 
   // (1, 0) x (0, 0) - APPLY (.input = {(2, 1), (4, 1)}, .output = {(10, 1)})
-  _cmds.emplace_back(command_t::create_unique(8,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(8,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 2, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 4, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 10, .node = 1}}));
 
   // (1, 1) x (1, 0) - APPLY (.input = {(3, 1), (6, 1)}, .output = {(11, 1)})
-  _cmds.emplace_back(command_t::create_unique(9,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(9,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 3, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 6, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 11, .node = 1}}));
 
   // (0, 0) x (0, 1) - APPLY (.input = {(0, 0), (5, 0)}, .output = {(12, 0)})
-  _cmds.emplace_back(command_t::create_unique(10,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(10,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 0, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 5, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 12, .node = 0}}));
 
   // (0, 1) x (1, 1) - APPLY (.input = {(1, 0), (7, 0)}, .output = {(13, 0)})
-  _cmds.emplace_back(command_t::create_unique(11,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(11,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 7, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 13, .node = 0}}));
 
   // (1, 0) x (0, 1) - APPLY (.input = {(2, 1), (5, 1)}, .output = {(14, 1)})
-  _cmds.emplace_back(command_t::create_unique(12,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(12,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 2, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 5, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 14, .node = 1}}));
 
   // (1, 1) x (1, 1) - APPLY (.input = {(3, 1), (7, 1)}, .output = {(15, 1)})
-  _cmds.emplace_back(command_t::create_unique(13,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(13,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 3, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 7, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 15, .node = 1}}));
@@ -642,33 +639,33 @@ TEST(TestReservationStation, TwoNodesBMM) {
 
 
   // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(8, 0), (9, 0)}, .output = {(16, 0)})
-  _cmds.emplace_back(command_t::create_unique(14,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(14,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 8, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 9, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 16, .node = 0}}));
 
   // (1, 0) x (0, 0) + (1, 1) x (1, 0) - REDUCE (.input = {(10, 1), (11, 1)}, .output = {(17, 1)})
-  _cmds.emplace_back(command_t::create_unique(15,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(15,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 10, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 11, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 17, .node = 1}}));
 
   // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(12, 0), (13, 0)}, .output = {(18, 0)})
-  _cmds.emplace_back(command_t::create_unique(16,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(16,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 12, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 13, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 18, .node = 0}}));
 
   // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(14, 1), (15, 1)}, .output = {(19, 1)})
-  _cmds.emplace_back(command_t::create_unique(17,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(17,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 14, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 15, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 19, .node = 1}}));
@@ -677,10 +674,7 @@ TEST(TestReservationStation, TwoNodesBMM) {
   /// Remove the intermediate results
 
   // remove them from node 0
-  _cmds.emplace_back(command_t::create_unique(18,
-                                            command_t::op_type_t::DELETE,
-                                            {0, 0},
-                                            {command_t::tid_node_id_t{.tid = 1, .node = 0},
+  _cmds.emplace_back(command_t::create_delete(18,{command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 2, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 6, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 7, .node = 0},
@@ -690,14 +684,10 @@ TEST(TestReservationStation, TwoNodesBMM) {
                                                     command_t::tid_node_id_t{.tid = 8, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 9, .node = 0},
                                                     command_t::tid_node_id_t{.tid = 12, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 13, .node = 0}},
-                                                   {}));
+                                                    command_t::tid_node_id_t{.tid = 13, .node = 0}}));
 
   // remove them from node 1
-  _cmds.emplace_back(command_t::create_unique(19,
-                                              command_t::op_type_t::DELETE,
-                                              {0, 0},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 1},
+  _cmds.emplace_back(command_t::create_delete(19,{command_t::tid_node_id_t{.tid = 0, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 3, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 4, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 5, .node = 1},
@@ -707,8 +697,7 @@ TEST(TestReservationStation, TwoNodesBMM) {
                                                       command_t::tid_node_id_t{.tid = 10, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 11, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 14, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 15, .node = 1}},
-                                                     {}));
+                                                      command_t::tid_node_id_t{.tid = 15, .node = 1}}));
 
   // schedule them all at once
   for(auto &cmd : _cmds) {
@@ -841,99 +830,91 @@ TEST(TestReservationStation, TwoNodesCMM) {
   /// 1.1 shuffle A.colID
 
   // MOVE (.input = {( 0,  1)}, .output = {( 0,  0)})
-  _cmds.emplace_back(command_t::create_unique(0,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 0}}));
+  _cmds.emplace_back(command_t::create_move(0,
+                                            command_t::tid_node_id_t{.tid = 0, .node = 1},
+                                            command_t::tid_node_id_t{.tid = 0, .node = 0}));
 
   // MOVE (.input = {(1,  0)}, .output = {(1,  1)})
-  _cmds.emplace_back(command_t::create_unique(1,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 1, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 1, .node = 1}}));
+  _cmds.emplace_back(command_t::create_move(1,
+                                            command_t::tid_node_id_t{.tid = 1, .node = 0},
+                                            command_t::tid_node_id_t{.tid = 1, .node = 1}));
 
   /// 1.2 shuffle B.rowID
 
   // MOVE (.input = {(4, 1)}, .output = {(4, 0)})
-  _cmds.emplace_back(command_t::create_unique(2,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 4, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 4, .node = 0}}));
+  _cmds.emplace_back(command_t::create_move(2,
+                                            command_t::tid_node_id_t{.tid = 4, .node = 1},
+                                            command_t::tid_node_id_t{.tid = 4, .node = 0}));
 
   // MOVE (.input = {(7, 0)}, .output = {(7, 1)})
-  _cmds.emplace_back(command_t::create_unique(3,
-                                              command_t::op_type_t::MOVE,
-                                              {-1, -1},
-                                              {command_t::tid_node_id_t{.tid = 7, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 7, .node = 1}}));
+  _cmds.emplace_back(command_t::create_move(3,
+                                            command_t::tid_node_id_t{.tid = 7, .node = 0},
+                                            command_t::tid_node_id_t{.tid = 7, .node = 1}));
 
 
   /// 2.1 Do the multiply
 
   // (0, 0) x (0, 0) - APPLY (.input = {(0, 0), (4, 0)}, .output = {(8, 0)})
-  _cmds.emplace_back(command_t::create_unique(4,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(4,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 0, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 4, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 8, .node = 0}}));
 
 
   // (0, 1) x (1, 0) - APPLY (.input = {(1, 1), (6, 1)}, .output = {(9, 1)})
-  _cmds.emplace_back(command_t::create_unique(5,
-                                              command_t::op_type_t::APPLY,
-                                              {0, 0},
+  _cmds.emplace_back(command_t::create_apply(5,
+                                             {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 1, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 6, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 9, .node = 1}}));
 
   // (1, 0) x (0, 0) - APPLY (.input = {(2, 0), (4, 0)}, .output = {(10, 0)})
-  _cmds.emplace_back(command_t::create_unique(6,
-                                              command_t::op_type_t::APPLY,
+  _cmds.emplace_back(command_t::create_apply(6,
                                               {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 2, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 4, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 10, .node = 0}}));
 
   // (1, 1) x (1, 0) - APPLY (.input = {(3, 1), (6, 1)}, .output = {(11, 1)})
-  _cmds.emplace_back(command_t::create_unique(7,
-                                              command_t::op_type_t::APPLY,
+  _cmds.emplace_back(command_t::create_apply(7,
                                               {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 3, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 6, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 11, .node = 1}}));
 
   // (0, 0) x (0, 1) - APPLY (.input = {(0, 0), (5, 0)}, .output = {(12, 0)})
-  _cmds.emplace_back(command_t::create_unique(8,
-                                              command_t::op_type_t::APPLY,
+  _cmds.emplace_back(command_t::create_apply(8,
                                               {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 0, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 5, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 12, .node = 0}}));
 
   // (0, 1) x (1, 1) - APPLY (.input = {(1, 0), (7, 0)}, .output = {(13, 0)})
-  _cmds.emplace_back(command_t::create_unique(9,
-                                              command_t::op_type_t::APPLY,
+  _cmds.emplace_back(command_t::create_apply(9,
                                               {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 1, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 7, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 13, .node = 1}}));
 
   // (1, 0) x (0, 1) - APPLY (.input = {(2, 1), (5, 1)}, .output = {(14, 1)})
-  _cmds.emplace_back(command_t::create_unique(10,
-                                              command_t::op_type_t::APPLY,
+  _cmds.emplace_back(command_t::create_apply(10,
                                               {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 2, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 5, .node = 0}},
                                               {command_t::tid_node_id_t{.tid = 14, .node = 0}}));
 
   // (1, 1) x (1, 1) - APPLY (.input = {(3, 1), (7, 1)}, .output = {(15, 1)})
-  _cmds.emplace_back(command_t::create_unique(11,
-                                              command_t::op_type_t::APPLY,
+  _cmds.emplace_back(command_t::create_apply(11,
                                               {0, 0},
+                                             {},
                                               {command_t::tid_node_id_t{.tid = 3, .node = 1},
                                                       command_t::tid_node_id_t{.tid = 7, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 15, .node = 1}}));
@@ -941,33 +922,33 @@ TEST(TestReservationStation, TwoNodesCMM) {
   /// 2.2 Do the reduce
 
   // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(8, 0), (9, 1)}, .output = {(16, 0)})
-  _cmds.emplace_back(command_t::create_unique(12,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(12,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 8, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 9, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 16, .node = 0}}));
 
   // (1, 0) x (0, 0) + (1, 1) x (1, 0) - REDUCE (.input = {(10, 0), (11, 1)}, .output = {(17, 1)})
-  _cmds.emplace_back(command_t::create_unique(13,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(13,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 10, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 11, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 17, .node = 1}}));
 
   // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(12, 0), (13, 0)}, .output = {(18, 0)})
-  _cmds.emplace_back(command_t::create_unique(14,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(14,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 12, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 13, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 18, .node = 0}}));
 
   // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(14, 1), (15, 1)}, .output = {(19, 1)})
-  _cmds.emplace_back(command_t::create_unique(15,
-                                              command_t::op_type_t::REDUCE,
+  _cmds.emplace_back(command_t::create_reduce(15,
                                               {0, 0},
+                                              {},
                                               {command_t::tid_node_id_t{.tid = 14, .node = 0},
                                                       command_t::tid_node_id_t{.tid = 15, .node = 1}},
                                               {command_t::tid_node_id_t{.tid = 19, .node = 1}}));
@@ -975,10 +956,7 @@ TEST(TestReservationStation, TwoNodesCMM) {
   /// 3.0 Remove the intermediate results
 
   // remove them from node 0
-  _cmds.emplace_back(command_t::create_unique(16,
-                                              command_t::op_type_t::DELETE,
-                                              {0, 0},
-                                              { command_t::tid_node_id_t{.tid = 1, .node = 0},
+  _cmds.emplace_back(command_t::create_delete(16,{ command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                        command_t::tid_node_id_t{.tid = 2, .node = 0},
                                                        command_t::tid_node_id_t{.tid = 5, .node = 0},
                                                        command_t::tid_node_id_t{.tid = 7, .node = 0},
@@ -989,13 +967,10 @@ TEST(TestReservationStation, TwoNodesCMM) {
                                                        command_t::tid_node_id_t{.tid = 12, .node = 0},
                                                        command_t::tid_node_id_t{.tid = 14, .node = 0},
                                                        command_t::tid_node_id_t{.tid = 16, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 18, .node = 0}}, {}));
+                                                       command_t::tid_node_id_t{.tid = 18, .node = 0}}));
 
   // remove them from node 0
-  _cmds.emplace_back(command_t::create_unique(17,
-                                              command_t::op_type_t::DELETE,
-                                              {0, 0},
-                                              {  command_t::tid_node_id_t{.tid = 0, .node = 1},
+  _cmds.emplace_back(command_t::create_delete(17,{  command_t::tid_node_id_t{.tid = 0, .node = 1},
                                                         command_t::tid_node_id_t{.tid = 3, .node = 1},
                                                         command_t::tid_node_id_t{.tid = 4, .node = 1},
                                                         command_t::tid_node_id_t{.tid = 6, .node = 1},
@@ -1006,7 +981,7 @@ TEST(TestReservationStation, TwoNodesCMM) {
                                                         command_t::tid_node_id_t{.tid = 13, .node = 1},
                                                         command_t::tid_node_id_t{.tid = 15, .node = 1},
                                                         command_t::tid_node_id_t{.tid = 17, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 19, .node = 1}}, {}));
+                                                        command_t::tid_node_id_t{.tid = 19, .node = 1}}));
 
   // schedule them all at once
   for(auto &cmd : _cmds) {
@@ -1058,7 +1033,7 @@ TEST(TestReservationStation, TwoNodesCMM) {
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(2);
   for(node_id_t node = 0; node < 2; ++node) {
-    _notification_handler_threads.push_back(std::move(tensor_notifier_t(node, rss, remote_notifications)));
+    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
   }
 
   // create the deleters
@@ -1168,11 +1143,9 @@ void create_shuffle(size_t num_nodes,
       }
 
       // move it
-      _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                  command_t::op_type_t::MOVE,
-                                                  {-1, -1},
-                                                  {command_t::tid_node_id_t{.tid = tid, .node = node}},
-                                                  {command_t::tid_node_id_t{.tid = tid, .node = target_node}}));
+      _cmds.emplace_back(command_t::create_move(cur_cmd++,
+                                                command_t::tid_node_id_t{.tid = tid, .node = node},
+                                                command_t::tid_node_id_t{.tid = tid, .node = target_node}));
 
 
       // mark that we need to delete it later
@@ -1231,9 +1204,9 @@ TEST(TestReservationStation, NNodesCMM) {
         auto target_node = (node_id_t) (k % num_nodes);
 
         // add the command
-        _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                    command_t::op_type_t::APPLY,
-                                                    { 0, 0 },
+        _cmds.emplace_back(command_t::create_apply(cur_cmd++,
+                                                   { 0, 0 },
+                                                   {},
                                                     { command_t::tid_node_id_t{ .tid = a_tid, .node = target_node },
                                                              command_t::tid_node_id_t{ .tid = b_tid, .node = target_node } },
                                                     { command_t::tid_node_id_t{.tid = cur_tid, .node = target_node} }));
@@ -1264,9 +1237,9 @@ TEST(TestReservationStation, NNodesCMM) {
       }
 
       // create the reduce command
-      _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                  command_t::op_type_t::REDUCE,
+      _cmds.emplace_back(command_t::create_reduce(cur_cmd++,
                                                   {0, 0},
+                                                  {},
                                                   inputs,
                                                   {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
 
@@ -1286,11 +1259,7 @@ TEST(TestReservationStation, NNodesCMM) {
     }
 
     // remove them from node
-    _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                command_t::op_type_t::DELETE,
-                                                {0, 0},
-                                                _inputs,
-                                                {}));
+    _cmds.emplace_back(command_t::create_delete(cur_cmd++,_inputs));
   }
 
   // schedule them all at once
@@ -1339,7 +1308,7 @@ TEST(TestReservationStation, NNodesCMM) {
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(num_nodes);
   for(node_id_t node = 0; node < num_nodes; ++node) {
-    _notification_handler_threads.push_back(std::move(tensor_notifier_t(node, rss, remote_notifications)));
+    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
   }
 
   // create the deleters

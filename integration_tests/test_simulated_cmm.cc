@@ -95,11 +95,9 @@ void create_shuffle(size_t num_nodes,
       }
 
       // move it
-      _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                  command_t::op_type_t::MOVE,
-                                                  {-1, -1},
-                                                  {command_t::tid_node_id_t{.tid = tid, .node = node}},
-                                                  {command_t::tid_node_id_t{.tid = tid, .node = target_node}}));
+      _cmds.emplace_back(command_t::create_move(cur_cmd++,
+                                                command_t::tid_node_id_t{.tid = tid, .node = node},
+                                                command_t::tid_node_id_t{.tid = tid, .node = target_node}));
 
 
       // mark that we need to delete it later
@@ -140,9 +138,9 @@ to_agg_index_t create_multiply(const udf_manager_ptr &udm,
         auto target_node = (node_id_t) (k % num_nodes);
 
         // add the command
-        _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                    command_t::op_type_t::APPLY,
-                                                    ud->impl_id,
+        _cmds.emplace_back(command_t::create_apply(cur_cmd++,
+                                                   ud->impl_id,
+                                                   {},
                                                     {command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
                                                      command_t::tid_node_id_t{.tid = b_tid, .node = target_node}},
                                                     {command_t::tid_node_id_t{.tid = tid_offset, .node = target_node}}));
@@ -194,9 +192,9 @@ void generate_aggregation(const udf_manager_ptr &udm,
       }
 
       // create the reduce command
-      _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                  command_t::op_type_t::REDUCE,
+      _cmds.emplace_back(command_t::create_reduce(cur_cmd++,
                                                   ud->impl_id,
+                                                  {},
                                                   inputs,
                                                   {command_t::tid_node_id_t{.tid = tid_offset, .node = target_node}}));
 
@@ -221,11 +219,7 @@ void create_delete(size_t num_nodes,
     }
 
     // remove them from node
-    _cmds.emplace_back(command_t::create_unique(cur_cmd++,
-                                                command_t::op_type_t::DELETE,
-                                                {0, 0},
-                                                _inputs,
-                                                {}));
+    _cmds.emplace_back(command_t::create_delete(cur_cmd++,_inputs));
   }
 }
 
@@ -289,7 +283,7 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 4;
+  const size_t split = 32;
   int32_t tid_offset = 0;
 
   std::cout << "Creating tensor A....\n";

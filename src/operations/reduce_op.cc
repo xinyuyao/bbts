@@ -3,7 +3,7 @@
 namespace bbts {
 
 reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-                         const std::vector<bbts::node_id_t> &_nodes, int32_t _tag,
+                         const bbts::command_t::node_list_t &_nodes, int32_t _tag,
                          bbts::tensor_t &_in, bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op) : _comm(_comm),
                                                                                                          _factory(_factory),
                                                                                                          _storage(_storage),
@@ -18,7 +18,9 @@ int32_t reduce_op_t::get_num_nodes() const {
 }
 
 int32_t reduce_op_t::get_local_rank() const {
-  return std::distance(_nodes.begin(), std::find(_nodes.begin(), _nodes.end(), _comm.get_rank()));
+
+  auto it = _nodes.find(_comm.get_rank());
+  return it.distance_from(_nodes.begin());
 }
 
 int32_t reduce_op_t::get_global_rank(int32_t local_rank) const {
