@@ -129,8 +129,6 @@ void bbts::command_runner_t::local_command_runner() {
 
       } else {
 
-        //std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << comm->get_rank() << '\n' << std::flush;
-
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
           throw std::runtime_error("Failed to forward reduce command.");
@@ -142,11 +140,25 @@ void bbts::command_runner_t::local_command_runner() {
         // return me that matcher for matrix addition
         auto ud = _udm->get_fn_impl(cmd->fun_id);
 
-        // get the source tensor
-        auto t = _ts->get_by_tid(cmd->get_reduce_input(_comm->get_rank()).tid);
+        // preallocate the input pointers
+        auto cmd_inputs = cmd->get_inputs();
+        std::vector<bbts::tensor_t*> inputs;
+        inputs.reserve(cmd_inputs.size());
+
+        // get all the tensors we need
+        for(const auto& in : cmd_inputs) {
+
+          // check if the node
+          if(in.node == _comm->get_rank()) {
+
+            // get the source tensor
+            auto t = _ts->get_by_tid(in.tid);
+            inputs.push_back(t);
+          }
+        }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, *t, cmd->get_output(0).tid, *ud);
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, cmd->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();
@@ -207,12 +219,25 @@ void bbts::command_runner_t::remote_command_handler() {
         // return me that matcher for matrix addition
         auto ud = _udm->get_fn_impl(c->fun_id);
 
-        // get the source tensor
-        auto t = _ts->get_by_tid(c->get_reduce_input(_comm->get_rank()).tid);
-        assert(t != nullptr);
+        // preallocate the input pointers
+        auto cmd_inputs = c->get_inputs();
+        std::vector<bbts::tensor_t*> inputs;
+        inputs.reserve(cmd_inputs.size());
+
+        // get all the tensors we need
+        for(const auto& in : cmd_inputs) {
+
+          // check if the node
+          if(in.node == _comm->get_rank()) {
+
+            // get the source tensor
+            auto t = _ts->get_by_tid(in.tid);
+            inputs.push_back(t);
+          }
+        }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, *t, c->get_output(0).tid, *ud);
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, c->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();
