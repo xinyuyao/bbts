@@ -58,11 +58,11 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
     }
   }
 
-  ud_impl_t::tensor_params_t inputParams = {{&a, &b}};
-  ud_impl_t::tensor_params_t outputParams = {{&a}};
+  ud_impl_t::tensor_args_t input_args = {{&a, &b}};
+  ud_impl_t::tensor_args_t output_args = {{&a}};
 
   // call the addition
-  ud->fn(inputParams, outputParams);
+  ud->fn(input_args, output_args);
 
   // check that the values are correct
   for(auto row = 0; row < am.num_rows; ++row) {

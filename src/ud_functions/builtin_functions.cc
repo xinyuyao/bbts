@@ -35,28 +35,28 @@ bbts::dense_matrix_add_t::dense_matrix_add_t() {
   fn = &dense_matrix_add_t::add;
 }
 
-size_t bbts::dense_matrix_add_t::get_complexity_hint(const bbts::ud_impl_t::meta_params_t &_in) {
+size_t bbts::dense_matrix_add_t::get_complexity_hint(const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m)
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
   return m_a.num_rows * m_a.num_cols;
 }
 
-void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::meta_params_t &_in,
-                                            bbts::ud_impl_t::meta_params_t &_out) const {
+void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::meta_args_t &_in,
+                                            bbts::ud_impl_t::meta_args_t &_out) const {
 
-  // get the input parameters
+  // get the input argeters
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
 
-  // get the output parameters
+  // get the output argeters
   auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
 
   // set the new values
   m_out = { m_a.num_rows, m_a.num_cols };
 }
 
-void bbts::dense_matrix_add_t::add(const bbts::ud_impl_t::tensor_params_t &_in,
-                                   bbts::ud_impl_t::tensor_params_t &_out) {
+void bbts::dense_matrix_add_t::add(const bbts::ud_impl_t::tensor_args_t &_in,
+                                   bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
   auto &a = _in.get<0>().as<dense_tensor_t>();
@@ -120,7 +120,7 @@ bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
   fn = &dense_matrix_mult_t::mult;
 }
 
-size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::meta_params_t &_in) {
+size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
@@ -128,22 +128,22 @@ size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::met
   return m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
-void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::meta_params_t &_in,
-                                             bbts::ud_impl_t::meta_params_t &_out) const {
+void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::meta_args_t &_in,
+                                             bbts::ud_impl_t::meta_args_t &_out) const {
 
-  // get the input parameters
+  // get the input argeters
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
   const auto &m_b = _in.get<1>().as<dense_tensor_meta_t>().m();
 
-  // get the output parameters
+  // get the output argeters
   auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
 
   // set the output
   m_out = {m_a.num_rows, m_b.num_cols};
 }
 
-void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_params_t &_in,
-                                     bbts::ud_impl_t::tensor_params_t &_out) {
+void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_args_t &_in,
+                                     bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
   auto &a = _in.get<0>().as<dense_tensor_t>();

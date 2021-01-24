@@ -23,60 +23,60 @@ struct ud_impl_id_t {
 
 struct ud_impl_t {
 
-  // the ud function parameters for either the input or the output
+  // the ud function arguments for either the input or the output
   template<class T>
-  struct ud_impl_params_t {
+  struct ud_impl_args_t {
 
-    // the input parameters
-    ud_impl_params_t(std::vector<T*> in_param) : parameters(std::move(in_param)) {}
+    // the input arguments
+    ud_impl_args_t(std::vector<T*> in_arg) : arguments(std::move(in_arg)) {}
 
-    // copy the input parameters
-    ud_impl_params_t(std::vector<T> &in_param) {
+    // copy the input arguments
+    ud_impl_args_t(std::vector<T> &in_arg) {
 
-      // fill up the parameters
-      parameters.reserve(in_param.size());
-      for(auto &p : in_param) {
-        parameters.push_back(&p);
+      // fill up the arguments
+      arguments.reserve(in_arg.size());
+      for(auto &p : in_arg) {
+        arguments.push_back(&p);
       }
     }
 
-    // just with empty parameters
-    ud_impl_params_t(size_t num_params) : parameters(num_params) {}
+    // just with empty arguments
+    ud_impl_args_t(size_t num_args) : arguments(num_args) {}
 
-    // this is for the output parameters
+    // this is for the output arguments
     template<size_t n>
-    T &get() { return *parameters[n]; }
+    T &get() { return *arguments[n]; }
 
-    // this is for the input parameters as they are constant
+    // this is for the input arguments as they are constant
     template<size_t n>
-    const T &get() const { return *parameters[n]; }
+    const T &get() const { return *arguments[n]; }
 
-    // this gets the parameters at runtime
-    const T &get_by_idx(size_t idx) { return *parameters[idx]; }
+    // this gets the arguments at runtime
+    const T &get_by_idx(size_t idx) { return *arguments[idx]; }
 
-    // sets the parameter
+    // sets the argument
     template<size_t n>
     void set(T &_in) {
-      parameters[n] = &_in;
+      arguments[n] = &_in;
     }
 
-    // set the parameter on index
+    // set the argument on index
     void set(size_t n, T &_in) {
-      parameters[n] = &_in;
+      arguments[n] = &_in;
     }
 
    private:
 
-    // holds the input parameters
-    std::vector<T*> parameters;
+    // holds the input arguments
+    std::vector<T*> arguments;
   };
 
-  // define the parameters for the meta
-  using tensor_params_t = ud_impl_params_t<tensor_t>;
-  using meta_params_t = ud_impl_params_t<tensor_meta_t>;
+  // define the arguments for the meta
+  using tensor_args_t = ud_impl_args_t<tensor_t>;
+  using meta_args_t = ud_impl_args_t<tensor_meta_t>;
 
   // each apply is a call to these
-  using ud_impl_callable = std::function<void(const tensor_params_t &_in, tensor_params_t &_out)>;
+  using ud_impl_callable = std::function<void(const tensor_args_t &_in, tensor_args_t &_out)>;
 
   // the impl_id of the implementation, this is initialized by the udf manager
   ud_impl_id_t impl_id;
@@ -111,10 +111,10 @@ struct ud_impl_t {
   ud_impl_callable fn;
 
   // returns the complexity hint of the ud function
-  virtual size_t get_complexity_hint(const meta_params_t &_in) = 0;
+  virtual size_t get_complexity_hint(const meta_args_t &_in) = 0;
 
   // returns the output meta data
-  virtual void get_out_meta(const meta_params_t &_in, meta_params_t &_out) const = 0;
+  virtual void get_out_meta(const meta_args_t &_in, meta_args_t &_out) const = 0;
 };
 
 // define a nice way to say unique_ptr of ud_impl_t

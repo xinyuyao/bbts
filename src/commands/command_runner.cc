@@ -61,40 +61,40 @@ void bbts::command_runner_t::local_command_runner() {
 
       /// 1. Figure out the meta data for the output
 
-      // make the input meta parameters
-      ud_impl_t::meta_params_t input_meta_params(cmd->get_num_inputs());
+      // make the input meta arguments
+      ud_impl_t::meta_args_t input_meta_args(cmd->get_num_inputs());
       for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
         // store it
         auto t = _ts->get_by_tid(cmd->get_input(idx).tid);
         assert(t != nullptr);
-        input_meta_params.set(idx, t->_meta);
+        input_meta_args.set(idx, t->_meta);
       }
 
-      // figure out the output parameters
-      std::vector<tensor_meta_t> parameters(cmd->get_num_outputs());
-      ud_impl_t::meta_params_t output_meta_params(parameters);
+      // figure out the output arguments
+      std::vector<tensor_meta_t> arguments(cmd->get_num_outputs());
+      ud_impl_t::meta_args_t output_meta_args(arguments);
 
       // get the output meta
-      ud->get_out_meta(input_meta_params, output_meta_params);
+      ud->get_out_meta(input_meta_args, output_meta_args);
 
-      /// 2. Prepare the output parameters
+      /// 2. Prepare the output arguments
 
-      // make the input parameters
-      ud_impl_t::tensor_params_t input_params(cmd->get_num_inputs());
+      // make the input arguments
+      ud_impl_t::tensor_args_t input_args(cmd->get_num_inputs());
       for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
         // store it
         auto t = _ts->get_by_tid(cmd->get_input(idx).tid);
-        input_params.set(idx, *t);
+        input_args.set(idx, *t);
       }
 
-      // setup the output parameters
-      ud_impl_t::tensor_params_t output_params(cmd->get_num_outputs());
+      // setup the output arguments
+      ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
       for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
 
         // the size of the tensor
-        auto ts_size = _tf->get_tensor_size(output_meta_params.get_by_idx(idx));
+        auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
 
         // store it
         auto t = _ts->create_tensor(cmd->get_output(idx).tid, ts_size);
@@ -103,14 +103,14 @@ void bbts::command_runner_t::local_command_runner() {
         auto &type = ud->outputTypes[idx];
         t->_meta.fmt_id = _tf->get_tensor_ftm(type);
 
-        // set the output param
-        output_params.set(idx, *t);
+        // set the output arg
+        output_args.set(idx, *t);
       }
 
       /// 3. Run the actual UD Function
 
       // apply the ud function
-      ud->fn(input_params, output_params);
+      ud->fn(input_args, output_args);
 
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));

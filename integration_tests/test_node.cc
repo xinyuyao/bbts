@@ -8,7 +8,7 @@ using index_t = std::map<std::tuple<int, int>, std::tuple<int, bool>>;
 using multi_index_t = std::map<std::tuple<int, int>, std::vector<int>>;
 
 class test_node : public bbts::node_t {
-public:
+ public:
 
   explicit test_node(const node_config_ptr_t &config) : node_t(config) {}
 
@@ -23,32 +23,41 @@ public:
 
     // create the tensor A
     //std::cout << "Creating tensor A....\n";
-    a_idx = create_matrix_tensors('A' , _res_station, _factory, _storage, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+    a_idx =
+        create_matrix_tensors('A', _res_station, _factory, _storage, 1000, num_nodes, my_rank, num_nodes, tid_offset);
 
     // create the tensor B
     //std::cout << "Creating tensor B....\n";
-    b_idx = create_matrix_tensors('B', _res_station, _factory, _storage, 1000, num_nodes, my_rank, num_nodes, tid_offset);
+    b_idx =
+        create_matrix_tensors('B', _res_station, _factory, _storage, 1000, num_nodes, my_rank, num_nodes, tid_offset);
   }
 
   void schedule() {
 
     // we only schedule on node 0
-    if(_comm->get_rank() != 0) {
+    if (_comm->get_rank() != 0) {
       return;
     }
 
     int32_t curCmd = 0;
-    for(auto node = 0; node < _comm->get_num_nodes(); ++node) {
+    for (auto node = 0; node < _comm->get_num_nodes(); ++node) {
       auto cmds = create_shuffle(a_idx, node, _comm->get_num_nodes(), curCmd);
       schedule_all(cmds);
     }
   }
 
-private:
+ private:
 
   // crates a matrix distributed around the cluster
-  index_t create_matrix_tensors(char matrix, reservation_station_ptr_t &rs, bbts::tensor_factory_ptr_t &tf, bbts::storage_ptr_t &ts,
-                                int n, int split, int my_rank, int num_nodes, int &cur_tid) {
+  index_t create_matrix_tensors(char matrix,
+                                reservation_station_ptr_t &rs,
+                                bbts::tensor_factory_ptr_t &tf,
+                                bbts::storage_ptr_t &ts,
+                                int n,
+                                int split,
+                                int my_rank,
+                                int num_nodes,
+                                int &cur_tid) {
 
     // the index
     index_t index;
@@ -120,11 +129,7 @@ private:
       }
 
       // make the command
-      auto cmd = bbts::command_t::create_unique(1, 1);
-      cmd->type = bbts::command_t::MOVE;
-      cmd->id = cur_cmd++;
-      cmd->get_input(0) = {.tid = tid, .node = my_rank};
-      cmd->get_output(0) = {.tid = tid, .node = to_node};
+      auto cmd = bbts::command_t::create_move(cur_cmd++, {.tid = tid, .node = my_rank}, {.tid = tid, .node = to_node});
 
       // store the command
       commands.emplace_back(std::move(cmd));
@@ -150,7 +155,6 @@ private:
   index_t b_idx;
 
 };
-
 
 int main(int argc, char **argv) {
 

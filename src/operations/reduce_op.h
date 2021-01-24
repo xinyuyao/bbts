@@ -86,12 +86,12 @@ public:
   // apply the pre-aggregation
   bbts::tensor_t *apply_preagg();
 
-  // make empty input parameter
+  // make empty input arguments
   bbts::tensor_meta_t _out_meta{};
-  bbts::ud_impl_t::tensor_params_t _input_tensors;
-  bbts::ud_impl_t::tensor_params_t _output_tensor;
-  bbts::ud_impl_t::meta_params_t _input_meta;
-  bbts::ud_impl_t::meta_params_t _output_meta;
+  bbts::ud_impl_t::tensor_args_t _input_tensors;
+  bbts::ud_impl_t::tensor_args_t _output_tensor;
+  bbts::ud_impl_t::meta_args_t _input_meta;
+  bbts::ud_impl_t::meta_args_t _output_meta;
 
   // the id of the tensor format
   bbts::tfid_t _id;

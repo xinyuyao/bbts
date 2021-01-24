@@ -107,7 +107,7 @@ public:
       return {-1, -1};
     }
 
-    // check if the number of parameters matches
+    // check if the number of arguments matches
     if(_impl->inputTypes.size() != _udfs[it->second]->num_in &&
        _impl->outputTypes.size() != _udfs[it->second]->num_out) {
       return {-1, -1};
