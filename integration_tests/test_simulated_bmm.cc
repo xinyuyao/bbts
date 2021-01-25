@@ -13,7 +13,12 @@ using index_t = std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid
 using to_agg_index_t = std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>>;
 
 // creates the matrix tensors on this node
-index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split, int &cur_tid) {
+index_t create_matrix_tensors(char matrix,
+                              bbts::node_t &node,
+                              int n,
+                              int split,
+                              int &cur_tid,
+                              std::vector<command_ptr_t> &_cmds) {
 
   // the index
   index_t index;
@@ -21,8 +26,8 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
   // block size
   uint32_t block_size = n / split;
 
-  // grab the format impl_id of the dense tensor
-  auto fmt_id = node._factory->get_tensor_ftm("dense");
+  // get the udf manager
+  auto udm = node._udf_manager;
 
   // get the rank
   auto my_rank = node._comm->get_rank();
@@ -33,34 +38,30 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
     for (int col_id = 0; col_id < split; ++col_id) {
 
       // check if this block is on this node
-      auto target_node = hash_fn(row_id * split + col_id) % node.get_num_nodes();
-      if (target_node == my_rank) {
+      auto target_node = static_cast<node_id_t>(hash_fn(row_id * split + col_id) % node.get_num_nodes());
 
-        // ok it is on this node make a tensor
-        // make the meta
-        dense_tensor_meta_t dm{fmt_id, block_size, block_size};
+      // return me that matcher for matrix addition
+      auto matcher = udm->get_matcher_for("uniform");
 
-        // get the size of the tensor we need to crate
-        auto tensor_size = node._factory->get_tensor_size(dm);
+      // get the ud object
+      auto ud = matcher->findMatch({}, {"dense"}, false);
 
-        // crate the tensor
-        auto t = node._storage->create_tensor(cur_tid, tensor_size);
+      // set the index
+      index[{row_id, col_id}] = {target_node, cur_tid};
 
-        // init the tensor
-        auto &dt = node._factory->init_tensor(t, dm).as<dense_tensor_t>();
+      // store the command
+      _cmds.emplace_back(command_t::create_apply(_cmds.size(),
+                                                 ud->impl_id,
+                                                 {command_param_t{.u = block_size},
+                                                         command_param_t{.u = block_size},
+                                                         command_param_t{.f = 0.0f},
+                                                         command_param_t{.f = 1.0f}},
+                                                 {},
+                                                 {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
 
-        // set the index
-        index[{row_id, col_id}] = {target_node, cur_tid};
-        node._res_station->register_tensor(cur_tid);
-
-        std::cout << "CREATE(matrix=" << matrix << ", tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid
-                  << " , node=" << my_rank
-                  << ")\n";
-      } else {
-
-        // store the index
-        index[{row_id, col_id}] = {target_node, cur_tid};
-      }
+      std::cout << "UNIFORM(matrix=" << matrix << ", tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid
+                << " , node=" << my_rank
+                << ")\n";
 
       // go to the next one
       cur_tid++;
@@ -71,10 +72,43 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
   return std::move(index);
 }
 
+// create all the broadcast commands
+void create_broadcast(size_t num_nodes,
+                      size_t split,
+                      index_t &mat_locs,
+                      std::vector<command_ptr_t> &_cmds,
+                      std::vector<std::vector<int32_t>> &to_del) {
+
+
+  // no need to move here
+  std::vector<command_t::tid_node_id_t> outputs;
+
+  // do the shuffle
+  for (int32_t rowID = 0; rowID < split; ++rowID) {
+    for (int32_t colID = 0; colID < split; ++colID) {
+
+      // get the tid and the node of this block
+      auto &[node, tid] = mat_locs[{rowID, colID}];
+
+      // set all the nodes we need to broadcast to
+      outputs.clear();
+      for(node_id_t n = 0; n < num_nodes; ++n) {
+        if(n != node) {
+          outputs.push_back(command_t::tid_node_id_t{.tid = tid, .node = n});
+          to_del[n].push_back(tid);
+        }
+      }
+
+      // create the broadcast
+      _cmds.emplace_back(command_t::create_broadcast(_cmds.size(), command_t::tid_node_id_t{.tid = tid, .node = node}, outputs));
+    }
+  }
+}
+
+// create the shuffle
 template<class fun>
 void create_shuffle(size_t num_nodes,
                     size_t split,
-                    command_id_t &cur_cmd,
                     fun fn,
                     index_t &mat_locs,
                     std::vector<command_ptr_t> &_cmds,
@@ -95,7 +129,7 @@ void create_shuffle(size_t num_nodes,
       }
 
       // move it
-      _cmds.emplace_back(command_t::create_move(cur_cmd++,
+      _cmds.emplace_back(command_t::create_move(_cmds.size(),
                                                 command_t::tid_node_id_t{.tid = tid, .node = node},
                                                 command_t::tid_node_id_t{.tid = tid, .node = target_node}));
 
@@ -106,7 +140,9 @@ void create_shuffle(size_t num_nodes,
   }
 }
 
-to_agg_index_t create_multiply(const udf_manager_ptr &udm,
+template<class fun>
+to_agg_index_t create_multiply(fun fn,
+                               const udf_manager_ptr &udm,
                                command_id_t &cur_cmd,
                                size_t split,
                                size_t num_nodes,
@@ -135,15 +171,15 @@ to_agg_index_t create_multiply(const udf_manager_ptr &udm,
         auto[b_node, b_tid] = b_mat[{k, j}];
 
         // get the target node
-        auto target_node = (node_id_t) (k % num_nodes);
+        auto target_node = (node_id_t) fn(i, k, num_nodes);
 
         // add the command
         _cmds.emplace_back(command_t::create_apply(cur_cmd++,
                                                    ud->impl_id,
                                                    {},
-                                                    { command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
-                                                         command_t::tid_node_id_t{.tid = b_tid, .node = target_node}},
-                                                    {command_t::tid_node_id_t{.tid = tid_offset, .node = target_node}}));
+                                                   { command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
+                                                        command_t::tid_node_id_t{.tid = b_tid, .node = target_node}},
+                                                   {command_t::tid_node_id_t{.tid = tid_offset, .node = target_node}}));
 
         // mark that we need to delete this tensor later
         to_del[target_node].push_back(tid_offset);
@@ -188,7 +224,7 @@ void generate_aggregation(const udf_manager_ptr &udm,
       std::vector<bbts::command_t::tid_node_id_t> inputs;
       for (auto &mul : muls) {
         auto &[tid, node] = mul;
-        inputs.push_back({.tid = tid, .node = node});
+        inputs.push_back({.tid = tid, .node = target_node});
       }
 
       // create the reduce command
@@ -204,8 +240,7 @@ void generate_aggregation(const udf_manager_ptr &udm,
 }
 
 void create_delete(size_t num_nodes,
-                   std::vector<std::vector<int32_t>> &to_del, std::vector<command_ptr_t> &_cmds,
-                   command_id_t &cur_cmd) {
+                   std::vector<std::vector<int32_t>> &to_del, std::vector<command_ptr_t> &_cmds) {
 
   // prepare the removes
   for (int32_t node = 0; node < num_nodes; ++node) {
@@ -219,57 +254,35 @@ void create_delete(size_t num_nodes,
     }
 
     // remove them from node
-    _cmds.emplace_back(command_t::create_delete(cur_cmd++,_inputs));
+    _cmds.emplace_back(command_t::create_delete(_cmds.size(), _inputs));
   }
 }
 
-std::vector<command_ptr_t> generate_commands(size_t split,
-                                             index_t a_mat,
-                                             index_t b_mat,
-                                             int32_t &tid_offset,
-                                             bbts::node_t &node) {
+std::vector<bbts::command_ptr_t> generate_commands(size_t split, bbts::node_t &node) {
 
-  // we put the commands we want to schedule here
-  std::vector<command_ptr_t> _cmds;
-  command_id_t cur_cmd = 0;
+  std::vector<bbts::command_ptr_t> commands;
+  int32_t tid_offset = 0;
 
-  // the number of nodes
-  auto num_nodes = node.get_num_nodes();
-  auto udm = node._udf_manager;
+  auto a_idx = create_matrix_tensors('A', node, 1000, split, tid_offset, commands);
+  auto b_idx = create_matrix_tensors('B', node, 1000, split, tid_offset, commands);
 
   // all the tensors that we need to delete
-  std::vector<std::vector<int32_t>> to_del(num_nodes);
+  std::vector<std::vector<int32_t>> to_del(node.get_num_nodes());
 
   // create the shuffle
-  create_shuffle(num_nodes,
+  create_shuffle(node.get_num_nodes(),
                  split,
-                 cur_cmd,
-                 [](int32_t rowID, int32_t colID, size_t num_nodes) { return colID % num_nodes; },
-                 a_mat,
-                 _cmds,
-                 to_del);
-
-  // create the shuffle
-  create_shuffle(num_nodes,
-                 split,
-                 cur_cmd,
                  [](int32_t rowID, int32_t colID, size_t num_nodes) { return rowID % num_nodes; },
-                 b_mat,
-                 _cmds,
+                 a_idx,
+                 commands,
                  to_del);
 
-
-  // create the multiply commands
-  auto multiplies = create_multiply(udm, cur_cmd, split, num_nodes, a_mat, b_mat, tid_offset, _cmds, to_del);
-
-  // generate the aggregation
-  generate_aggregation(udm, split, num_nodes, tid_offset, cur_cmd, multiplies, _cmds);
+  create_broadcast(node.get_num_nodes(), split, b_idx, commands, to_del);
 
   // create the delete
-  create_delete(num_nodes, to_del, _cmds, cur_cmd);
+  create_delete(node.get_num_nodes(), to_del, commands);
 
-  // move the commands
-  return std::move(_cmds);
+  return std::move(commands);
 }
 
 int main(int argc, char **argv) {
@@ -283,16 +296,10 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 32;
-  int32_t tid_offset = 0;
-
-  std::cout << "Creating tensor A....\n";
-  auto a_idx = create_matrix_tensors('A', node, 1000, split, tid_offset);
-  std::cout << "Creating tensor B....\n";
-  auto b_idx = create_matrix_tensors('B', node, 1000, split, tid_offset);
+  const size_t split = 4;
 
   // generate all the commands
-  auto cmds = generate_commands(split, a_idx, b_idx, tid_offset, node);
+  auto cmds = generate_commands(split, node);
 
   // load the commands
   node.load_commands(cmds);

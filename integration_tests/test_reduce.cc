@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   auto matcher = manager.get_matcher_for("matrix_add");
 
   // get the ud object
-  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false, 0);
+  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false);
 
   // make the meta
   bbts::dense_tensor_meta_t dm{id, 100, 200};

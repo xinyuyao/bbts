@@ -19,7 +19,7 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
   EXPECT_NE(matcher, nullptr);
 
   // get the ud object
-  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false, 0);
+  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false);
 
   // check if we actually got it
   EXPECT_NE(ud, nullptr);

@@ -42,15 +42,15 @@ void bbts::command_runner_t::local_command_runner() {
 
         // do the apply
         op.apply();
+
+        // retire the command so it knows that we have processed the tensors
+        _rs->retire_command(std::move(cmd));
       }
-        // it is a broadcast
+      // it is a broadcast
       else {
 
         std::cout << "BROADCAST\n";
       }
-
-      // retire the command so it knows that we have processed the tensors
-      _rs->retire_command(std::move(cmd));
 
     } else if (cmd->type == command_t::APPLY) {
 

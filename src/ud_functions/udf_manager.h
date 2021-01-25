@@ -17,8 +17,7 @@ public:
   // TODO this is most likely going to be slow but for now it is fine
   auto findMatch(const std::vector<std::string> &inputs,
                  const std::vector<std::string> &outputs,
-                 bool require_gpu = false,
-                 int32_t inplaceInput = -1) {
+                 bool require_gpu = false) {
 
     // go through each implementation
     for(const auto &f : _impls) {
@@ -36,11 +35,6 @@ public:
       // match the output types
       for (size_t i = 0; i < outputs.size(); ++i) {
         if (outputs[i] != f->outputTypes[i]) { continue; }
-      }
-
-      // match the inplace
-      for (size_t i = 0; i < outputs.size(); ++i) {
-        if (f->inputInplace[i] != inplaceInput) { continue; }
       }
 
       return f.get();

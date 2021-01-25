@@ -26,15 +26,6 @@ int main(int argc, char **argv) {
   // get the impl_id
   auto id = factory->get_tensor_ftm("dense");
 
-  // crate the udf manager
-  bbts::udf_manager manager(factory);
-
-  // return me that matcher for matrix addition
-  auto matcher = manager.get_matcher_for("matrix_add");
-
-  // get the ud object
-  auto ud = matcher->findMatch({"dense", "dense"}, {"dense"}, false, 0);
-
   // make the meta
   bbts::dense_tensor_meta_t dm{id, 100, 200};
   auto &m = dm.as<bbts::tensor_meta_t>();
