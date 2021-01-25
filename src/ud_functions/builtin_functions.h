@@ -1,6 +1,6 @@
 #pragma once
 
-#include <assert.h>
+#include <cassert>
 #include "ud_function.h"
 #include "../tensor/builtin_formats.h"
 
@@ -54,10 +54,10 @@ struct dense_matrix_mult_t : public ud_impl_t {
 /// 3. Uniform random
 ud_func_ptr_t get_matrix_uniform_udf();
 
-struct uniform_t : public ud_impl_t {
+struct dense_uniform_t : public ud_impl_t {
 
   // initializes the function
-  uniform_t();
+  dense_uniform_t();
 
   // returns an estimate of the complexity
   size_t get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,

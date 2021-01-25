@@ -182,7 +182,20 @@ void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_params_t &par
   m_out = {m_a.num_rows, m_b.num_cols};
 }
 
-bbts::uniform_t::uniform_t() {
+bbts::ud_func_ptr_t bbts::get_matrix_uniform_udf() {
+  return std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+          .ud_name = "uniform",
+          .is_ass = false,
+          .is_com = false,
+          .num_in = 0,
+          .num_out = 1,
+          .impls = {},
+      }
+  );
+}
+
+bbts::dense_uniform_t::dense_uniform_t() {
 
   // set the names
   impl_name = "dense_uniform";
@@ -199,11 +212,11 @@ bbts::uniform_t::uniform_t() {
   is_gpu = false;
 
   // set the function that actually performs the add
-  fn = &uniform_t::uniform_rand;
+  fn = &dense_uniform_t::uniform_rand;
 }
 
-size_t bbts::uniform_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
-                                            const bbts::ud_impl_t::meta_args_t &_in) {
+size_t bbts::dense_uniform_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+                                                  const bbts::ud_impl_t::meta_args_t &_in) {
 
   // make sure that there are enough parameters
   if(params.num_parameters() < 2){
@@ -214,9 +227,9 @@ size_t bbts::uniform_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params
   return params.get_uint<0>() * params.get_uint<1>();
 }
 
-void bbts::uniform_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
-                                   const bbts::ud_impl_t::meta_args_t &_in,
-                                   bbts::ud_impl_t::meta_args_t &_out) const {
+void bbts::dense_uniform_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+                                         const bbts::ud_impl_t::meta_args_t &_in,
+                                         bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the output argeters
   auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
@@ -225,9 +238,9 @@ void bbts::uniform_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &param
   m_out = { params.get_uint<0>(),  params.get_uint<1>() };
 }
 
-void bbts::uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t &params,
-                                   const bbts::ud_impl_t::tensor_args_t &_in,
-                                   bbts::ud_impl_t::tensor_args_t &_out) {
+void bbts::dense_uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t &params,
+                                         const bbts::ud_impl_t::tensor_args_t &_in,
+                                         bbts::ud_impl_t::tensor_args_t &_out) {
 
 
   // make the random stream
@@ -243,8 +256,8 @@ void bbts::uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t &param
   auto numCols = params.get_uint<1>();
 
   // the left and right boundary
-  auto left = params.get_float<2>();
-  auto right = params.get_float<3>();
+  auto left = params.get_float_or_default<2>(0.0f);
+  auto right = params.get_float_or_default<3>(1.0f);
 
   // set the new meta data
   m_out = {.num_rows = numRows, .num_cols = numCols};
