@@ -17,9 +17,9 @@ public:
 
   // constructs the broadcast operation, the root node is assumed to be the first in the _nodes array
   broadcast_op_t(bbts::communicator_t &_comm,
-               bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-               const std::vector<bbts::node_id_t> &_nodes,
-               int32_t _tag, bbts::tensor_t *_in);
+                 bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
+                 const bbts::command_t::node_list_t &_nodes,
+                 int32_t _tag, bbts::tensor_t *_in, bbts::tid_t _tid);
 
   // the mpi communicator we are going to use to perform the communication
   bbts::communicator_t &_comm;
@@ -31,13 +31,16 @@ public:
   bbts::storage_t &_storage;
 
   // the nodes
-  const std::vector<bbts::node_id_t> &_nodes;
+  const bbts::command_t::node_list_t &_nodes;
 
   // the tag we use to identify this reduce
   int32_t _tag;
 
   // the input tensor of this node
   bbts::tensor_t *_in;
+
+  // the tid
+  bbts::tid_t _tid;
 
   // calculates the highest bit in an integer
   static inline int opal_hibit(int value, int start) {
@@ -71,13 +74,13 @@ public:
   }
 
   // returns the number of nodes used for the broadcast
-  int32_t get_num_nodes() const;
+  [[nodiscard]] int32_t get_num_nodes() const;
 
   // returns the local rank within the broadcast
-  int32_t get_local_rank() const;
+  [[nodiscard]] int32_t get_local_rank() const;
 
   // returns the global rank
-  int32_t get_global_rank(int32_t local_rank) const;
+  [[nodiscard]] int32_t get_global_rank(int32_t local_rank) const;
 
   // runs the broadcast
   bbts::tensor_t *apply();

@@ -1,6 +1,7 @@
 #include "command_runner.h"
 #include "../operations/move_op.h"
 #include "../operations/reduce_op.h"
+#include "../operations/broadcast_op.h"
 #include <thread>
 
 bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
@@ -49,7 +50,27 @@ void bbts::command_runner_t::local_command_runner() {
       // it is a broadcast
       else {
 
-        std::cout << "BROADCAST\n";
+        //std::cout << "BROADCAST\n";
+
+        // forward the command to the right nodes
+        if(!_comm->op_request(cmd)) {
+          throw std::runtime_error("Failed to forward reduce command.");
+        }
+
+        // get the nodes involved
+        auto nodes = cmd->get_nodes();
+
+        // get the tensor we want to sent
+        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
+
+        // create the move operation
+        broadcast_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, t, cmd->get_input(0).tid);
+
+        // do the apply
+        op.apply();
+
+        // retire the command so it knows that we have processed the tensors
+        _rs->retire_command(std::move(cmd));
       }
 
     } else if (cmd->type == command_t::APPLY) {
@@ -202,11 +223,30 @@ void bbts::command_runner_t::remote_command_handler() {
         // detach the thread
         child.detach();
       }
-        // check if this is a broadcast
+      // check if this is a broadcast
       else {
 
-      }
+        // kick off a thread to process the request
+        std::thread child = std::thread([this, c = std::move(cmd)]() mutable {
 
+          // get the nodes involved
+          auto nodes = c->get_nodes();
+
+          // create the move operation
+          broadcast_op_t op(*_comm, *_tf, *_ts, nodes, c->id, nullptr, c->get_input(0).tid);
+
+          // do the apply
+          op.apply();
+
+          // retire the command so it knows that we have processed the tensors
+          _rs->retire_command(std::move(c));
+
+          std::cout << "BROADCAST FINISHED\n";
+        });
+
+        // detach the thread
+        child.detach();
+      }
     }
     else if(cmd->type == bbts::command_t::REDUCE) {
 

@@ -3,21 +3,23 @@
 namespace bbts {
 
 broadcast_op_t::broadcast_op_t(bbts::communicator_t &_comm,
-                           bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-                           const std::vector<bbts::node_id_t> &_nodes,
-                           int32_t _tag, bbts::tensor_t *_in): _comm(_comm),
-                                                               _factory(_factory),
-                                                               _storage(_storage),
-                                                               _nodes(_nodes),
-                                                               _tag(_tag),
-                                                               _in(_in) {}
+                               bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
+                               const bbts::command_t::node_list_t &_nodes,
+                               int32_t _tag, bbts::tensor_t *_in, bbts::tid_t _tid): _comm(_comm),
+                                                                                     _factory(_factory),
+                                                                                     _storage(_storage),
+                                                                                     _nodes(_nodes),
+                                                                                     _tag(_tag),
+                                                                                     _in(_in),
+                                                                                     _tid(_tid) {}
 
 int32_t broadcast_op_t::get_num_nodes() const {
   return _nodes.size();
 }
 
 int32_t broadcast_op_t::get_local_rank() const {
-  return std::distance(_nodes.begin(), std::find(_nodes.begin(), _nodes.end(), _comm.get_rank()));
+  auto it = _nodes.find(_comm.get_rank());
+  return it.distance_from(_nodes.begin());
 }
 
 int32_t broadcast_op_t::get_global_rank(int32_t local_rank) const {
@@ -52,7 +54,7 @@ bbts::tensor_t *broadcast_op_t::apply() {
     }
 
     // allocate a buffer for the tensor
-    _in = _storage.create_tensor(req.num_bytes);
+    _in = _storage.create_tensor(_tid, req.num_bytes);
 
     // recieve the request and check if there is an error
     if (!_comm.receive_request_sync(_in, req)) {
