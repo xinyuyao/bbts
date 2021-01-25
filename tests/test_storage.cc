@@ -31,7 +31,7 @@ TEST(TestStorage, Test1) {
     // run a bunch of threads
     threads.emplace_back([&storage, &tf, &num_matrices, fmt_id, t]() {
 
-      for(int32_t i = 0; i < num_matrices; i++) {
+      for(uint32_t i = 0; i < num_matrices; i++) {
         
         // make the meta
         dense_tensor_meta_t dm{fmt_id, i * 100, i * 200};

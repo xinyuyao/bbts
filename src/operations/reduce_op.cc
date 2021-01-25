@@ -2,14 +2,16 @@
 
 namespace bbts {
 
-reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-                         const bbts::command_t::node_list_t &_nodes, int32_t _tag, const std::vector<bbts::tensor_t*> &_inputs,
+reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
+                         bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
+                         int32_t _tag, const std::vector<bbts::tensor_t*> &_inputs, const ud_impl_t::tensor_params_t &_params,
                          bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op) : _comm(_comm),
                                                                                     _factory(_factory),
                                                                                     _storage(_storage),
                                                                                     _nodes(_nodes),
                                                                                     _tag(_tag),
                                                                                     _out_tid(_out_tid),
+                                                                                    _params(_params),
                                                                                     _inputs(_inputs),
                                                                                     _reduce_op(_reduce_op),
                                                                                     _input_tensors({nullptr, nullptr}),
@@ -81,7 +83,7 @@ bbts::tensor_t *reduce_op_t::apply() {
         _input_meta.set<1>(rhs->_meta);
 
         // get the meta data
-        _reduce_op.get_out_meta(_input_meta, _output_meta);
+        _reduce_op.get_out_meta(_params, _input_meta, _output_meta);
 
         // set the format as get_out_meta is not responsble for doing that
         _out_meta.fmt_id = _id;
@@ -101,7 +103,7 @@ bbts::tensor_t *reduce_op_t::apply() {
         _output_tensor.set<0>(*out);
 
         // run the function
-        _reduce_op.fn(_input_tensors, _output_tensor);
+        _reduce_op.fn(_params, _input_tensors, _output_tensor);
 
         // manage the memory
         if(lhs != _in) {
@@ -171,7 +173,7 @@ bbts::tensor_t *reduce_op_t::apply_preagg() {
     _input_meta.set<1>(rhs->_meta);
 
     // get the meta data
-    _reduce_op.get_out_meta(_input_meta, _output_meta);
+    _reduce_op.get_out_meta(_params, _input_meta, _output_meta);
 
     /// 1.2 allocate the output tensor
 
@@ -192,7 +194,7 @@ bbts::tensor_t *reduce_op_t::apply_preagg() {
     _output_tensor.set<0>(*out);
 
     // run the function
-    _reduce_op.fn(_input_tensors, _output_tensor);
+    _reduce_op.fn(_params, _input_tensors, _output_tensor);
 
     /// 1.4 deallocate the previous output tensor and swap
 

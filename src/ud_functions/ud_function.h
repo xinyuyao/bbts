@@ -2,6 +2,7 @@
 
 #include <memory>
 #include "../tensor/tensor.h"
+#include "../commands/command_utils.h"
 
 namespace bbts {
 
@@ -75,8 +76,30 @@ struct ud_impl_t {
   using tensor_args_t = ud_impl_args_t<tensor_t>;
   using meta_args_t = ud_impl_args_t<tensor_meta_t>;
 
+  // define the parameters
+  struct tensor_params_t {
+
+    // returns the
+    template<size_t n>
+    float get_float() const { return _params[n].f; }
+
+    template<size_t n>
+    int32_t get_int() const { return _params[n].i; }
+
+    template<size_t n>
+    uint32_t get_uint() const { return _params[n].u; }
+
+    // returns the number of parameters
+    size_t num_parameters() const { return _params.size(); }
+
+    // the parameters
+    bbts::command_param_list_t _params;
+  };
+
   // each apply is a call to these
-  using ud_impl_callable = std::function<void(const tensor_args_t &_in, tensor_args_t &_out)>;
+  using ud_impl_callable = std::function<void(const bbts::ud_impl_t::tensor_params_t &params,
+                                              const tensor_args_t &_in,
+                                              tensor_args_t &_out)>;
 
   // the impl_id of the implementation, this is initialized by the udf manager
   ud_impl_id_t impl_id;
@@ -111,10 +134,13 @@ struct ud_impl_t {
   ud_impl_callable fn;
 
   // returns the complexity hint of the ud function
-  virtual size_t get_complexity_hint(const meta_args_t &_in) = 0;
+  virtual size_t get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+                                     const meta_args_t &_in) = 0;
 
   // returns the output meta data
-  virtual void get_out_meta(const meta_args_t &_in, meta_args_t &_out) const = 0;
+  virtual void get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+                            const meta_args_t &_in,
+                            meta_args_t &_out) const = 0;
 };
 
 // define a nice way to say unique_ptr of ud_impl_t

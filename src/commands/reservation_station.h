@@ -7,7 +7,7 @@
 #include <tuple>
 #include <memory>
 #include "../tensor/tensor.h"
-#include "../commands/commands.h"
+#include "command.h"
 #include "../storage/storage.h"
 
 namespace bbts {

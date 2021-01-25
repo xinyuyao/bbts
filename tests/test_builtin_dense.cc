@@ -25,8 +25,8 @@ TEST(TestDenseTensor, GetSize) {
   auto id = factory.get_tensor_ftm("dense");
 
   // check if get size works
-  for (int num_rows = 0; num_rows < 100; num_rows++) {
-    for (int num_cols = 0; num_cols < 100; num_cols++) {
+  for (uint num_rows = 0; num_rows < 100; num_rows++) {
+    for (uint num_cols = 0; num_cols < 100; num_cols++) {
 
       // make the meta
       dense_tensor_meta_t dm{id, num_rows, num_cols};

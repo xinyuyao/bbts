@@ -10,8 +10,8 @@ struct dense_tensor_meta_t : public tensor_meta_t {
   auto &m() const {
 
     struct m {
-      int32_t num_rows;
-      int32_t num_cols;
+      uint32_t num_rows;
+      uint32_t num_cols;
     };
 
     // we use it as the blob
@@ -22,7 +22,7 @@ struct dense_tensor_meta_t : public tensor_meta_t {
   dense_tensor_meta_t(tfid_t _id) : tensor_meta_t{.fmt_id = _id} {}
 
   // init the tensor meta with row and column numbers
-  dense_tensor_meta_t(tfid_t _id, int32_t num_rows, int32_t num_cols) : tensor_meta_t{.fmt_id = _id} {
+  dense_tensor_meta_t(tfid_t _id, uint32_t num_rows, uint32_t num_cols) : tensor_meta_t{.fmt_id = _id} {
     this->m() = {.num_rows = num_rows, .num_cols = num_cols};
   }
 };

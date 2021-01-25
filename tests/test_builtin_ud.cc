@@ -62,7 +62,7 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
   ud_impl_t::tensor_args_t output_args = {{&a}};
 
   // call the addition
-  ud->fn(input_args, output_args);
+  ud->fn({ ._params = bbts::command_param_list_t {._data = nullptr, ._num_elements = 0} }, input_args, output_args);
 
   // check that the values are correct
   for(auto row = 0; row < am.num_rows; ++row) {

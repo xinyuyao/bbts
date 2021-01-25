@@ -63,7 +63,7 @@ class test_node : public bbts::node_t {
     index_t index;
 
     // block size
-    int block_size = n / split;
+    uint32_t block_size = n / split;
 
     // grab the format impl_id of the dense tensor
     auto fmt_id = tf->get_tensor_ftm("dense");

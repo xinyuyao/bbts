@@ -76,7 +76,7 @@ void bbts::command_runner_t::local_command_runner() {
       ud_impl_t::meta_args_t output_meta_args(arguments);
 
       // get the output meta
-      ud->get_out_meta(input_meta_args, output_meta_args);
+      ud->get_out_meta({ ._params = cmd->get_parameters() }, input_meta_args, output_meta_args);
 
       /// 2. Prepare the output arguments
 
@@ -110,7 +110,7 @@ void bbts::command_runner_t::local_command_runner() {
       /// 3. Run the actual UD Function
 
       // apply the ud function
-      ud->fn(input_args, output_args);
+      ud->fn(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
 
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));
@@ -158,7 +158,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, cmd->get_output(0).tid, *ud);
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();
@@ -237,7 +237,7 @@ void bbts::command_runner_t::remote_command_handler() {
         }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, c->get_output(0).tid, *ud);
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();

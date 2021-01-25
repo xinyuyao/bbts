@@ -73,6 +73,7 @@ int main(int argc, char **argv) {
                                        bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
                                        111,
                                        _inputs,
+                                       { ._params = bbts::command_param_list_t {._data = nullptr, ._num_elements = 0} },
                                        0,
                                        *ud);
     auto b = reduce_op.apply();

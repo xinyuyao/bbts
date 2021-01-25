@@ -19,7 +19,7 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
   index_t index;
 
   // block size
-  int block_size = n / split;
+  uint32_t block_size = n / split;
 
   // grab the format impl_id of the dense tensor
   auto fmt_id = node._factory->get_tensor_ftm("dense");

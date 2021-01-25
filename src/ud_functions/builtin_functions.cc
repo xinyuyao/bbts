@@ -1,5 +1,6 @@
 #include "builtin_functions.h"
 #include <mkl/mkl_cblas.h>
+#include <mkl/mkl.h>
 
 /// 1. Matrix Add
 bbts::ud_func_ptr_t bbts::get_matrix_add_udf() {
@@ -35,14 +36,16 @@ bbts::dense_matrix_add_t::dense_matrix_add_t() {
   fn = &dense_matrix_add_t::add;
 }
 
-size_t bbts::dense_matrix_add_t::get_complexity_hint(const bbts::ud_impl_t::meta_args_t &_in) {
+size_t bbts::dense_matrix_add_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+                                                     const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m)
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
   return m_a.num_rows * m_a.num_cols;
 }
 
-void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::meta_args_t &_in,
+void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+                                            const bbts::ud_impl_t::meta_args_t &_in,
                                             bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
@@ -55,7 +58,8 @@ void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::meta_args_t &
   m_out = { m_a.num_rows, m_a.num_cols };
 }
 
-void bbts::dense_matrix_add_t::add(const bbts::ud_impl_t::tensor_args_t &_in,
+void bbts::dense_matrix_add_t::add(const bbts::ud_impl_t::tensor_params_t &params,
+                                   const bbts::ud_impl_t::tensor_args_t &_in,
                                    bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
@@ -120,7 +124,8 @@ bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
   fn = &dense_matrix_mult_t::mult;
 }
 
-size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::meta_args_t &_in) {
+size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+                                                      const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
@@ -128,7 +133,8 @@ size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::met
   return m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
-void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::meta_args_t &_in,
+void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+                                             const bbts::ud_impl_t::meta_args_t &_in,
                                              bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
@@ -142,7 +148,8 @@ void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::meta_args_t 
   m_out = {m_a.num_rows, m_b.num_cols};
 }
 
-void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_args_t &_in,
+void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_params_t &params,
+                                     const bbts::ud_impl_t::tensor_args_t &_in,
                                      bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
@@ -173,4 +180,78 @@ void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_args_t &_in,
 
   // set the new meta data
   m_out = {m_a.num_rows, m_b.num_cols};
+}
+
+bbts::uniform_t::uniform_t() {
+
+  // set the names
+  impl_name = "dense_uniform";
+  ud_name = "uniform";
+
+  // set the input and output types
+  inputTypes = {};
+  outputTypes = {"dense"};
+
+  // both inputs zero and one can be used as the inplace output
+  inputInplace = {};
+
+  // this is a CPU dense add
+  is_gpu = false;
+
+  // set the function that actually performs the add
+  fn = &uniform_t::uniform_rand;
+}
+
+size_t bbts::uniform_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+                                            const bbts::ud_impl_t::meta_args_t &_in) {
+
+  // make sure that there are enough parameters
+  if(params.num_parameters() < 2){
+    throw std::runtime_error("Not enough parameters");
+  }
+
+  // O(n * m)
+  return params.get_uint<0>() * params.get_uint<1>();
+}
+
+void bbts::uniform_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+                                   const bbts::ud_impl_t::meta_args_t &_in,
+                                   bbts::ud_impl_t::meta_args_t &_out) const {
+
+  // get the output argeters
+  auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
+
+  // set the new values
+  m_out = { params.get_uint<0>(),  params.get_uint<1>() };
+}
+
+void bbts::uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t &params,
+                                   const bbts::ud_impl_t::tensor_args_t &_in,
+                                   bbts::ud_impl_t::tensor_args_t &_out) {
+
+
+  // make the random stream
+  VSLStreamStatePtr stream;
+  vslNewStream(&stream, VSL_BRNG_MCG31, time(nullptr));
+
+  // get the dense tensor
+  auto &out = _out.get<0>().as<dense_tensor_t>();
+  auto &m_out = out.meta().m();
+
+  // the number of rows and columns
+  auto numRows = params.get_uint<0>();
+  auto numCols = params.get_uint<1>();
+
+  // the left and right boundary
+  auto left = params.get_float<2>();
+  auto right = params.get_float<3>();
+
+  // set the new meta data
+  m_out = {.num_rows = numRows, .num_cols = numCols};
+
+  // create a bunch of random numbers
+  vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, (int32_t) (numRows * numCols), out.data(), left, right);
+
+  // delete the stream
+  vslDeleteStream(&stream);
 }

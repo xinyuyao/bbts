@@ -60,6 +60,9 @@ public:
   // the input tensors of this node
   const std::vector<bbts::tensor_t*> &_inputs;
 
+  // the parameters that are the input to the ud function
+  ud_impl_t::tensor_params_t _params;
+
   // the reduce operation
   const bbts::ud_impl_t &_reduce_op;
 
@@ -67,18 +70,19 @@ public:
   bbts::tid_t _out_tid;
 
   // constructs the reduce operation
-  reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
-              const bbts::command_t::node_list_t &_nodes, int32_t _tag,
-              const std::vector<bbts::tensor_t*> &_inputs, bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
+  reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
+              bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
+              int32_t _tag, const std::vector<bbts::tensor_t*> &_inputs, const ud_impl_t::tensor_params_t &_params,
+              bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
 
   // get the number of nodes
-  int32_t get_num_nodes() const;
+  [[nodiscard]] int32_t get_num_nodes() const;
 
   // get local rank
-  int32_t get_local_rank() const;
+  [[nodiscard]] int32_t get_local_rank() const;
 
   // get global rank
-  int32_t get_global_rank(int32_t local_rank) const;
+  [[nodiscard]] int32_t get_global_rank(int32_t local_rank) const;
 
   // apply this operation
   bbts::tensor_t *apply();

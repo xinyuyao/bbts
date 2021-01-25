@@ -5,7 +5,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-#include "commands.h"
+#include "command.h"
 #include "../communication/communicator.h"
 #include "reservation_station.h"
 

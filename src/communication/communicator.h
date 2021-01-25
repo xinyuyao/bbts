@@ -9,7 +9,7 @@
 #include "../server/node_config.h"
 #include "../ud_functions/ud_function.h"
 #include "../tensor/tensor.h"
-#include "../commands/commands.h"
+#include "../commands/command.h"
 
 namespace bbts {
 

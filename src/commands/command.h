@@ -3,9 +3,9 @@
 #include <vector>
 #include <assert.h>
 #include <cstring>
-#include "../utils/raw_vector.h"
-#include "../server/node_config.h"
+#include "command_utils.h"
 #include "../ud_functions/ud_function.h"
+#include "../server/node_config.h"
 
 namespace bbts {
 
@@ -31,22 +31,12 @@ struct command_t {
 
   // specifies exactly what tensor on which node we refer to
   struct tid_node_id_t {
-    tid_t tid; 
+    tid_t tid;
     node_id_t node;
   };
 
   // the list of tensors
   using tensor_id_list_t = raw_vector_t<tid_node_id_t>;
-
-  // a command parameter used to parametrize the APPLY or REDUCE
-  union command_param_t {
-    float f;
-    int32_t i;
-    uint32_t u;
-  };
-
-  // the list of parameters
-  using command_param_list_t = raw_vector_t<command_param_t>;
 
   // the list of nodes
   using node_list_t = raw_vector_t<node_id_t>;
