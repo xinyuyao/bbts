@@ -31,7 +31,7 @@ public:
   bbts::storage_t &_storage;
 
   // the nodes
-  const bbts::command_t::node_list_t &_nodes;
+  bbts::command_t::node_list_t _nodes;
 
   // the tag we use to identify this reduce
   int32_t _tag;

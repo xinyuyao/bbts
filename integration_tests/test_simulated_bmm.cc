@@ -143,7 +143,6 @@ void create_shuffle(size_t num_nodes,
 template<class fun>
 to_agg_index_t create_multiply(fun fn,
                                const udf_manager_ptr &udm,
-                               command_id_t &cur_cmd,
                                size_t split,
                                size_t num_nodes,
                                index_t a_mat,
@@ -174,7 +173,7 @@ to_agg_index_t create_multiply(fun fn,
         auto target_node = (node_id_t) fn(i, k, num_nodes);
 
         // add the command
-        _cmds.emplace_back(command_t::create_apply(cur_cmd++,
+        _cmds.emplace_back(command_t::create_apply(_cmds.size(),
                                                    ud->impl_id,
                                                    {},
                                                    { command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
@@ -277,7 +276,13 @@ std::vector<bbts::command_ptr_t> generate_commands(size_t split, bbts::node_t &n
                  commands,
                  to_del);
 
+  // create the broadcast
   create_broadcast(node.get_num_nodes(), split, b_idx, commands, to_del);
+
+  // create the multiply commands
+  auto multiplies = create_multiply([](int32_t rowID, int32_t colID, size_t num_nodes) { return rowID % num_nodes; },
+                                       node._udf_manager, split, node.get_num_nodes(),
+                                       a_idx, b_idx, tid_offset, commands, to_del);
 
   // create the delete
   create_delete(node.get_num_nodes(), to_del, commands);

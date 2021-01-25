@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   std::unique_ptr<char[]> a_mem(new char[size]);
 
   // init the tensor
-  auto &a = factory->init_tensor((bbts::tensor_t *)a_mem.get(), m).as<bbts::dense_tensor_t>();
+  auto &a = factory->init_tensor((bbts::tensor_t *) a_mem.get(), m).as<bbts::dense_tensor_t>();
 
   // get a reference to the metadata
   auto &am = a.meta().m();
@@ -51,38 +51,43 @@ int main(int argc, char **argv) {
 
   // pick all the nodes with an even rank, for testing purpouses 
   std::vector<bbts::node_id_t> nodes;
-  for(bbts::node_id_t i = 0; i < comm.get_num_nodes(); i += 2) {
+  for (bbts::node_id_t i = 0; i < comm.get_num_nodes(); i += 2) {
     nodes.push_back(i);
   }
   std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
   // if the rank is even this takes part
   bool success = (am.num_rows * am.num_cols) != 0;
-  if(comm.get_rank() % 2 == 0) {
+  if (comm.get_rank() % 2 == 0) {
 
     // make a broadcast
-    bbts::broadcast_op_t bcst(comm, *factory, storage, nodes, 888, &a);
+    bbts::broadcast_op_t bcst(comm,
+                              *factory,
+                              storage,
+                              bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
+                              888,
+                              &a,
+                              12);
 
     // execute the broadcast
     auto &bcs = bcst.apply()->as<bbts::dense_tensor_t>();
 
     // check if the values are fine
-    for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
-        int32_t val = 1 + root_node + i;
-        if(bcs.data()[i] != val) {
-          success = false;
-          std::cout << "not ok " << val << " " << bcs.data()[i] << '\n';
-        }
+    for (int i = 0; i < am.num_rows * am.num_cols; ++i) {
+      int32_t val = 1 + root_node + i;
+      if (bcs.data()[i] != val) {
+        success = false;
+        std::cout << "not ok " << val << " " << bcs.data()[i] << '\n';
+      }
     }
   }
 
   // wait for all
   comm.barrier();
 
-  if(!success) {
+  if (!success) {
     std::cout << "Failed here\n";
-  }
-  else  {
+  } else {
     std::cout << "Everything ok\n";
   }
 
