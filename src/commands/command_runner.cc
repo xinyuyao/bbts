@@ -2,6 +2,7 @@
 #include "../operations/move_op.h"
 #include "../operations/reduce_op.h"
 #include "../operations/broadcast_op.h"
+#include "../operations/local_reduce_op.h"
 #include <thread>
 
 bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
@@ -146,7 +147,34 @@ void bbts::command_runner_t::local_command_runner() {
       // check if the reduce is remote or local
       if (cmd->is_local_reduce(_comm->get_rank())) {
 
+        // return me that matcher for matrix addition
+        auto ud = _udm->get_fn_impl(cmd->fun_id);
+
+        // preallocate the input pointers
+        auto cmd_inputs = cmd->get_inputs();
+        std::vector<bbts::tensor_t*> inputs;
+        inputs.reserve(cmd_inputs.size());
+
+        // get all the tensors we need
+        for(const auto& in : cmd_inputs) {
+
+          // get the source tensor
+          auto t = _ts->get_by_tid(in.tid);
+          inputs.push_back(t);
+        }
+
+        // create the reduce op
+        local_reduce_op_t op(*_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
+                             cmd->get_output(0).tid, *ud);
+
+        // do the apply
+        op.apply();
+
         std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << _comm->get_rank() << '\n' << std::flush;
+
+        // retire the command so it knows that we have processed the tensors
+        _rs->retire_command(std::move(cmd));
+
 
       } else {
 
@@ -183,12 +211,12 @@ void bbts::command_runner_t::local_command_runner() {
 
         // do the apply
         op.apply();
+
+        // retire the command so it knows that we have processed the tensors
+        _rs->retire_command(std::move(cmd));
+
+        std::cout << "REMOTE_REDUCE PROCESSED on node " << _comm->get_rank() << '\n' << std::flush;
       }
-
-      // retire the command so it knows that we have processed the tensors
-      _rs->retire_command(std::move(cmd));
-
-      std::cout << "REMOTE_REDUCE PROCESSED on node " << _comm->get_rank() << '\n' << std::flush;
     }
   }
 }

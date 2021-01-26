@@ -199,7 +199,6 @@ void generate_aggregation(const udf_manager_ptr &udm,
                           size_t split,
                           size_t num_nodes,
                           int32_t &tid_offset,
-                          command_id_t &cur_cmd,
                           to_agg_index_t &multiplies,
                           std::vector<command_ptr_t> &_cmds) {
 
@@ -227,7 +226,7 @@ void generate_aggregation(const udf_manager_ptr &udm,
       }
 
       // create the reduce command
-      _cmds.emplace_back(command_t::create_reduce(cur_cmd++,
+      _cmds.emplace_back(command_t::create_reduce(_cmds.size(),
                                                   ud->impl_id,
                                                   {},
                                                   inputs,
@@ -284,6 +283,9 @@ std::vector<bbts::command_ptr_t> generate_commands(size_t split, bbts::node_t &n
                                        node._udf_manager, split, node.get_num_nodes(),
                                        a_idx, b_idx, tid_offset, commands, to_del);
 
+  // generate the aggregation
+  generate_aggregation(node._udf_manager, split, node.get_num_nodes(), tid_offset, multiplies, commands);
+
   // create the delete
   create_delete(node.get_num_nodes(), to_del, commands);
 
@@ -301,7 +303,7 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 4;
+  const size_t split = 32;
 
   // generate all the commands
   auto cmds = generate_commands(split, node);
