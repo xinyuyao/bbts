@@ -10,13 +10,24 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  "${PROJECT_SOURCE_DIR}/bin")
 # set the location for cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG")
-endif()
-set(CMAKE_CXX_FLAGS "-g3")
+# if we are compiling for debug add the debug flags
+if(CMAKE_BUILD_TYPE MATCHES Debug)
 
-set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG")
+    endif()
+    set(CMAKE_CXX_FLAGS "-g3")
+
+    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+
+# if we are compiling for release
+elseif(CMAKE_BUILD_TYPE MATCHES Release)
+
+    # do -O3 and set the instruction set to the native one for this machine
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native")
+
+endif()
 
 # try to find mkl
 set(BLA_VENDOR Intel10_64lp_seq)

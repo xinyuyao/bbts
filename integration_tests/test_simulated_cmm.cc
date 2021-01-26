@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 32;
+  const size_t split = 8;
   int32_t tid_offset = 0;
 
   std::cout << "Creating tensor A....\n";
