@@ -138,6 +138,16 @@ bool storage_t::remove_by_tid(tid_t _id) {
   _allocated_tensors.erase(it->second.address);
   _tensor_nfo.erase(it);
 
+  // unlock
+  lck.unlock();
+
+  // call the hook if necessary
+  if constexpr (static_config::enable_hooks) {
+
+    // call that the tensor is deleted
+    _tensor_delete_hook(_id);
+  }
+
   return true;
 }
 

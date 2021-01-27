@@ -68,6 +68,14 @@ std::tuple<node_id_t, std::vector<bbts::tid_t>> mpi_communicator_t::receive_tens
   return { _req.status.MPI_SOURCE, std::move(p) };
 }
 
+bool mpi_communicator_t::shutdown_notification_handler() {
+
+  // just a tensor with a tid -1
+  std::vector<bbts::tid_t> tensor = { -1 };
+  return MPI_Ssend(tensor.data(), (int32_t) (tensor.size() * sizeof(bbts::tid_t)), MPI_CHAR,
+                   get_rank(), NOTIFY_TENSOR_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
+}
+
 mpi_communicator_t::async_request_t mpi_communicator_t::send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
 
   // initiate an asynchronous send request
@@ -111,17 +119,9 @@ bool mpi_communicator_t::op_request(const command_ptr_t &_cmd) {
 
   // find all the nodes referenced in the input
   std::vector<node_id_t> to_sent_to;
-  for(int32_t idx = 0; idx < _cmd->get_num_inputs(); ++idx) {
-    auto node = _cmd->get_input(idx).node;
-    if(node != _rank && std::find(to_sent_to.begin(), to_sent_to.end(), node) == to_sent_to.end()) {
-      to_sent_to.push_back(node);
-    }
-  }
-
-  // find all the nodes referenced in the output
-  for(int32_t idx = 0; idx < _cmd->get_num_outputs(); ++idx) {
-    auto node = _cmd->get_output(idx).node;
-    if(node != _rank && std::find(to_sent_to.begin(), to_sent_to.end(), node) == to_sent_to.end()) {
+  auto nodes = _cmd->get_nodes();
+  for(int node : nodes) {
+    if(node != _rank) {
       to_sent_to.push_back(node);
     }
   }
@@ -141,6 +141,23 @@ bool mpi_communicator_t::op_request(const command_ptr_t &_cmd) {
   }
 
   return success;
+}
+
+bool mpi_communicator_t::shutdown_op_request() {
+
+  // create a shutdown command to send to the remote handler
+  command_ptr_t cmd = command_t::create_shutdown(get_rank());
+
+  // initiate an asynchronous send request
+  std::vector<async_request_t> requests;
+
+  // init the send
+  async_request_t _req;
+  _req.success = MPI_Isend(cmd.get(), cmd->num_bytes(), MPI_CHAR,
+                           get_rank(), SEND_CMD_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+
+  // wait for all the request to finish
+  return _req.success && MPI_Wait(&_req.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS;;
 }
 
 command_ptr_t mpi_communicator_t::expect_op_request() {

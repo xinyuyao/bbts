@@ -33,14 +33,20 @@ public:
   // starts handling the commands
   void run();
 
-  // return the nuber of nodes
+  // return the number of nodes
   [[nodiscard]] size_t get_num_nodes() const;
+
+  // return the rank of the node
+  [[nodiscard]] size_t get_rank() const;
 
   // load all commands
   void load_commands(const std::vector<command_ptr_t>& commands);
 
   // sync all the nodes to know that they have all execute up to this point
   void sync();
+
+  // shutdown this node, will return once all the nodes call shutdown
+  void shutdown();
 
   // add the hook
   template<event_t event, class fn>

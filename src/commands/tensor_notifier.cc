@@ -11,7 +11,6 @@ void bbts::tensor_notifier_t::run_notification_sender_for_node(bbts::node_id_t o
     // get tensors to notify the other node
     bool is_done;
     auto tensors = _rs->tensors_to_notify_node(out_node, is_done);
-    std::cout << "Notifying\n";
 
     // if it is node break out
     if (is_done) {
@@ -31,14 +30,19 @@ void bbts::tensor_notifier_t::run_notification_handler() {
 
     // wait for the command
     auto [node, tensors] = _comm->receive_tensor_created_notification();
-    std::cout << "Recv notification\n";
 
     // check if we are done...
-    if (node == -1) {
+    if (tensors[0] == -1) {
       break;
     }
 
     // notify that the tensors became available
     _rs->notify_available_tensors(node, tensors);
+  }
+}
+
+void bbts::tensor_notifier_t::shutdown() {
+  if(!_comm->shutdown_notification_handler()){
+    throw std::runtime_error("Failed to shutdown!");
   }
 }

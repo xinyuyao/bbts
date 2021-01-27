@@ -83,6 +83,9 @@ public:
   // wait to receive a notification
   std::tuple<node_id_t, std::vector<bbts::tid_t>> receive_tensor_created_notification();
 
+  // shutdown the notification handler
+  bool shutdown_notification_handler();
+
   // send async
   async_request_t send_async(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
 
@@ -97,6 +100,9 @@ public:
 
   // waits to recieve an operation
   command_ptr_t expect_op_request();
+
+  // this sends a shutdown command to the thread that is calling @see expect_op_request
+  bool shutdown_op_request();
 
   // the the command to all relevant nodes
   bool forward_cmd(const command_ptr_t &_cmd);

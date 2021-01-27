@@ -225,7 +225,7 @@ bbts::tid_t bbts::reservation_station_t::get_to_remove() {
 
   // wait until we have something to delete
   std::unique_lock<std::mutex> lk(_m);
-  _cv.wait(lk, [&]{ return !_to_delete.empty() || _shutdown; });
+  _deletion_cv.wait(lk, [&]{ return !_to_delete.empty() || _shutdown; });
 
   // if we have nothing to delete
   if(_to_delete.empty()) {
@@ -669,4 +669,7 @@ void bbts::reservation_station_t::_remove_tensor(bbts::tid_t _tid) {
 
   // make sure there are not commands waiting for the delete
   assert(_commands_waiting_for[_my_rank].find(_tid) == _commands_waiting_for[_my_rank].end());
+
+  // notify that there is stuff to delete
+  _deletion_cv.notify_all();
 }

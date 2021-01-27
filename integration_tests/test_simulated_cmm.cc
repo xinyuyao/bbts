@@ -283,12 +283,7 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  // add a hook for deletion
-  node.add_hook<bbts::node_t::event_t::TENSOR_DELETED>([](tid_t id) {
-    std::cout << "Deleting tensor " << id << '\n';
-  });
-
-  const size_t split = 8;
+  const size_t split = 16;
   int32_t tid_offset = 0;
 
   std::cout << "Creating tensor A....\n";
@@ -299,6 +294,26 @@ int main(int argc, char **argv) {
   // generate all the commands
   auto cmds = generate_commands(split, a_idx, b_idx, tid_offset, node);
 
+
+  // figure out how many we need to delete
+  std::atomic_int64_t num_del; num_del = 0;
+  node.add_hook<bbts::node_t::event_t::COMMAND_QUEUED>([&](command_id_t id) {
+    if(cmds[id]->is_delete()) {
+      num_del += cmds[id]->get_num_inputs();
+    }
+  });
+
+  // add a hook for deletion
+  node.add_hook<bbts::node_t::event_t::TENSOR_DELETED>([&](tid_t id) {
+    if(id != TID_NONE) {
+      num_del--;
+      if(num_del == 0) {
+        std::cout << "SHUTDOWN CALLED\n";
+        node.shutdown();
+      }
+    }
+  });
+
   // load the commands
   node.load_commands(cmds);
 
@@ -307,6 +322,9 @@ int main(int argc, char **argv) {
 
   // kick of all the stuff
   node.run();
+
+  // sync everything
+  node.sync();
 
   return 0;
 }

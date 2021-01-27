@@ -21,6 +21,9 @@ public:
   // handles notifications sent to this node
   void run_notification_handler();
 
+  // shuts down the notification handler only as the reservation station does that for the sender
+  void shutdown();
+
 private:
 
   // the communicator used to send and receive the notifications

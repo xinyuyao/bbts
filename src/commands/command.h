@@ -396,6 +396,31 @@ struct command_t {
     return std::move(tmp);
   }
 
+  // crates a shutdown command
+  static command_ptr_t create_shutdown(node_id_t node) {
+
+    // allocate the memory
+    auto tmp = allocate_command(_num_bytes(0, 1, 0, 0));
+
+    // set the id type and function
+    tmp->id = -1;
+    tmp->type = SHUTDOWN;
+    tmp->fun_id = {-1, -1};
+    tmp->_num_parameters = 0;
+    tmp->_num_inputs = 0;
+    tmp->_num_outputs = 0;
+    tmp->_num_nodes = 1;
+
+    // setup the offsets
+    tmp->_setup_offsets();
+
+    // set the node
+    tmp->_nodes()[0] = node;
+
+    // return the created pointer
+    return std::move(tmp);
+  }
+
   // the impl_id of the operation
   command_id_t id;
 

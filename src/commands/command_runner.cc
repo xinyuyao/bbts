@@ -345,3 +345,8 @@ void bbts::command_runner_t::run_deleter() {
     std::cout << "Remove tensor : " << id << '\n' << std::flush;
   }
 }
+
+void bbts::command_runner_t::shutdown() {
+
+  _comm->shutdown_op_request();
+}

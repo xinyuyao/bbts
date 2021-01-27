@@ -67,19 +67,27 @@ void bbts::node_t::run() {
     rns.join();
   }
 
+  //
   command_expect.join();
 
+  //
   tsn_thread.join();
 
+  //
   for(auto &cpt : command_processing_threads) {
     cpt.join();
   }
 
+  //
   deleter.join();
 }
 
 size_t bbts::node_t::get_num_nodes() const {
   return _comm->get_num_nodes();
+}
+
+size_t bbts::node_t::get_rank() const {
+  return _comm->get_rank();
 }
 
 void bbts::node_t::load_commands(const std::vector<command_ptr_t> &commands) {
@@ -96,6 +104,21 @@ void bbts::node_t::load_commands(const std::vector<command_ptr_t> &commands) {
 
 void bbts::node_t::sync() {
 
+  _comm->barrier();
+}
+
+void bbts::node_t::shutdown() {
+
+  // shutdown the command runner
+  _command_runner->shutdown();
+
+  // shutdown the reservation station
+  _res_station->shutdown();
+
+  // shutdown the tensor notifier
+  _tensor_notifier->shutdown();
+
+  // sync
   _comm->barrier();
 }
 
