@@ -1,4 +1,5 @@
 #include "reservation_station.h"
+#include "../server/static_config.h"
 
 bbts::reservation_station_t::reservation_station_t(bbts::node_id_t _node_id, int32_t num_nodes) : _my_rank(_node_id),
                                                                                                   _num_nodes(num_nodes),
@@ -8,6 +9,11 @@ bbts::reservation_station_t::reservation_station_t(bbts::node_id_t _node_id, int
   // make one of these for each node
   _remote_tensors.resize(num_nodes);
   _send_status_queue.resize(num_nodes);
+
+  // just empty hooks
+  _command_retired_hook = [](command_id_t _) {};
+  _command_scheduled_hook = [](command_id_t _) {};
+  _command_queued_hook = [](command_id_t _) {};
 }
 
 bool bbts::reservation_station_t::queue_command(bbts::command_ptr_t _command) {
@@ -35,6 +41,16 @@ bool bbts::reservation_station_t::queue_command(bbts::command_ptr_t _command) {
     _last_cmd = cmd_id;
   }
 
+  // unlock here
+  lk.unlock();
+
+  // call the hook if necessary
+  if constexpr (static_config::enable_hooks) {
+
+    // notify that we have queued a command
+    _command_queued_hook(cmd_id);
+  }
+
   // we are done get out of here
   return success;
 }
@@ -44,13 +60,30 @@ bool bbts::reservation_station_t::retire_command(bbts::command_ptr_t _command) {
   // lock the reservation station
   std::unique_lock<std::mutex> lk(_m);
 
+  // store the command id
+  auto cmd_id = _command->id;
+
   // check if this is a remote node
+  bool success;
   if(_command->get_root_node() == _my_rank) {
-    return _retire_command(std::move(_command));
+    success = _retire_command(std::move(_command));
   }
   else {
-    return _retire_remote_command(std::move(_command));
+    success = _retire_remote_command(std::move(_command));
   }
+
+  // unlock here
+  lk.unlock();
+
+  // call the hook if necessary
+  if constexpr (static_config::enable_hooks) {
+
+    // notify that we have retired a command
+    _command_retired_hook(cmd_id);
+  }
+
+  // we are done get out of here
+  return success;
 }
 
 std::vector<bbts::tid_t> bbts::reservation_station_t::tensors_to_notify_node(bbts::node_id_t node, bool &is_done) {
@@ -176,6 +209,13 @@ bbts::command_ptr_t bbts::reservation_station_t::get_next_command() {
   // pop the unique pointer of the vector
   auto tmp = std::move(_execute.back());
   _execute.pop_back();
+
+  // call the hook if necessary
+  if constexpr (static_config::enable_hooks) {
+
+    // mark that we have scheduled this command
+    _command_scheduled_hook(tmp->id);
+  }
 
   // return it
   return std::move(tmp);

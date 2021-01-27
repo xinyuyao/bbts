@@ -283,6 +283,11 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
+  // add a hook for deletion
+  node.add_hook<bbts::node_t::event_t::TENSOR_DELETED>([](tid_t id) {
+    std::cout << "Deleting tensor " << id << '\n';
+  });
+
   const size_t split = 8;
   int32_t tid_offset = 0;
 

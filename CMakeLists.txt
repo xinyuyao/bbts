@@ -29,6 +29,11 @@ elseif(CMAKE_BUILD_TYPE MATCHES Release)
 
 endif()
 
+# forward the definitions ENABLE_HOOKS=ON/OFF
+if(${ENABLE_HOOKS})
+    add_compile_definitions(ENABLE_HOOKS)
+endif()
+
 # try to find mkl
 set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)

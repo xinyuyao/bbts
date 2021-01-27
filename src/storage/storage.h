@@ -13,6 +13,13 @@ namespace bbts {
 // tensors to disk or moving them to GPU
 struct storage_t {
 
+  storage_t() {
+
+    // just empty hooks
+    _tensor_create_hook = [](tid_t _) {};
+    _tensor_delete_hook = [](tid_t _) {};
+  }
+
   // destroy the storage and frees all the tensors
   ~storage_t();
 
@@ -44,6 +51,14 @@ struct storage_t {
   // remove by tid
   bool remove_by_tid(tid_t _id);
 
+  // add the retired hook
+  template<class fn>
+  void add_created_hook(fn fun){ _tensor_create_hook = fun; }
+
+  // add the retired hook
+  template<class fn>
+  void add_deleted_hook(fn fun){ _tensor_delete_hook = fun; }
+
   // get the number of tensors in the system
   size_t get_num_tensors() const;
 
@@ -55,6 +70,12 @@ struct storage_t {
 
   // maps to the information
   std::unordered_map<tid_t, sto_tensor_nfo_t> _tensor_nfo;
+
+  // called when a command is retired on this node
+  std::function<void(tid_t id)> _tensor_create_hook;
+
+  // called when a command is retired on this node
+  std::function<void(tid_t id)> _tensor_delete_hook;
 };
 
 // we put the storage here

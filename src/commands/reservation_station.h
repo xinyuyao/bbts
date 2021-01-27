@@ -6,8 +6,8 @@
 #include <condition_variable>
 #include <tuple>
 #include <memory>
-#include "../tensor/tensor.h"
 #include "command.h"
+#include "../tensor/tensor.h"
 #include "../storage/storage.h"
 
 namespace bbts {
@@ -45,6 +45,18 @@ class reservation_station_t {
 
   // shutdown the reservation station
   void shutdown();
+
+  // add the hook that is triggered on scheduling
+  template<class fn>
+  void add_queued_hook(fn fun){ _command_queued_hook = fun; }
+
+  // add the hook
+  template<class fn>
+  void add_scheduled_hook(fn fun) { _command_scheduled_hook = fun; }
+
+  // add the retired hook
+  template<class fn>
+  void add_retired_hook(fn fun){ _command_retired_hook = fun; }
 
  private:
 
@@ -131,6 +143,16 @@ class reservation_station_t {
 
   // the tensors we want to delete from storage
   std::vector<tid_t> _to_delete;
+
+  // called when a command is retired on this node
+  std::function<void(command_id_t id)> _command_retired_hook;
+
+  // called when a command is scheduled on this node
+  std::function<void(command_id_t id)> _command_scheduled_hook;
+
+  // called when a command is scheduled on this node
+  std::function<void(command_id_t id)> _command_queued_hook;
+
 };
 
 using reservation_station_ptr_t = std::shared_ptr<reservation_station_t>;

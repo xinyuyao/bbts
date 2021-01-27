@@ -11,9 +11,18 @@
 
 namespace bbts {
 
-
 class node_t {
 public:
+
+  // the event that happened
+  enum class event_t {
+
+    COMMAND_QUEUED,
+    COMMAND_SCHEDULED,
+    COMMAND_RETIRED,
+    TENSOR_DELETED,
+    TENSOR_CREATED
+  };
 
   // creates the node
   explicit node_t(bbts::node_config_ptr_t config) : _config(std::move(config)) {}
@@ -32,6 +41,28 @@ public:
 
   // sync all the nodes to know that they have all execute up to this point
   void sync();
+
+  // add the hook
+  template<event_t event, class fn>
+  void add_hook(fn fun) {
+
+    // add the relevant hooks
+    if constexpr (event == event_t::COMMAND_QUEUED) {
+      _res_station->add_queued_hook(fun);
+    }
+    else if constexpr (event == event_t::COMMAND_SCHEDULED) {
+      _res_station->add_scheduled_hook(fun);
+    }
+    else if constexpr(event == event_t::COMMAND_RETIRED) {
+      _res_station->add_retired_hook(fun);
+    }
+    else if constexpr (event == event_t::TENSOR_CREATED) {
+      _storage->add_created_hook(fun);
+    }
+    else if constexpr (event == event_t::TENSOR_DELETED) {
+      _storage->add_deleted_hook(fun);
+    }
+  }
 
 // protected: for now everything is public
 
