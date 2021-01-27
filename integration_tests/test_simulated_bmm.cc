@@ -303,10 +303,29 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 32;
+  const size_t split = 16;
 
   // generate all the commands
   auto cmds = generate_commands(split, node);
+
+  // figure out how many we need to delete
+  std::atomic_int64_t num_del; num_del = 0;
+  node.add_hook<bbts::node_t::event_t::COMMAND_QUEUED>([&](command_id_t id) {
+    if(cmds[id]->is_delete()) {
+      num_del += cmds[id]->get_num_inputs();
+    }
+  });
+
+  // add a hook for deletion
+  node.add_hook<bbts::node_t::event_t::TENSOR_DELETED>([&](tid_t id) {
+    if(id != TID_NONE) {
+      num_del--;
+      if(num_del == 0) {
+        std::cout << "SHUTDOWN CALLED\n";
+        node.shutdown();
+      }
+    }
+  });
 
   // load the commands
   node.load_commands(cmds);

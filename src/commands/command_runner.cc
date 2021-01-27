@@ -28,13 +28,13 @@ void bbts::command_runner_t::local_command_runner() {
       // move the
       std::cout << "MOVE " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
 
-      // forward the command to the right nodes
-      if(!_comm->op_request(cmd)) {
-        throw std::runtime_error("Failed to forward the command.");
-      }
-
       // it is a point to point move
       if(cmd->is_move()) {
+
+        // forward the command to the right nodes
+        if(!_comm->op_request(cmd)) {
+          throw std::runtime_error("Failed to forward the command.");
+        }
 
         // get the tensor we want to sent
         auto t = _ts->get_by_tid(cmd->get_input(0).tid);
@@ -268,8 +268,6 @@ void bbts::command_runner_t::remote_command_handler() {
 
           // retire the command so it knows that we have processed the tensors
           _rs->retire_command(std::move(c));
-
-          std::cout << "BROADCAST FINISHED\n";
         });
 
         // detach the thread
