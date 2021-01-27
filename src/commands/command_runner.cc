@@ -345,6 +345,5 @@ void bbts::command_runner_t::run_deleter() {
 }
 
 void bbts::command_runner_t::shutdown() {
-
   _comm->shutdown_op_request();
 }

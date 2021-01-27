@@ -1,13 +1,16 @@
 #include <map>
 #include <thread>
+#include <chrono>
 #include "../src/operations/move_op.h"
 #include "../src/operations/reduce_op.h"
 #include "../src/commands/reservation_station.h"
 #include "../src/commands/tensor_notifier.h"
 #include "../src/commands/command_runner.h"
 #include "../src/server/node.h"
+#include "../src/server/static_config.h"
 
 using namespace bbts;
+using namespace std::chrono;
 
 using index_t = std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>>;
 using to_agg_index_t = std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>>;
@@ -294,6 +297,11 @@ std::vector<bbts::command_ptr_t> generate_commands(size_t split, bbts::node_t &n
 
 int main(int argc, char **argv) {
 
+  // check if the hooks are enabled
+  if constexpr (!static_config::enable_hooks) {
+    std::cout << "You need to compile with hooks enabled to run this test add -DENABLE_HOOKS=ON when running cmake.\n";
+  }
+
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv, .num_threads = 8});
 
@@ -329,12 +337,22 @@ int main(int argc, char **argv) {
 
   // load the commands
   node.load_commands(cmds);
+  auto start = high_resolution_clock::now();
 
   // sync everything
   node.sync();
 
   // kick of all the stuff
   node.run();
+
+  // sync everything
+  auto stop = high_resolution_clock::now();
+  node.sync();
+
+  // print the time
+  if(node.get_rank() == 0) {
+    std::cout << "Time to compute : " << ((double) duration_cast<nanoseconds>(stop - start).count()) / duration_cast<nanoseconds>(1s).count() << "s\n";
+  }
 
   return 0;
 }

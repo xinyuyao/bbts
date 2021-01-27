@@ -102,6 +102,9 @@ bool storage_t::remove_by_tensor(tensor_t &_tensor) {
 
 bool storage_t::assign_tid(tensor_t &_tensor, tid_t _tid) {
 
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
   // try to find the tensor
   auto it = _allocated_tensors.find(&_tensor);
   if(it == _allocated_tensors.end()) {
