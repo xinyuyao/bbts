@@ -19,6 +19,9 @@ struct node_config_t {
 
   // the number of threads we are running
   size_t num_threads = 8;
+
+  // the total available ram memory
+  size_t total_ram = 0;
 };
 
 // a nice way to reference the configuration ptr

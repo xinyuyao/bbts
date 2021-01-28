@@ -90,6 +90,22 @@ size_t bbts::node_t::get_rank() const {
   return _comm->get_rank();
 }
 
+size_t bbts::node_t::get_physical_cores() const {
+  return _config->num_threads;
+}
+
+size_t bbts::node_t::get_total_ram() const {
+  return _config->total_ram;
+}
+
+void bbts::node_t::print_cluster_info(std::ostream& out) {
+
+  out << "Cluster Information : \n";
+  out << "\tNumber of Nodes : " << _comm->get_num_nodes() << " \n";
+  out << "\tNumber of physical cores : " << _config->num_threads << " \n";
+  out << "\tTotal RAM : " << _config->total_ram / (1024 * 1024) << " MB \n";
+}
+
 void bbts::node_t::load_commands(const std::vector<command_ptr_t> &commands) {
 
   // schedule them all at once
@@ -172,3 +188,5 @@ std::thread bbts::node_t::tensor_notifier() {
 
   return std::move(t);
 }
+
+

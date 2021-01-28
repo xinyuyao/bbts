@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <utility>
+#include <sys/sysinfo.h>
 
 #include "node_config.h"
 #include "../commands/scheduler.h"
@@ -25,7 +26,20 @@ public:
   };
 
   // creates the node
-  explicit node_t(bbts::node_config_ptr_t config) : _config(std::move(config)) {}
+  explicit node_t(bbts::node_config_ptr_t config) {
+
+    // move the config
+    _config = std::move(config);
+
+    /// TODO this needs to be filled by more detailed information, once the systems starts
+    /// supporting multiple numa nodes and multiple GPUs
+    // set the number of thread to the number of physical cores
+    _config->num_threads = std::thread::hardware_concurrency() / 2;
+
+    // set the total memory
+    struct sysinfo info{}; sysinfo(&info);
+    _config->total_ram = info.totalram;
+  }
 
   // initialize stuff like communication
   void init();
@@ -38,6 +52,15 @@ public:
 
   // return the rank of the node
   [[nodiscard]] size_t get_rank() const;
+
+  // returns the number of physical cores
+  [[nodiscard]] size_t get_physical_cores() const;
+
+  // returns the total ram
+  [[nodiscard]] size_t get_total_ram() const;
+
+  // print the cluster info
+  void print_cluster_info(std::ostream& out);
 
   // load all commands
   void load_commands(const std::vector<command_ptr_t>& commands);

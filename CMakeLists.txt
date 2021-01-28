@@ -92,4 +92,7 @@ include(tests/Tests.cmake)
 include(integration_tests/Integration.cmake)
 
 # the main executable
-add_executable(tra_sub_sys_barbatos src/server/node_main.cc)
+add_executable(node_main src/main/node_main.cc)
+target_link_libraries(node_main ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(node_main ${MPI_LIBRARIES})
+target_link_libraries(node_main bbts-common)

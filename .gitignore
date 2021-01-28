@@ -4,6 +4,8 @@ cmake-build-release
 .build
 .vscode
 build
+bin/node_main
 bin/test*
 bin/tra_sub_sys_barbatos
 lib/lib*
+third_party
