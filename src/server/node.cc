@@ -109,6 +109,9 @@ void bbts::node_t::sync() {
 
 void bbts::node_t::shutdown() {
 
+  // sync
+  _comm->barrier();
+
   // shutdown the command runner
   _command_runner->shutdown();
 
@@ -117,9 +120,6 @@ void bbts::node_t::shutdown() {
 
   // shutdown the tensor notifier
   _tensor_notifier->shutdown();
-
-  // sync
-  _comm->barrier();
 }
 
 std::thread bbts::node_t::create_deleter_thread() {

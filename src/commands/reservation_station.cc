@@ -95,7 +95,7 @@ std::vector<bbts::tid_t> bbts::reservation_station_t::tensors_to_notify_node(bbt
   _send_status_cv[node].wait(lk, [&]{ return !_send_status_queue[node].empty() || _shutdown; });
 
   // if we have shutdown return
-  if(_shutdown) {
+  if(_shutdown && _send_status_queue[node].empty()) {
     is_done = true;
     return {};
   }
