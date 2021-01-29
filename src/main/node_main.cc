@@ -2,12 +2,18 @@
 #include "../tensor/tensor.h"
 #include "../tensor/tensor_factory.h"
 #include "../server/node.h"
+#include "../commands/parsed_command.h"
 #include "../utils/terminal_color.h"
 
 #include "../../third_party/cli/include/cli/cli.h"
 #include "../../third_party/cli/include/cli/clifilesession.h"
 
 using namespace cli;
+
+
+void load_binary_command() {
+
+}
 
 // the prompt
 void prompt(bbts::node_t &node) {
@@ -17,7 +23,7 @@ void prompt(bbts::node_t &node) {
   std::cout << "\t\t-----///----///----///----///----///----///----///----///-----\n";
   std::cout << "\t\t    /   \\  /   \\  /   \\  /   \\  /   \\  /   \\  /   \\  /   \\  \n";
   std::cout << "\n";
-  std::cout << "\t\t\tWelcome to " << bbts::green << "Barbatos" << bbts::reset << ", the tensor operating system\n";
+  std::cout << "\t\t\tWelcome to " << bbts::green << "BarbaTOS" << bbts::reset << ", the tensor operating system\n";
   std::cout << "\t\t\t\tVersion : 0.1 - Lupus Rex\n";
   std::cout << "\t\t\t\tEmail : dj16@rice.edu\n";
   std::cout << '\n';
@@ -28,6 +34,12 @@ void prompt(bbts::node_t &node) {
   rootMenu->Insert("info",
                    [&](std::ostream &out) { node.print_cluster_info(out); },
                    "Returns information about the cluster\n");
+
+  rootMenu->Insert("load",[&](std::ostream &out, const std::string &file) {
+
+    out << file << '\n';
+
+  },"Load commands form a binary file. Usage : load <file>\n");
 
   // init the command line interface
   Cli cli(std::move(rootMenu));
