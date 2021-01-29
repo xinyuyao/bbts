@@ -1,12 +1,12 @@
 #include <iostream>
-#include "../tensor/tensor.h"
-#include "../tensor/tensor_factory.h"
-#include "../server/node.h"
-#include "../commands/parsed_command.h"
-#include "../utils/terminal_color.h"
+#include "../src/tensor/tensor.h"
+#include "../src/tensor/tensor_factory.h"
+#include "../src/server/node.h"
+#include "../src/commands/parsed_command.h"
+#include "../src/utils/terminal_color.h"
 
-#include "../../third_party/cli/include/cli/cli.h"
-#include "../../third_party/cli/include/cli/clifilesession.h"
+#include "../third_party/cli/include/cli/cli.h"
+#include "../third_party/cli/include/cli/clifilesession.h"
 
 using namespace cli;
 

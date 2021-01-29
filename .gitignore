@@ -6,6 +6,7 @@ cmake-build-release
 build
 bin/out.bbts
 bin/node_main
+bin/print_commands
 bin/test*
 bin/tra_sub_sys_barbatos
 lib/lib*

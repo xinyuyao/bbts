@@ -44,6 +44,85 @@ struct parsed_command_t {
   // the outputs of this op
   std::vector<std::tuple<tid_t, node_id_t>> outputs;
 
+  void print_tensor_list(const std::vector<std::tuple<tid_t, node_id_t>> &list) {
+
+    std::cout << "[";
+    for(size_t i = 0; i < list.size(); ++i) {
+      if(i == list.size() - 1) {
+        std::cout << "(" << std::get<0>(list[i]) << "," << std::get<1>(list[i]) << ")";
+      }
+      else {
+        std::cout << "(" << std::get<0>(list[i]) << "," << std::get<1>(list[i]) << "),";
+      }
+    }
+    std::cout << "]";
+  }
+
+  void print_string_list(const std::vector<std::string> &list) {
+
+    std::cout << "[";
+    for(size_t i = 0; i < list.size(); ++i) {
+      if(i == list.size() - 1) {
+        std::cout << "\"" << list[i] << "\"";
+      }
+      else {
+        std::cout << "\"" << list[i] << "\",";
+      }
+    }
+    std::cout << "]";
+  }
+
+  void print() {
+
+    switch(type) {
+      case op_type_t::APPLY : {
+        std::cout << "APPLY (";
+        std::cout << "\"" << def.ud_name << "\",";
+        print_string_list(def.input_types);
+        std::cout << ",";
+        print_string_list(def.output_types);
+        std::cout << ",";
+
+        print_tensor_list(inputs);
+        std::cout << ',';
+        print_tensor_list(outputs);
+        std::cout << ")\n";
+
+        break;
+      }
+      case op_type_t::REDUCE : {
+        std::cout << "REDUCE (";
+        std::cout << "\"" << def.ud_name << "\",";
+        print_string_list(def.input_types);
+        std::cout << ",";
+        print_string_list(def.output_types);
+        std::cout << ",";
+
+        print_tensor_list(inputs);
+        std::cout << ',';
+        print_tensor_list(outputs);
+        std::cout << ")\n";
+
+        break;
+      }
+      case op_type_t::MOVE : {
+        std::cout << "MOVE (";
+        print_tensor_list(inputs);
+        std::cout << ',';
+        print_tensor_list(outputs);
+        std::cout << ")\n";
+        break;
+      }
+      case op_type_t::DELETE : {
+        std::cout << "DELETE (";
+        print_tensor_list(inputs);
+        std::cout << ")\n";
+        break;
+      }
+    }
+
+  }
+
 };
 
 // TODO - the deserialization can be optimized if necessary
@@ -138,6 +217,14 @@ struct parsed_command_list_t {
   }
 
   const parsed_command_t& operator[](size_t idx) const { return _commands[idx]; };
+
+  void print() {
+
+    // print each command
+    for(auto &cmd : _commands) {
+      cmd.print();
+    }
+  }
 
  private:
 
