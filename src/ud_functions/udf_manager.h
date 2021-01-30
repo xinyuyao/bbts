@@ -52,11 +52,11 @@ public:
 using udf_matcher_ptr = std::unique_ptr<udf_matcher>;
 
 //
-class udf_manager {
+class udf_manager_t {
 public:
 
   // initializes the UD manager
-  udf_manager(tensor_factory_ptr_t _tensor_factory) : _tensor_factory(_tensor_factory) {
+  udf_manager_t(tensor_factory_ptr_t _tensor_factory) : _tensor_factory(_tensor_factory) {
 
     /// 1. matrix summation
     register_udf(get_matrix_add_udf());
@@ -130,6 +130,24 @@ public:
     return std::make_unique<udf_matcher>(_udfs[it->second]->impls);
   }
 
+  udf_matcher_ptr get_matcher_for(const std::string &ud_name, bool is_commutative, bool is_associative) {
+
+    // check if udf is registered.
+    auto it = _udfs_name_to_id.find(ud_name);
+    if(it == _udfs_name_to_id.end()) {
+      return nullptr;
+    }
+
+    // check for the parameters
+    auto &fn = _udfs[it->second];
+    if((!fn->is_ass && is_associative) || (!fn->is_com && is_commutative)) {
+      return nullptr;
+    }
+
+    // make a matcher with the given implementations
+    return std::make_unique<udf_matcher>(fn->impls);
+  }
+
   // return the implementation
   ud_impl_t* get_fn_impl(ud_impl_id_t _id) {
 
@@ -155,6 +173,6 @@ private:
   std::unordered_map<std::string, ud_id_t> _udfs_name_to_id;
 };
 
-using udf_manager_ptr = std::shared_ptr<udf_manager>;
+using udf_manager_ptr = std::shared_ptr<udf_manager_t>;
 
 }

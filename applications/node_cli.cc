@@ -10,9 +10,58 @@
 
 using namespace cli;
 
+std::thread loading_message(const std::string &s, std::atomic_bool &b) {
 
-void load_binary_command() {
+  auto t = std::thread([s, &b]() {
 
+    // as long as we load
+    int32_t dot = 0;
+    while(!b) {
+
+      std::cout << '\r' << s;
+      for(int32_t i = 0; i < dot; ++i) { std::cout << '.';}
+      dot = (dot + 1) % 4;
+      usleep(300000);
+    }
+
+    std::cout << '\n';
+  });
+
+  return std::move(t);
+}
+
+void load_binary_command(bbts::node_t &node, const std::string &file_path) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Loading the file", b);
+
+  // try to deserialize
+  bbts::parsed_command_list_t cmd_list;
+  bool success = cmd_list.deserialize(file_path);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!success) {
+    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+  }
+
+  // kick of a loading message
+  b = false;
+  t = loading_message("Scheduling the loaded commands", b);
+
+  // load the commands we just parsed
+  auto [did_compile, error] = node.load_commands(cmd_list);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_compile) {
+    std::cout << bbts::red << "Failed to schedule the loaded commands : \"" << error << "\"\n" << bbts::reset;
+  }
 }
 
 // the prompt
@@ -37,7 +86,7 @@ void prompt(bbts::node_t &node) {
 
   rootMenu->Insert("load",[&](std::ostream &out, const std::string &file) {
 
-    out << file << '\n';
+    load_binary_command(node, file);
 
   },"Load commands form a binary file. Usage : load <file>\n");
 

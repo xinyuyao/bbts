@@ -9,6 +9,7 @@
 #include "../ud_functions/udf_manager.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
+#include "../commands/parsed_command.h"
 
 namespace bbts {
 
@@ -63,7 +64,10 @@ public:
   void print_cluster_info(std::ostream& out);
 
   // load all commands
-  void load_commands(const std::vector<command_ptr_t>& commands);
+  void load_commands(const std::vector<command_ptr_t>& cmds);
+
+  // load all the parsed commands
+  std::tuple<bool, std::string> load_commands(const bbts::parsed_command_list_t &cmds);
 
   // sync all the nodes to know that they have all execute up to this point
   void sync();

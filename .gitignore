@@ -4,6 +4,7 @@ cmake-build-release
 .build
 .vscode
 build
+bin/*
 bin/out.bbts
 bin/node_main
 bin/print_commands
@@ -12,3 +13,4 @@ bin/generate*
 bin/tra_sub_sys_barbatos
 lib/lib*
 third_party
+*.bbts

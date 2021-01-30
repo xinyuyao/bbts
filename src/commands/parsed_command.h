@@ -226,6 +226,10 @@ struct parsed_command_list_t {
 
   const parsed_command_t& operator[](size_t idx) const { return _commands[idx]; };
 
+  size_t get_num_commands() const {
+    return _commands.size();
+  }
+
   void print() {
 
     // print each command

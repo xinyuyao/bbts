@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   auto id = factory->get_tensor_ftm("dense");
 
   // crate the udf manager
-  bbts::udf_manager manager(factory);
+  bbts::udf_manager_t manager(factory);
 
   // return me that matcher for matrix addition
   auto matcher = manager.get_matcher_for("matrix_add");

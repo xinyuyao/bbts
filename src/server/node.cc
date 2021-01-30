@@ -1,4 +1,5 @@
 #include "node.h"
+#include "../commands/command_compiler.h"
 
 void bbts::node_t::init() {
 
@@ -15,7 +16,7 @@ void bbts::node_t::init() {
   _factory = std::make_shared<bbts::tensor_factory_t>();
 
   // init the udf manager
-  _udf_manager = std::make_shared<bbts::udf_manager>(_factory);
+  _udf_manager = std::make_shared<bbts::udf_manager_t>(_factory);
 
   // init the reservation station
   _res_station = std::make_shared<bbts::reservation_station_t>(_comm->get_rank(), _comm->get_num_nodes());
@@ -106,15 +107,34 @@ void bbts::node_t::print_cluster_info(std::ostream& out) {
   out << "\tTotal RAM : " << _config->total_ram / (1024 * 1024) << " MB \n";
 }
 
-void bbts::node_t::load_commands(const std::vector<command_ptr_t> &commands) {
+void bbts::node_t::load_commands(const std::vector<command_ptr_t> &cmds) {
 
   // schedule them all at once
-  for (auto &_cmd : commands) {
+  for (auto &_cmd : cmds) {
 
     // if it uses the node
     if (_cmd->uses_node(_comm->get_rank())) {
       _res_station->queue_command(_cmd->clone());
     }
+  }
+}
+
+std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_command_list_t &cmds) {
+
+  // init the compiler
+  command_compiler_t compiler(*_factory, *_udf_manager);
+
+  // compile the commands
+  try {
+
+    // the compiled commands
+    auto compiled_cmds = compiler.compile(cmds);
+
+
+    return {true, ""};
+  }
+  catch (const std::runtime_error& ex) {
+    return {false, ex.what()};
   }
 }
 
