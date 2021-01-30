@@ -4,6 +4,7 @@
 #include "../server/node_config.h"
 #include "../tensor/tensor.h"
 #include "../utils/raw_vector.h"
+#include "command_utils.h"
 
 namespace bbts {
 
@@ -43,6 +44,9 @@ struct parsed_command_t {
 
   // the outputs of this op
   std::vector<std::tuple<tid_t, node_id_t>> outputs;
+
+  // the parameters of the ud function
+  std::vector<command_param_t> parameters;
 
   void print_tensor_list(const std::vector<std::tuple<tid_t, node_id_t>> &list) {
 
@@ -141,28 +145,32 @@ struct parsed_command_list_t {
                  const std::vector<std::string> &in_types,
                  const std::vector<std::string> &out_types,
                  const std::vector<std::tuple<tid_t, node_id_t>> &in,
-                 const std::vector<std::tuple<tid_t, node_id_t>> &out) {
+                 const std::vector<std::tuple<tid_t, node_id_t>> &out,
+                 const std::vector<command_param_t> &params) {
 
     _commands.push_back(parsed_command_t{.type = parsed_command_t::op_type_t::APPLY,
                                          .def = {.ud_name = fn,
                                                  .input_types = in_types,
                                                  .output_types = out_types},
                                          .inputs = in,
-                                         .outputs = out});
+                                         .outputs = out,
+                                         .parameters = params});
   }
 
   void add_reduce(const std::string &fn,
                   const std::vector<std::string> &in_types,
                   const std::vector<std::string> &out_types,
                   const std::vector<std::tuple<tid_t, node_id_t>> &in,
-                  const std::tuple<tid_t, node_id_t> &out) {
+                  const std::tuple<tid_t, node_id_t> &out,
+                  const std::vector<command_param_t> &params) {
 
     _commands.push_back(parsed_command_t{.type = parsed_command_t::op_type_t::REDUCE,
                                          .def = {.ud_name = fn,
                                                  .input_types = in_types,
                                                  .output_types = out_types},
                                          .inputs = in,
-                                         .outputs = { out } });
+                                         .outputs = { out },
+                                         .parameters = params});
   }
 
   void add_delete(const std::vector<std::tuple<tid_t, node_id_t>> &in) {
@@ -243,6 +251,7 @@ struct parsed_command_list_t {
     // serialize the input and output array
     serialize_array(file, cmd.inputs);
     serialize_array(file, cmd.outputs);
+    serialize_array(file, cmd.parameters);
   }
 
   void serialize_strings(std::ofstream &file, const std::vector<std::string> &strs) {
@@ -299,6 +308,7 @@ struct parsed_command_list_t {
     // serialize the input and output array
     cmd.inputs = deserialize_array<std::tuple<tid_t, node_id_t>>(file);
     cmd.outputs = deserialize_array<std::tuple<tid_t, node_id_t>>(file);
+    cmd.parameters = deserialize_array<command_param_t>(file);
   }
 
   std::vector<std::string> deserialize_strings(std::ifstream &file) {

@@ -13,14 +13,16 @@ TEST(TestCommandParsing, Test1) {
                        {"dense", "sparse"},
                        {"sparse", "dense", "dense"},
                        {{0,0}, {0, 1}},
-                       {{0,2}, {0, 3}, {0, 4}});
+                       {{0,2}, {0, 3}, {0, 4}},
+                       {command_param_t{.u = 1}, command_param_t{.i = 2}, command_param_t{.f = 3.0f}});
 
     cmd_list.add_delete({{1,0}, {1, 1}, {1, 2}});
     cmd_list.add_reduce("bla2",
                         {"dense1", "sparse1"},
                         {"sparse1", "dense2"},
                         {{0,0}, {0, 1}},
-                        {0, 3});
+                        {0, 3},
+                        {});
 
     cmd_list.serialize("out.bbts");
   }
@@ -48,6 +50,8 @@ TEST(TestCommandParsing, Test1) {
 
     EXPECT_EQ(std::get<0>(cmd_list[0].outputs[2]), 0);
     EXPECT_EQ(std::get<1>(cmd_list[0].outputs[2]), 2);
+
+    EXPECT_EQ(cmd_list[0].parameters.size(), 0);
 
     /// 2. check the second command
 
@@ -82,6 +86,12 @@ TEST(TestCommandParsing, Test1) {
     EXPECT_EQ(std::get<0>(cmd_list[1].outputs[2]), 0);
     EXPECT_EQ(std::get<1>(cmd_list[1].outputs[2]), 4);
 
+    EXPECT_EQ(cmd_list[1].parameters.size(), 3);
+
+    EXPECT_EQ(cmd_list[1].parameters[0].u, 1);
+    EXPECT_EQ(cmd_list[1].parameters[1].i, 2);
+    EXPECT_EQ(cmd_list[1].parameters[2].f, 3.0f);
+
     /// 3. check the third command
 
     EXPECT_EQ(cmd_list[2].type, parsed_command_t::op_type_t::DELETE);
@@ -98,6 +108,8 @@ TEST(TestCommandParsing, Test1) {
 
     EXPECT_EQ(std::get<0>(cmd_list[2].inputs[2]), 1);
     EXPECT_EQ(std::get<1>(cmd_list[2].inputs[2]), 2);
+
+    EXPECT_EQ(cmd_list[2].parameters.size(), 0);
 
     /// 4. check the fourth command
 
@@ -125,6 +137,7 @@ TEST(TestCommandParsing, Test1) {
     EXPECT_EQ(std::get<0>(cmd_list[3].outputs[0]), 0);
     EXPECT_EQ(std::get<1>(cmd_list[3].outputs[0]), 3);
 
+    EXPECT_EQ(cmd_list[3].parameters.size(), 0);
   }
 
 }
