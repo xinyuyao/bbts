@@ -5,7 +5,7 @@
 #include <sys/sysinfo.h>
 
 #include "node_config.h"
-#include "../commands/scheduler.h"
+#include "coordinator.h"
 #include "../ud_functions/udf_manager.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
@@ -62,12 +62,15 @@ public:
 
   // print the cluster info
   void print_cluster_info(std::ostream& out);
-
+  
   // load all commands
   void load_commands(const std::vector<command_ptr_t>& cmds);
 
   // load all the parsed commands
   std::tuple<bool, std::string> load_commands(const bbts::parsed_command_list_t &cmds);
+
+  // run all the scheduled commands
+  std::tuple<bool, std::string> run_commands();
 
   // sync all the nodes to know that they have all execute up to this point
   void sync();
@@ -110,6 +113,8 @@ public:
 
   std::thread tensor_notifier();
 
+  std::thread create_coordinator_thread();
+
   // the configuration of the node
   node_config_ptr_t _config;
 
@@ -120,7 +125,7 @@ public:
   reservation_station_ptr_t _res_station;
 
   // this is responsible for forwarding all the commands to the right node and receiving commands
-  scheduler_ptr_t _scheduler;
+  coordinator_ptr_t _coordinator;
 
   // this initializes the tensors
   tensor_factory_ptr_t _factory;

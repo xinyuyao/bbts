@@ -6,9 +6,6 @@ void bbts::node_t::init() {
   // the communicator
   _comm = std::make_shared<communicator_t>(_config);
 
-  // the scheduler
-  _scheduler = std::make_shared<scheduler_t>(_comm);
-
   // create the storage
   _storage = std::make_shared<storage_t>();
 
@@ -26,6 +23,9 @@ void bbts::node_t::init() {
 
   // the tensor notifier
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
+
+  // the scheduler
+  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station);
 }
 void bbts::node_t::run() {
 
@@ -46,6 +46,9 @@ void bbts::node_t::run() {
 
   // this kicks off and handles remove commands (MOVE and REDUCE)
   auto command_expect = expect_remote_command();
+
+  // this will accept requests from the coordinator
+  auto coord_thread = create_coordinator_thread();
 
   // notification sender
   std::vector<std::thread> remote_notification_sender;
@@ -81,6 +84,8 @@ void bbts::node_t::run() {
 
   //
   deleter.join();
+
+  coord_thread.join();
 }
 
 size_t bbts::node_t::get_num_nodes() const {
@@ -130,12 +135,18 @@ std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_com
     // the compiled commands
     auto compiled_cmds = compiler.compile(cmds);
 
-
-    return {true, ""};
+    // schedule all commands
+    return _coordinator->schedule_commands(compiled_cmds);
   }
   catch (const std::runtime_error& ex) {
     return {false, ex.what()};
   }
+}
+
+std::tuple<bool, std::string> bbts::node_t::run_commands() {
+
+  // run all the commands
+  return _coordinator->run_commands();
 }
 
 void bbts::node_t::sync() {
@@ -197,6 +208,19 @@ std::thread bbts::node_t::remote_tensor_notification_sender(bbts::node_id_t out_
 
   return std::move(t);
 }
+
+std::thread bbts::node_t::create_coordinator_thread() {
+
+  // create the thread
+  std::thread t = std::thread([this]() {
+
+    // this will send notifications to out node
+    _coordinator->accept();
+  });
+
+  return std::move(t);
+}
+
 std::thread bbts::node_t::tensor_notifier() {
 
   // create the thread
@@ -208,5 +232,6 @@ std::thread bbts::node_t::tensor_notifier() {
 
   return std::move(t);
 }
+
 
 

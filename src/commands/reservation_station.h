@@ -46,6 +46,21 @@ class reservation_station_t {
   // shutdown the reservation station
   void shutdown();
 
+  // waits until we have some local commands to run
+  void wait_for_local_commands();
+
+  // wait until we have some remote commands to run
+  void wait_for_remote_commands();
+
+  // wait until all commands remote and local are executed
+  void wait_until_finished();
+
+  // execute all the scheduled commands
+  void execute_scheduled_async();
+
+  // stop executing all the commands
+  void stop_executing();
+
   // add the hook that is triggered on scheduling
   template<class fn>
   void add_queued_hook(fn fun){ _command_queued_hook = fun; }
@@ -100,7 +115,10 @@ class reservation_station_t {
   // we use this to wait for commands
   std::condition_variable _cv;
 
-  // is it still running
+  // is executing
+  bool _is_executing = false;
+
+  // is the node still running
   bool _shutdown = false;
 
   // the node for which this reservation station is for
@@ -114,6 +132,9 @@ class reservation_station_t {
 
   // commands ready to execute
   std::vector<command_ptr_t> _execute;
+
+  // the number of remote commands to be processed
+  size_t _num_remote_commands = 0;
 
   // the local commands and the number of tensors they are waiting for
   std::unordered_map<command_id_t, std::pair<command_ptr_t, int32_t>> _local_commands;
@@ -140,6 +161,9 @@ class reservation_station_t {
 
   // deletion cv
   std::condition_variable _deletion_cv;
+
+  // kick off once the commands
+  std::condition_variable _has_commands_cv;
 
   // the tensors we want to delete from storage
   std::vector<tid_t> _to_delete;

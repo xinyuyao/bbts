@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../server/node_config.h"
-#include "scheduler.h"
 #include "reservation_station.h"
 #include "../communication/communicator.h"
 

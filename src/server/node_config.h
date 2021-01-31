@@ -22,6 +22,9 @@ struct node_config_t {
 
   // the total available ram memory
   size_t total_ram = 0;
+
+  // should we print out everything?
+  bool verbose = false;
 };
 
 // a nice way to reference the configuration ptr

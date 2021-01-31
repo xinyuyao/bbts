@@ -263,6 +263,7 @@ int main(int argc, char **argv) {
   if (argc != 5) {
     std::cout << "Incorrect usage\n";
     std::cout << "Usage ./generate_bmm <split> <num_nodes> <matrix_size> <file>.bbts\n";
+    return 0;
   }
 
   // get the parameters

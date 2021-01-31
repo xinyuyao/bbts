@@ -53,16 +53,41 @@ void load_binary_command(bbts::node_t &node, const std::string &file_path) {
   t = loading_message("Scheduling the loaded commands", b);
 
   // load the commands we just parsed
-  auto [did_compile, error] = node.load_commands(cmd_list);
+  auto [did_load, message] = node.load_commands(cmd_list);
 
   // finish the loading message
   b = true; t.join();
 
   // did we fail
-  if(!did_compile) {
-    std::cout << bbts::red << "Failed to schedule the loaded commands : \"" << error << "\"\n" << bbts::reset;
+  if(!did_load) {
+    std::cout << bbts::red << "Failed to schedule the loaded commands : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    std::cout << bbts::green << message << bbts::reset;
   }
 }
+
+void run_commands(bbts::node_t &node) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Running the commands.", b);
+
+  // run all the commands
+  auto [did_load, message] = node.run_commands();
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_load) {
+    std::cout << bbts::red << "Failed to run commands : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    std::cout << bbts::green << message << bbts::reset;
+  }
+}
+
 
 // the prompt
 void prompt(bbts::node_t &node) {
@@ -89,6 +114,13 @@ void prompt(bbts::node_t &node) {
     load_binary_command(node, file);
 
   },"Load commands form a binary file. Usage : load <file>\n");
+
+
+  rootMenu->Insert("run",[&](std::ostream &out) {
+
+    run_commands(node);
+
+  },"Run scheduled commands.\n");
 
   // init the command line interface
   Cli cli(std::move(rootMenu));

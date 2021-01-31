@@ -41,6 +41,11 @@ bool bbts::reservation_station_t::queue_command(bbts::command_ptr_t _command) {
     _last_cmd = cmd_id;
   }
 
+  // we have some new commands notify...
+  if(_is_executing) {
+    _has_commands_cv.notify_all();
+  }
+
   // unlock here
   lk.unlock();
 
@@ -70,6 +75,11 @@ bool bbts::reservation_station_t::retire_command(bbts::command_ptr_t _command) {
   }
   else {
     success = _retire_remote_command(std::move(_command));
+  }
+
+  // we retired a bunch of commands notify if we have no more
+  if(_local_commands.empty() && _num_remote_commands == 0) {
+    _has_commands_cv.notify_all();
   }
 
   // unlock here
@@ -249,6 +259,42 @@ void bbts::reservation_station_t::shutdown() {
   for(auto &cv : _send_status_cv) { cv.notify_all(); }
 }
 
+void bbts::reservation_station_t::wait_for_local_commands() {
+
+  // wait until we have something here
+  std::unique_lock<std::mutex> lk(_m);
+  _has_commands_cv.wait(lk, [&]{ return !_local_commands.empty() && _is_executing; });
+}
+
+void bbts::reservation_station_t::wait_for_remote_commands() {
+
+  // wait until we have something here
+  std::unique_lock<std::mutex> lk(_m);
+  _has_commands_cv.wait(lk, [&]{ return _num_remote_commands != 0 && _is_executing; });
+}
+
+void bbts::reservation_station_t::wait_until_finished() {
+
+  // wait until all the commands are run
+  std::unique_lock<std::mutex> lk(_m);
+  _has_commands_cv.wait(lk, [&]{ return _num_remote_commands == 0 && _local_commands.empty(); });
+}
+
+void bbts::reservation_station_t::execute_scheduled_async() {
+
+  // kick off everything
+  std::unique_lock<std::mutex> lk(_m);
+  _is_executing = true;
+  _has_commands_cv.notify_all();
+}
+
+void bbts::reservation_station_t::stop_executing() {
+
+  // update the flag
+  std::unique_lock<std::mutex> lk(_m);
+  _is_executing = false;
+}
+
 bool bbts::reservation_station_t::_queue_remote(bbts::command_ptr_t _command) {
 
   // handle delete
@@ -311,6 +357,9 @@ bool bbts::reservation_station_t::_queue_remote(bbts::command_ptr_t _command) {
       s.writing_tensor = true;
     }
   }
+
+  // we scheduled the remote command
+  _num_remote_commands++;
 
   return true;
 }
@@ -648,6 +697,9 @@ bool bbts::reservation_station_t::_retire_remote_command(bbts::command_ptr_t _co
       _remove_tensor(in.tid);
     }
   }
+
+  // we finished running the command
+  _num_remote_commands--;
 
   return true;
 }

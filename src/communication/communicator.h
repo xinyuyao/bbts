@@ -10,6 +10,7 @@
 #include "../ud_functions/ud_function.h"
 #include "../tensor/tensor.h"
 #include "../commands/command.h"
+#include "../server/coordinator_ops.h"
 
 namespace bbts {
 
@@ -25,18 +26,19 @@ const com_tags ANY_TAG = MPI_ANY_TAG;
 // the request to a node to send the sending node the tensors it wants
 const com_tags SEND_CMD_TAG = 1;
 const com_tags SHUTDOWN_TAG = 2;
-const com_tags FORWARD_CMD_TAG = 3;
-const com_tags NOTIFY_TENSOR_TAG = 4;
+const com_tags COORDINATOR_TAG = 3;
+const com_tags COORDINATOR_BCAST_CMD_TAG = 4;
+const com_tags NOTIFY_TENSOR_TAG = 5;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 5;
+const com_tags FREE_TAG = 6;
 
 // the mpi communicator
 class mpi_communicator_t {
 public:
 
-  mpi_communicator_t(const node_config_ptr_t &_cfg);
+  explicit mpi_communicator_t(const node_config_ptr_t &_cfg);
 
   ~mpi_communicator_t();
 
@@ -44,16 +46,16 @@ public:
   struct sync_request_t {
 
     // the type of the message
-    com_tags message_tag;
+    com_tags message_tag{};
     
     // the number of bytes
-    int32_t num_bytes;
+    int32_t num_bytes{};
 
     // the status of the message
-    MPI_Status status;
+    MPI_Status status{};
 
     // the message identifier
-    MPI_Message message;
+    MPI_Message message{};
 
     // the success 
     bool success = true;
@@ -62,7 +64,7 @@ public:
   struct async_request_t {
 
     // the message request identifier
-    MPI_Request request;
+    MPI_Request request{};
 
     // the success 
     bool success = true;
@@ -104,20 +106,26 @@ public:
   // this sends a shutdown command to the thread that is calling @see expect_op_request
   bool shutdown_op_request();
 
-  // the the command to all relevant nodes
-  bool forward_cmd(const command_ptr_t &_cmd);
+  // send the coord op to all nodes
+  bool send_coord_op(const bbts::coordinator_op_t &op);
 
-  // expect the command
-  command_ptr_t expect_cmd();
+  // expect the a coord op
+  bbts::coordinator_op_t expect_coord_op();
+
+  // send the cmds to all nodes
+  bool send_coord_cmds(const std::vector<command_ptr_t> &cmds);
+
+  // expect the a coord op
+  bool expect_coord_cmds(size_t num_cmds, std::vector<command_ptr_t> &out);
 
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();
 
   // return the rank
-  int32_t get_rank() const;
+  [[nodiscard]] int32_t get_rank() const;
 
   // return the number of nodes
-  int32_t get_num_nodes() const;
+  [[nodiscard]] int32_t get_num_nodes() const;
 
  private:
 

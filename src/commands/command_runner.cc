@@ -16,6 +16,9 @@ void bbts::command_runner_t::local_command_runner() {
 
   while (true) {
 
+    // wait until we get some commands
+    _rs->wait_for_local_commands();
+
     // get the command
     auto cmd = _rs->get_next_command();
     if (cmd == nullptr) {
@@ -26,7 +29,7 @@ void bbts::command_runner_t::local_command_runner() {
     if (cmd->type == command_t::MOVE) {
 
       // move the
-      std::cout << "MOVE " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
+//      std::cout << "MOVE " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
 
       // it is a point to point move
       if(cmd->is_move()) {
@@ -76,7 +79,7 @@ void bbts::command_runner_t::local_command_runner() {
 
     } else if (cmd->type == command_t::APPLY) {
 
-      std::cout << "APPLY " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
+//      std::cout << "APPLY " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
 
       // return me that matcher for matrix addition
       auto ud = _udm->get_fn_impl(cmd->fun_id);
@@ -170,7 +173,7 @@ void bbts::command_runner_t::local_command_runner() {
         // do the apply
         op.apply();
 
-        std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << _comm->get_rank() << '\n' << std::flush;
+//        std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << _comm->get_rank() << '\n' << std::flush;
 
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
@@ -215,7 +218,7 @@ void bbts::command_runner_t::local_command_runner() {
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
 
-        std::cout << "REMOTE_REDUCE PROCESSED on node " << _comm->get_rank() << '\n' << std::flush;
+//        std::cout << "REMOTE_REDUCE PROCESSED on node " << _comm->get_rank() << '\n' << std::flush;
       }
     }
   }
@@ -225,6 +228,9 @@ void bbts::command_runner_t::remote_command_handler() {
 
   // while we
   while (true) {
+
+    // wait for remote commands
+    _rs->wait_for_remote_commands();
 
     // get the remote command
     auto cmd = _comm->expect_op_request();
@@ -340,7 +346,7 @@ void bbts::command_runner_t::run_deleter() {
 
     // deleted
     _ts->remove_by_tid(id);
-    std::cout << "Remove tensor : " << id << '\n' << std::flush;
+//    std::cout << "Remove tensor : " << id << '\n' << std::flush;
   }
 }
 
