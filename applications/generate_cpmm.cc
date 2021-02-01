@@ -186,7 +186,7 @@ void generate_aggregation(size_t split,
       std::vector<std::tuple<tid_t, node_id_t>> inputs;
       for (auto &mul : muls) {
         auto &[tid, node] = mul;
-        inputs.emplace_back(tid, target_node);
+        inputs.emplace_back(tid, node);
       }
 
       // create the reduce command
@@ -247,7 +247,7 @@ bbts::parsed_command_list_t generate_commands(size_t split,
   create_shuffle(num_nodes,
                  split,
                  [](int32_t rowID, int32_t colID, size_t num_nodes) { return rowID % num_nodes; },
-                 a_idx,
+                 b_idx,
                  _cmds,
                  to_del);
 
