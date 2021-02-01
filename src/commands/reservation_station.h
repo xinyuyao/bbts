@@ -46,6 +46,9 @@ class reservation_station_t {
   // shutdown the reservation station
   void shutdown();
 
+  // clear the reservation station
+  void clear();
+
   // waits until we have some local commands to run
   void wait_for_local_commands();
 

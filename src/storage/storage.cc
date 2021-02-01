@@ -175,4 +175,17 @@ void storage_t::print() {
   }
 }
 
+void storage_t::clear() {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // go through each allocated tensor and free it
+  for(auto &it : _allocated_tensors) {
+    free(it.first);
+  }
+  _allocated_tensors.clear();
+  _tensor_nfo.clear();
+}
+
 }

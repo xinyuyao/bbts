@@ -259,6 +259,31 @@ void bbts::reservation_station_t::shutdown() {
   for(auto &cv : _send_status_cv) { cv.notify_all(); }
 }
 
+void bbts::reservation_station_t::clear() {
+
+  std::unique_lock<std::mutex> lk(_m);
+
+  _last_cmd = -1;
+  _execute.clear();
+  _local_commands.clear();
+
+  for(auto &ls : _commands_waiting_for) {
+    ls.clear();
+  }
+  _tensors.clear();
+
+  for(auto &rt : _remote_tensors) {
+    rt.clear();
+  }
+  _notify_on_creation.clear();
+
+  for(auto &t : _send_status_queue) {
+    t.clear();
+  }
+
+  _to_delete.clear();
+}
+
 void bbts::reservation_station_t::wait_for_local_commands() {
 
   // wait until we have something here

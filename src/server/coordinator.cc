@@ -156,8 +156,27 @@ std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
   return {true, ""};
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::clear() {
+
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::CLEAR, ._val = 0 })) {
+    return {false, "Failed to clear the cluster!\n"};
+  }
+
+  // print the storage
+  _clear();
+
+  // sync everything
+  _comm->barrier();
+
+  // we succeded
+  return {true, "Cleared the cluster!"};
+}
+
 void bbts::coordinator_t::_clear() {
-  std::cout << "CLEAR\n";
+
+  // clear everything
+  _storage->clear();
+  _rs->clear();
 }
 
 void bbts::coordinator_t::_shutdown() {

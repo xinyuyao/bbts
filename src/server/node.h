@@ -79,6 +79,9 @@ public:
   // print the info about the storage
   std::tuple<bool, std::string> print_storage_info();
 
+  // resets the cluster
+  std::tuple<bool, std::string> clear();
+
   // sync all the nodes to know that they have all execute up to this point
   void sync();
 

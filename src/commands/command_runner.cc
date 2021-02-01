@@ -348,7 +348,7 @@ void bbts::command_runner_t::run_deleter() {
 
     // deleted
     _ts->remove_by_tid(id);
-//    std::cout << "Remove tensor : " << id << '\n' << std::flush;
+    _logger->message("Remove tensor : " + std::to_string(id) + '\n');
   }
 }
 

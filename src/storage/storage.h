@@ -62,6 +62,9 @@ struct storage_t {
   // print the storage
   void print();
 
+  // clear the storage
+  void clear();
+
   // get the number of tensors in the system
   size_t get_num_tensors();
 

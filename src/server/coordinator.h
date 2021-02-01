@@ -37,6 +37,9 @@ public:
   // print the info abo
   std::tuple<bool, std::string> print_storage_info();
 
+  // clears the storage
+  std::tuple<bool, std::string> clear();
+
   // shutdown the coordinator
   void shutdown();
 

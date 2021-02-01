@@ -110,6 +110,27 @@ void print(bbts::node_t &node, const std::string &file_path) {
   cmd_list.print(std::cout);
 }
 
+void clear(bbts::node_t &node) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Running the commands", b);
+
+  // run all the commands
+  auto [did_load, message] = node.clear();
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_load) {
+    std::cout << bbts::red << "Failed to run commands : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    std::cout << bbts::green << message << bbts::reset;
+  }
+}
+
 void verbose(bbts::node_t &node, bool val) {
 
   // kick of a loading message
@@ -175,13 +196,19 @@ void prompt(bbts::node_t &node) {
 
     verbose(node, val);
 
-  },"Load commands form a binary file. Usage : load <file>\n");
+  },"Enables or disables debug messages. verbose [true|false]\n");
 
   rootMenu->Insert("print",[&](std::ostream &out, const std::string &file) {
 
     print(node, file);
 
   },"Prints command stored in a file. Usage : print <file>\n");
+
+  rootMenu->Insert("clear",[&](std::ostream &out) {
+
+    clear(node);
+
+  },"Clears the tensor operating system.\n");
 
   // init the command line interface
   Cli cli(std::move(rootMenu));
