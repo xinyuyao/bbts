@@ -10,6 +10,9 @@
 #include "../commands/command.h"
 #include "../communication/communicator.h"
 #include "../commands/reservation_station.h"
+#include "../commands/command_runner.h"
+#include "../commands/tensor_notifier.h"
+#include "coordinator.h"
 
 namespace bbts {
 
@@ -20,7 +23,9 @@ public:
   coordinator_t(bbts::communicator_ptr_t _comm,
                 bbts::reservation_station_ptr_t _rs,
                 bbts::logger_ptr_t _logger,
-                storage_ptr_t _storage);
+                storage_ptr_t _storage,
+                bbts::command_runner_ptr_t _command_runner,
+                bbts::tensor_notifier_ptr_t _tensor_notifier);
 
   // accept a request
   void accept();
@@ -39,6 +44,9 @@ public:
 
   // clears the storage
   std::tuple<bool, std::string> clear();
+
+  // shutdown the cluster
+  std::tuple<bool, std::string> shutdown_cluster();
 
   // shutdown the coordinator
   void shutdown();
@@ -75,6 +83,12 @@ private:
 
   // shutdown
   std::atomic<bool> _is_down{};
+
+  // runs commands
+  bbts::command_runner_ptr_t _command_runner;
+
+  // the notifier
+  bbts::tensor_notifier_ptr_t _tensor_notifier;
 };
 
 // the pointer

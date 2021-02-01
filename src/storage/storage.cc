@@ -171,7 +171,7 @@ void storage_t::print() {
   // print all the allocated tensors
   std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _allocated_tensors) {
-    std::cout << std::get<0>(t.second) << "\t" << std::get<1>(t.second) << '\t\t' << (void*) t.first << '\n';
+    std::cout << std::get<0>(t.second) << "\t" << std::get<1>(t.second) << "\t\t" << (void*) t.first << '\n';
   }
 }
 

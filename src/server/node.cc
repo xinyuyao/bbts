@@ -31,7 +31,8 @@ void bbts::node_t::init() {
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
-  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger, _storage);
+  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger,
+                                                 _storage, _command_runner, _tensor_notifier);
 }
 
 void bbts::node_t::run() {
@@ -54,8 +55,13 @@ void bbts::node_t::run() {
   // this kicks off and handles remove commands (MOVE and REDUCE)
   auto command_expect = expect_remote_command();
 
-  // this will accept requests from the coordinator
-  auto coord_thread = create_coordinator_thread();
+  // if this is the root node, it does not have a coordinator thread
+  std::thread coord_thread;
+  if(get_rank() != 0) {
+
+    // this will accept requests from the coordinator
+    coord_thread = create_coordinator_thread();
+  }
 
   // notification sender
   std::vector<std::thread> remote_notification_sender;
@@ -73,26 +79,29 @@ void bbts::node_t::run() {
 
   /// 2.0 Wait for stuff to finish
 
-  // wa
+  // wait for the notification sender threads to finish
   for(auto &rns : remote_notification_sender) {
     rns.join();
   }
 
-  //
+  // wait for the remote command handler threads to finish
   command_expect.join();
 
-  //
+  // wait for the notifier to finish
   tsn_thread.join();
 
-  //
+  // wait for the command processing thread to finish
   for(auto &cpt : command_processing_threads) {
     cpt.join();
   }
 
-  //
+  // wait for the deleter to shutdown
   deleter.join();
 
-  coord_thread.join();
+  // we only have a coordinator thread if we are not the root node
+  if(get_rank() != 0) {
+    coord_thread.join();
+  }
 }
 
 size_t bbts::node_t::get_num_nodes() const {
@@ -173,6 +182,10 @@ std::tuple<bool, std::string> bbts::node_t::clear() {
   return _coordinator->clear();
 }
 
+std::tuple<bool, std::string> bbts::node_t::shutdown_cluster() {
+  return _coordinator->shutdown_cluster();
+}
+
 void bbts::node_t::sync() {
 
   _comm->barrier();
@@ -180,17 +193,7 @@ void bbts::node_t::sync() {
 
 void bbts::node_t::shutdown() {
 
-  // sync
-  _comm->barrier();
 
-  // shutdown the command runner
-  _command_runner->shutdown();
-
-  // shutdown the reservation station
-  _res_station->shutdown();
-
-  // shutdown the tensor notifier
-  _tensor_notifier->shutdown();
 }
 
 std::thread bbts::node_t::create_deleter_thread() {

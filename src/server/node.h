@@ -82,6 +82,9 @@ public:
   // resets the cluster
   std::tuple<bool, std::string> clear();
 
+  // shutdown cluster
+  std::tuple<bool, std::string> shutdown_cluster();
+
   // sync all the nodes to know that they have all execute up to this point
   void sync();
 

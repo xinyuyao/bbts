@@ -44,6 +44,7 @@ void load_binary_command(bbts::node_t &node, const std::string &file_path) {
   // did we fail
   if(!success) {
     std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+    return;
   }
 
   // kick of a loading message
@@ -112,7 +113,7 @@ void clear(bbts::node_t &node) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Running the commands", b);
+  auto t = loading_message("Clearing", b);
 
   // run all the commands
   auto [did_load, message] = node.clear();
@@ -122,7 +123,7 @@ void clear(bbts::node_t &node) {
 
   // did we fail
   if(!did_load) {
-    std::cout << bbts::red << "Failed to run commands : \"" << message << "\"\n" << bbts::reset;
+    std::cout << bbts::red << "Failed to clear : \"" << message << "\"\n" << bbts::reset;
   }
   else {
     std::cout << bbts::green << message << bbts::reset;
@@ -144,6 +145,27 @@ void verbose(bbts::node_t &node, bool val) {
   // did we fail
   if(!did_load) {
     std::cout << bbts::red << "Set to fail verbose : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    std::cout << bbts::green << message << bbts::reset;
+  }
+}
+
+void shutdown(bbts::node_t &node) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Shutting down", b);
+
+  // run all the commands
+  auto [did_load, message] = node.shutdown_cluster();
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_load) {
+    std::cout << bbts::red << "Failed to shutdown : \"" << message << "\"\n" << bbts::reset;
   }
   else {
     std::cout << bbts::green << message << bbts::reset;
@@ -212,7 +234,7 @@ void prompt(bbts::node_t &node) {
   Cli cli(std::move(rootMenu));
 
   // global exit action
-  cli.ExitAction([](auto &out) { out << "Goodbye...\n"; });
+  cli.ExitAction([&](auto &out) { shutdown(node); });
 
   // start the cli session
   CliFileSession input(cli);
@@ -234,13 +256,16 @@ int main(int argc, char **argv) {
   node.sync();
 
   // kick off the prompt
+  std::thread t;
   if (node.get_rank() == 0) {
-    std::thread t = std::thread([&]() { prompt(node); });
-    t.detach();
+    t = std::thread([&]() { prompt(node); });
   }
 
   // the node
   node.run();
+
+  // wait for the prompt to finish
+  if (node.get_rank() == 0) { t.join();}
 
   return 0;
 }
