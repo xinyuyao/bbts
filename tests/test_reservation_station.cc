@@ -58,6 +58,7 @@ std::thread create_deleter_thread(reservation_station_ptr_t &_rs, fake_storage_t
 
       // deleted
       _sto.remove(id);
+      _rs->retire_remove(id);
       std::cout << "Remove tensor : " <<  id << '\n' << std::flush;
       to_deleted--;
     }
@@ -381,6 +382,9 @@ TEST(TestReservationStation, FewLocalCommands1) {
                                                                  {command_t::tid_node_id_t{.tid = 1, .node = 0},
                                                                   command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
+  // kick off commands
+  rs->execute_scheduled_async();
+
   // get the first command to execute
   auto c1 = rs->get_next_command();
 
@@ -401,6 +405,9 @@ TEST(TestReservationStation, FewLocalCommands1) {
 
   // make sure there is only one tensors
   EXPECT_EQ(storage.num_tensors(), 1);
+
+  // wait for the reservation station to finish
+  rs->wait_until_finished();
 }
 
 
@@ -443,6 +450,8 @@ TEST(TestReservationStation, FewLocalCommands2) {
                                                                  command_t::tid_node_id_t{.tid = 2, .node = 0}},
                                                                 {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
 
+  // kick off commands
+  rs->execute_scheduled_async();
 
   // get the first command to execute
   auto c1 = rs->get_next_command();
@@ -471,6 +480,9 @@ TEST(TestReservationStation, FewLocalCommands2) {
 
   // make sure there is only one tensors
   EXPECT_EQ(storage.num_tensors(), 0);
+
+  // wait for the reservation station to finish
+  rs->wait_until_finished();
 }
 
 
@@ -713,6 +725,11 @@ TEST(TestReservationStation, TwoNodesBMM) {
     }
   }
 
+  // kick off commands
+  for(const auto& rs : rss) {
+    rs->execute_scheduled_async();
+  }
+
   // create the queues for commands
   std::vector<bbts::concurent_queue<_remote_cmd_t>> remote_cmds(2);
 
@@ -763,6 +780,11 @@ TEST(TestReservationStation, TwoNodesBMM) {
   // make sure there are exactly two for the reduce...
   EXPECT_EQ(sto[0].num_tensors(), 2);
   EXPECT_EQ(sto[1].num_tensors(), 2);
+
+  // wait for the reservation station to finish
+  for(auto &rs : rss) {
+    rs->wait_until_finished();
+  }
 }
 
 TEST(TestReservationStation, TwoNodesCMM) {
@@ -997,6 +1019,11 @@ TEST(TestReservationStation, TwoNodesCMM) {
     }
   }
 
+  // kick off commands
+  for(const auto& rs : rss) {
+    rs->execute_scheduled_async();
+  }
+
   // create the queues for commands
   std::vector<bbts::concurent_queue<_remote_cmd_t>> remote_cmds(2);
 
@@ -1080,6 +1107,11 @@ TEST(TestReservationStation, TwoNodesCMM) {
   // make sure there are exactly two for the reduce...
   EXPECT_EQ(sto[0].num_tensors(), 0);
   EXPECT_EQ(sto[1].num_tensors(), 0);
+
+  // wait for the reservation station to finish
+  for(auto &rs : rss) {
+    rs->wait_until_finished();
+  }
 }
 
 std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> init_matrix(size_t split,
@@ -1273,6 +1305,11 @@ TEST(TestReservationStation, NNodesCMM) {
     }
   }
 
+  // kick off commands
+  for(const auto& rs : rss) {
+    rs->execute_scheduled_async();
+  }
+
   // create the queues for commands
   std::vector<bbts::concurent_queue<_remote_cmd_t>> remote_cmds(num_nodes);
 
@@ -1364,6 +1401,11 @@ TEST(TestReservationStation, NNodesCMM) {
   }
 
   EXPECT_EQ(num, split * split);
+
+  // wait for the reservation station to finish
+  for(auto &rs : rss) {
+    rs->wait_until_finished();
+  }
 }
 
 }

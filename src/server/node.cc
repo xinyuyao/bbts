@@ -112,13 +112,6 @@ size_t bbts::node_t::get_rank() const {
   return _comm->get_rank();
 }
 
-size_t bbts::node_t::get_physical_cores() const {
-  return _config->num_threads;
-}
-
-size_t bbts::node_t::get_total_ram() const {
-  return _config->total_ram;
-}
 
 void bbts::node_t::print_cluster_info(std::ostream& out) {
 
@@ -129,16 +122,10 @@ void bbts::node_t::print_cluster_info(std::ostream& out) {
 }
 
 
-void bbts::node_t::load_commands(const std::vector<command_ptr_t> &cmds) {
+std::tuple<bool, std::string> bbts::node_t::load_commands(const std::vector<command_ptr_t> &cmds) {
 
-  // schedule them all at once
-  for (auto &_cmd : cmds) {
-
-    // if it uses the node
-    if (_cmd->uses_node(_comm->get_rank())) {
-      _res_station->queue_command(_cmd->clone());
-    }
-  }
+  // schedule all commands
+  return _coordinator->schedule_commands(cmds);
 }
 
 std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_command_list_t &cmds) {
@@ -189,11 +176,6 @@ std::tuple<bool, std::string> bbts::node_t::shutdown_cluster() {
 void bbts::node_t::sync() {
 
   _comm->barrier();
-}
-
-void bbts::node_t::shutdown() {
-
-
 }
 
 std::thread bbts::node_t::create_deleter_thread() {

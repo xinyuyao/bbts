@@ -294,52 +294,47 @@ int main(int argc, char **argv) {
   const size_t split = 16;
   int32_t tid_offset = 0;
 
+  // kick of all the stuff
+  std::thread t = std::thread([&]() {
+    node.run();
+  });
+
+  // create all the tensors
   std::cout << "Creating tensor A....\n";
   auto a_idx = create_matrix_tensors('A', node, 1000, split, tid_offset);
   std::cout << "Creating tensor B....\n";
   auto b_idx = create_matrix_tensors('B', node, 1000, split, tid_offset);
 
-  // generate all the commands
-  auto cmds = generate_commands(split, a_idx, b_idx, tid_offset, node);
-
-
-  // figure out how many we need to delete
-  std::atomic_int64_t num_del; num_del = 0;
-  node.add_hook<bbts::node_t::event_t::COMMAND_QUEUED>([&](command_id_t id) {
-    if(cmds[id]->is_delete()) {
-      num_del += cmds[id]->get_num_inputs();
-    }
-  });
-
-  // add a hook for deletion
-  node.add_hook<bbts::node_t::event_t::TENSOR_DELETED>([&](tid_t id) {
-    if(id != TID_NONE) {
-      num_del--;
-      if(num_del == 0) {
-        std::cout << "SHUTDOWN CALLED\n";
-        node.shutdown();
-      }
-    }
-  });
-
-  // load the commands
-  node.load_commands(cmds);
-  auto start = high_resolution_clock::now();
-
-  // sync everything
-  node.sync();
-
-  // kick of all the stuff
-  node.run();
-
-  // sync everything
-  auto stop = high_resolution_clock::now();
-  node.sync();
-
-  // print the time
+  // is this the root node
   if(node.get_rank() == 0) {
-    std::cout << "Time to compute : " << ((double) duration_cast<nanoseconds>(stop - start).count()) / duration_cast<nanoseconds>(1s).count() << '\n';
+
+    // generate all the commands
+    auto cmds = generate_commands(split, a_idx, b_idx, tid_offset, node);
+
+    // print out all the debug info
+    node.set_verbose(true);
+
+    // load the commands
+    node.load_commands(cmds);
+
+    // start measuring time
+    auto start = high_resolution_clock::now();
+
+    // run all the commands
+    node.run_commands();
+
+    // finish measuring
+    auto stop = high_resolution_clock::now();
+
+    // shutdown the cluster
+    node.shutdown_cluster();
+
+    // log time
+    std::cout << "Time to compute : " << ((double) duration_cast<nanoseconds>(stop - start).count()) / duration_cast<nanoseconds>(1s).count() << "s\n";
   }
+
+  // finish running
+  t.join();
 
   return 0;
 }

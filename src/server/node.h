@@ -55,17 +55,11 @@ public:
   // return the rank of the node
   [[nodiscard]] size_t get_rank() const;
 
-  // returns the number of physical cores
-  [[nodiscard]] size_t get_physical_cores() const;
-
-  // returns the total ram
-  [[nodiscard]] size_t get_total_ram() const;
-
   // print the cluster info
   void print_cluster_info(std::ostream& out);
 
   // load all commands
-  void load_commands(const std::vector<command_ptr_t>& cmds);
+  std::tuple<bool, std::string> load_commands(const std::vector<command_ptr_t>& cmds);
 
   // load all the parsed commands
   std::tuple<bool, std::string> load_commands(const bbts::parsed_command_list_t &cmds);
@@ -87,9 +81,6 @@ public:
 
   // sync all the nodes to know that they have all execute up to this point
   void sync();
-
-  // shutdown this node, will return once all the nodes call shutdown
-  void shutdown();
 
   // add the hook
   template<event_t event, class fn>

@@ -297,11 +297,6 @@ std::vector<bbts::command_ptr_t> generate_commands(size_t split, bbts::node_t &n
 
 int main(int argc, char **argv) {
 
-  // check if the hooks are enabled
-  if constexpr (!static_config::enable_hooks) {
-    std::cout << "You need to compile with hooks enabled to run this test add -DENABLE_HOOKS=ON when running cmake.\n";
-  }
-
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv, .num_threads = 8});
 
@@ -311,48 +306,41 @@ int main(int argc, char **argv) {
   // init the node
   node.init();
 
-  const size_t split = 16;
-
-  // generate all the commands
-  auto cmds = generate_commands(split, node);
-
-  // figure out how many we need to delete
-  std::atomic_int64_t num_del; num_del = 0;
-  node.add_hook<bbts::node_t::event_t::COMMAND_QUEUED>([&](command_id_t id) {
-    if(cmds[id]->is_delete()) {
-      num_del += cmds[id]->get_num_inputs();
-    }
-  });
-
-  // add a hook for deletion
-  node.add_hook<bbts::node_t::event_t::TENSOR_DELETED>([&](tid_t id) {
-    if(id != TID_NONE) {
-      num_del--;
-      if(num_del == 0) {
-        std::cout << "SHUTDOWN CALLED\n";
-        node.shutdown();
-      }
-    }
-  });
-
-  // load the commands
-  node.load_commands(cmds);
-  auto start = high_resolution_clock::now();
-
-  // sync everything
-  node.sync();
-
   // kick of all the stuff
-  node.run();
+  std::thread t = std::thread([&]() {
+    node.run();
+  });
 
-  // sync everything
-  auto stop = high_resolution_clock::now();
-  node.sync();
-
-  // print the time
+  // is this the root node
   if(node.get_rank() == 0) {
+
+    // generate all the commands
+    auto cmds = generate_commands(16, node);
+
+    // print out all the debug info
+    node.set_verbose(true);
+
+    // load the commands
+    node.load_commands(cmds);
+
+    // start measuring time
+    auto start = high_resolution_clock::now();
+
+    // run all the commands
+    node.run_commands();
+
+    // finish measuring
+    auto stop = high_resolution_clock::now();
+
+    // shutdown the cluster
+    node.shutdown_cluster();
+
+    // log time
     std::cout << "Time to compute : " << ((double) duration_cast<nanoseconds>(stop - start).count()) / duration_cast<nanoseconds>(1s).count() << "s\n";
   }
+
+  // finish running
+  t.join();
 
   return 0;
 }
