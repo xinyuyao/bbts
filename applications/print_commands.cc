@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
   // load them and print them
   bbts::parsed_command_list_t cmd_list;
   cmd_list.deserialize(std::string(argv[1]));
-  cmd_list.print();
+  cmd_list.print(std::cout);
 
   return 0;
 }

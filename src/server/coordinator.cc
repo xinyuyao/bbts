@@ -6,9 +6,11 @@ using namespace std::chrono;
 
 bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    bbts::reservation_station_ptr_t _rs,
-                                   bbts::logger_ptr_t _logger) : _comm(std::move(_comm)),
+                                   bbts::logger_ptr_t _logger,
+                                   storage_ptr_t _storage) : _comm(std::move(_comm)),
                                                              _rs(std::move(_rs)),
-                                                             _logger(std::move(_logger)) {
+                                                             _logger(std::move(_logger)),
+                                                             _storage(std::move(_storage)) {
   _is_down = false;
 }
 
@@ -27,6 +29,7 @@ void bbts::coordinator_t::accept() {
       case coordinator_op_types_t::SCHEDULE : { _schedule(op); break; }
       case coordinator_op_types_t::SHUTDOWN : { _shutdown(); break; }
       case coordinator_op_types_t::VERBOSE : { _set_verbose(static_cast<bool>(op._val)); break; }
+      case coordinator_op_types_t::PRINT_STORAGE : { _print_storage(); break; }
     }
 
     // sync all nodes
@@ -140,6 +143,19 @@ std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
   return {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
+
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_STORAGE, ._val = 0 })) {
+    return {false, "Failed to set the verbose flag!\n"};
+  }
+
+  // print the storage
+  _print_storage();
+
+  // we succeded
+  return {true, ""};
+}
+
 void bbts::coordinator_t::_clear() {
   std::cout << "CLEAR\n";
 }
@@ -150,4 +166,22 @@ void bbts::coordinator_t::_shutdown() {
 
 void bbts::coordinator_t::_set_verbose(bool val) {
   _logger->set_enabled(val);
+}
+
+void bbts::coordinator_t::_print_storage() {
+
+  // each node gets a turn
+  for(node_id_t node = 0; node < _comm->get_num_nodes(); ++node) {
+
+    // check the rank of the node
+    if(node == _comm->get_rank()) {
+      std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
+      _storage->print();
+    }
+
+    _comm->barrier();
+  }
+
+  // final sync just in case
+  _comm->barrier();
 }

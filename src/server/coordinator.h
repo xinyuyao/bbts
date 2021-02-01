@@ -19,7 +19,8 @@ public:
   // init the scheduler
   coordinator_t(bbts::communicator_ptr_t _comm,
                 bbts::reservation_station_ptr_t _rs,
-                bbts::logger_ptr_t _logger);
+                bbts::logger_ptr_t _logger,
+                storage_ptr_t _storage);
 
   // accept a request
   void accept();
@@ -32,6 +33,9 @@ public:
 
   // set the verbose status
   std::tuple<bool, std::string> set_verbose(bool val);
+
+  // print the info abo
+  std::tuple<bool, std::string> print_storage_info();
 
   // shutdown the coordinator
   void shutdown();
@@ -52,8 +56,13 @@ private:
 
   void _set_verbose(bool val);
 
+  void _print_storage();
+
   // the communicator
   bbts::communicator_ptr_t _comm;
+
+  // this stores all our tensors
+  storage_ptr_t _storage;
 
   // the reservation station
   bbts::reservation_station_ptr_t _rs;

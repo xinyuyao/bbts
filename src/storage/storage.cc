@@ -1,5 +1,6 @@
 #include "storage.h"
 #include "../server/static_config.h"
+#include "../utils/terminal_color.h"
 #include <iostream>
 
 namespace bbts {
@@ -154,8 +155,24 @@ bool storage_t::remove_by_tid(tid_t _id) {
   return true;
 }
 
-size_t storage_t::get_num_tensors() const {
+size_t storage_t::get_num_tensors() {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
   return _tensor_nfo.size();
+}
+
+void storage_t::print() {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // print all the allocated tensors
+  std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  for(auto &t : _allocated_tensors) {
+    std::cout << std::get<0>(t.second) << "\t" << std::get<1>(t.second) << '\t\t' << (void*) t.first << '\n';
+  }
 }
 
 }

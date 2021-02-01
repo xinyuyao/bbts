@@ -88,6 +88,27 @@ void run_commands(bbts::node_t &node) {
   }
 }
 
+void print(bbts::node_t &node, const std::string &file_path) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Loading the file", b);
+
+  // try to deserialize
+  bbts::parsed_command_list_t cmd_list;
+  bool success = cmd_list.deserialize(file_path);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!success) {
+    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+  }
+
+  // print out the commands
+  cmd_list.print(std::cout);
+}
 
 void verbose(bbts::node_t &node, bool val) {
 
@@ -127,9 +148,15 @@ void prompt(bbts::node_t &node) {
   auto rootMenu = std::make_unique<Menu>("cli");
 
   // setup the info command
-  rootMenu->Insert("info",
-                   [&](std::ostream &out) { node.print_cluster_info(out); },
-                   "Returns information about the cluster\n");
+  rootMenu->Insert("info",[&](std::ostream &out, const std::string &what) {
+
+    if(what == "cluster") {
+      node.print_cluster_info(out);
+    }
+    else if(what == "storage") {
+      node.print_storage_info();
+    }
+  },"Returns information about the cluster. Usage : info [cluster, storage] \n ");
 
   rootMenu->Insert("load",[&](std::ostream &out, const std::string &file) {
 
@@ -149,6 +176,12 @@ void prompt(bbts::node_t &node) {
     verbose(node, val);
 
   },"Load commands form a binary file. Usage : load <file>\n");
+
+  rootMenu->Insert("print",[&](std::ostream &out, const std::string &file) {
+
+    print(node, file);
+
+  },"Prints command stored in a file. Usage : print <file>\n");
 
   // init the command line interface
   Cli cli(std::move(rootMenu));

@@ -48,79 +48,79 @@ struct parsed_command_t {
   // the parameters of the ud function
   std::vector<command_param_t> parameters;
 
-  void print_tensor_list(const std::vector<std::tuple<tid_t, node_id_t>> &list) {
+  void print_tensor_list(const std::vector<std::tuple<tid_t, node_id_t>> &list, std::ostream &out) const {
 
-    std::cout << "[";
+    out << "[";
     for(size_t i = 0; i < list.size(); ++i) {
       if(i == list.size() - 1) {
-        std::cout << "(" << std::get<0>(list[i]) << "," << std::get<1>(list[i]) << ")";
+        out << "(" << std::get<0>(list[i]) << "," << std::get<1>(list[i]) << ")";
       }
       else {
-        std::cout << "(" << std::get<0>(list[i]) << "," << std::get<1>(list[i]) << "),";
+        out << "(" << std::get<0>(list[i]) << "," << std::get<1>(list[i]) << "),";
       }
     }
-    std::cout << "]";
+    out << "]";
   }
 
-  void print_string_list(const std::vector<std::string> &list) {
+  void print_string_list(const std::vector<std::string> &list, std::ostream &out) const {
 
-    std::cout << "[";
+    out << "[";
     for(size_t i = 0; i < list.size(); ++i) {
       if(i == list.size() - 1) {
-        std::cout << "\"" << list[i] << "\"";
+        out << "\"" << list[i] << "\"";
       }
       else {
-        std::cout << "\"" << list[i] << "\",";
+        out << "\"" << list[i] << "\",";
       }
     }
-    std::cout << "]";
+    out << "]";
   }
 
-  void print() {
+  void print(std::ostream &out) const {
 
     switch(type) {
       case op_type_t::APPLY : {
-        std::cout << "APPLY (";
-        std::cout << "\"" << def.ud_name << "\",";
-        print_string_list(def.input_types);
-        std::cout << ",";
-        print_string_list(def.output_types);
-        std::cout << ",";
+        out << "APPLY (";
+        out << "\"" << def.ud_name << "\",";
+        print_string_list(def.input_types, out);
+        out << ",";
+        print_string_list(def.output_types, out);
+        out << ",";
 
-        print_tensor_list(inputs);
-        std::cout << ',';
-        print_tensor_list(outputs);
-        std::cout << ")\n";
+        print_tensor_list(inputs, out);
+        out << ',';
+        print_tensor_list(outputs, out);
+        out << ")\n";
 
         break;
       }
       case op_type_t::REDUCE : {
-        std::cout << "REDUCE (";
-        std::cout << "\"" << def.ud_name << "\",";
-        print_string_list(def.input_types);
-        std::cout << ",";
-        print_string_list(def.output_types);
-        std::cout << ",";
+        out << "REDUCE (";
+        out << "\"" << def.ud_name << "\",";
+        print_string_list(def.input_types, out);
+        out << ",";
+        print_string_list(def.output_types, out);
+        out << ",";
 
-        print_tensor_list(inputs);
-        std::cout << ',';
-        print_tensor_list(outputs);
-        std::cout << ")\n";
+        print_tensor_list(inputs, out);
+        out << ',';
+        print_tensor_list(outputs, out);
+        out << ")\n";
 
         break;
       }
       case op_type_t::MOVE : {
-        std::cout << "MOVE (";
-        print_tensor_list(inputs);
-        std::cout << ',';
-        print_tensor_list(outputs);
-        std::cout << ")\n";
+        out << "MOVE (";
+        print_tensor_list(inputs, out);
+        out << ',';
+        print_tensor_list(outputs, out);
+        out << ")\n";
         break;
       }
       case op_type_t::DELETE : {
-        std::cout << "DELETE (";
-        print_tensor_list(inputs);
-        std::cout << ")\n";
+        out << "DELETE (";
+        print_tensor_list(inputs, out);
+        out << ")\n";
         break;
       }
     }
@@ -230,11 +230,11 @@ struct parsed_command_list_t {
     return _commands.size();
   }
 
-  void print() {
+  void print(std::ostream &out) const {
 
     // print each command
     for(auto &cmd : _commands) {
-      cmd.print();
+      cmd.print(out);
     }
   }
 

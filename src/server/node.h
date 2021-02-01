@@ -63,7 +63,7 @@ public:
 
   // print the cluster info
   void print_cluster_info(std::ostream& out);
-  
+
   // load all commands
   void load_commands(const std::vector<command_ptr_t>& cmds);
 
@@ -75,6 +75,9 @@ public:
 
   //
   std::tuple<bool, std::string> set_verbose(bool val);
+
+  // print the info about the storage
+  std::tuple<bool, std::string> print_storage_info();
 
   // sync all the nodes to know that they have all execute up to this point
   void sync();

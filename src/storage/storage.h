@@ -59,8 +59,11 @@ struct storage_t {
   template<class fn>
   void add_deleted_hook(fn fun){ _tensor_delete_hook = fun; }
 
+  // print the storage
+  void print();
+
   // get the number of tensors in the system
-  size_t get_num_tensors() const;
+  size_t get_num_tensors();
 
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;

@@ -1,3 +1,4 @@
+#include <sstream>
 #include "node.h"
 #include "../commands/command_compiler.h"
 
@@ -30,7 +31,7 @@ void bbts::node_t::init() {
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
-  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger);
+  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger, _storage);
 }
 
 void bbts::node_t::run() {
@@ -118,6 +119,7 @@ void bbts::node_t::print_cluster_info(std::ostream& out) {
   out << "\tTotal RAM : " << _config->total_ram / (1024 * 1024) << " MB \n";
 }
 
+
 void bbts::node_t::load_commands(const std::vector<command_ptr_t> &cmds) {
 
   // schedule them all at once
@@ -131,6 +133,10 @@ void bbts::node_t::load_commands(const std::vector<command_ptr_t> &cmds) {
 }
 
 std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_command_list_t &cmds) {
+
+  // log the loaded commands
+  std::ostringstream ss; cmds.print(ss);
+  _logger->message(ss.str());
 
   // init the compiler
   command_compiler_t compiler(*_factory, *_udf_manager);
@@ -157,6 +163,10 @@ std::tuple<bool, std::string> bbts::node_t::run_commands() {
 
 std::tuple<bool, std::string> bbts::node_t::set_verbose(bool val) {
   return _coordinator->set_verbose(val);
+}
+
+std::tuple<bool, std::string> bbts::node_t::print_storage_info() {
+  return _coordinator->print_storage_info();
 }
 
 void bbts::node_t::sync() {
