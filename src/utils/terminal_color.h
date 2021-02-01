@@ -32,4 +32,10 @@ std::basic_ostream<CharT, Traits> &blue(std::basic_ostream<CharT, Traits> &os) {
   return os << "\033[34m";
 }
 
+template<class CharT, class Traits>
+constexpr
+std::basic_ostream<CharT, Traits> &yellow(std::basic_ostream<CharT, Traits> &os) {
+  return os << "\033[33m";
+}
+
 }

@@ -6,6 +6,9 @@ void bbts::node_t::init() {
   // the communicator
   _comm = std::make_shared<communicator_t>(_config);
 
+  // the logger
+  _logger = std::make_shared<logger_t>(_config);
+
   // create the storage
   _storage = std::make_shared<storage_t>();
 
@@ -16,17 +19,20 @@ void bbts::node_t::init() {
   _udf_manager = std::make_shared<bbts::udf_manager_t>(_factory);
 
   // init the reservation station
-  _res_station = std::make_shared<bbts::reservation_station_t>(_comm->get_rank(), _comm->get_num_nodes());
+  _res_station = std::make_shared<bbts::reservation_station_t>(_comm->get_rank(),
+                                                               _comm->get_num_nodes());
 
   // this runs commands
-  _command_runner = std::make_shared<bbts::command_runner_t>(_storage, _factory, _udf_manager, _res_station, _comm);
+  _command_runner = std::make_shared<bbts::command_runner_t>(_storage, _factory, _udf_manager,
+                                                             _res_station, _comm, _logger);
 
   // the tensor notifier
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
-  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station);
+  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger);
 }
+
 void bbts::node_t::run() {
 
   /// 1.0 Kick off all the stuff that needs to run
@@ -147,6 +153,10 @@ std::tuple<bool, std::string> bbts::node_t::run_commands() {
 
   // run all the commands
   return _coordinator->run_commands();
+}
+
+std::tuple<bool, std::string> bbts::node_t::set_verbose(bool val) {
+  return _coordinator->set_verbose(val);
 }
 
 void bbts::node_t::sync() {

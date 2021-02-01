@@ -4,6 +4,7 @@
 #include "reservation_station.h"
 #include "../ud_functions/udf_manager.h"
 #include "../communication/communicator.h"
+#include "../server/logger.h"
 
 namespace bbts {
 
@@ -14,7 +15,8 @@ public:
                    tensor_factory_ptr_t tf,
                    udf_manager_ptr udm,
                    reservation_station_ptr_t rs,
-                   communicator_ptr_t comm);
+                   communicator_ptr_t comm,
+                   logger_ptr_t logger);
 
   // runs local command
   void local_command_runner();
@@ -45,6 +47,9 @@ private:
 
   // the communicator
   bbts::communicator_ptr_t _comm;
+
+  // logger
+  logger_ptr_t _logger;
 };
 
 using command_runner_ptr_t = std::shared_ptr<command_runner_t>;

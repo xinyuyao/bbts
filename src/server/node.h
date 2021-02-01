@@ -4,6 +4,7 @@
 #include <utility>
 #include <sys/sysinfo.h>
 
+#include "logger.h"
 #include "node_config.h"
 #include "coordinator.h"
 #include "../ud_functions/udf_manager.h"
@@ -72,6 +73,9 @@ public:
   // run all the scheduled commands
   std::tuple<bool, std::string> run_commands();
 
+  //
+  std::tuple<bool, std::string> set_verbose(bool val);
+
   // sync all the nodes to know that they have all execute up to this point
   void sync();
 
@@ -117,6 +121,9 @@ public:
 
   // the configuration of the node
   node_config_ptr_t _config;
+
+  // the logger
+  logger_ptr_t _logger;
 
   // the communicator, this is doing all the sending
   communicator_ptr_t _comm;

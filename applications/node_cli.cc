@@ -71,7 +71,7 @@ void run_commands(bbts::node_t &node) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Running the commands.", b);
+  auto t = loading_message("Running the commands", b);
 
   // run all the commands
   auto [did_load, message] = node.run_commands();
@@ -82,6 +82,28 @@ void run_commands(bbts::node_t &node) {
   // did we fail
   if(!did_load) {
     std::cout << bbts::red << "Failed to run commands : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    std::cout << bbts::green << message << bbts::reset;
+  }
+}
+
+
+void verbose(bbts::node_t &node, bool val) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Set verbose", b);
+
+  // run all the commands
+  auto [did_load, message] = node.set_verbose(val);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_load) {
+    std::cout << bbts::red << "Set to fail verbose : \"" << message << "\"\n" << bbts::reset;
   }
   else {
     std::cout << bbts::green << message << bbts::reset;
@@ -121,6 +143,12 @@ void prompt(bbts::node_t &node) {
     run_commands(node);
 
   },"Run scheduled commands.\n");
+
+  rootMenu->Insert("verbose",[&](std::ostream &out, bool val) {
+
+    verbose(node, val);
+
+  },"Load commands form a binary file. Usage : load <file>\n");
 
   // init the command line interface
   Cli cli(std::move(rootMenu));

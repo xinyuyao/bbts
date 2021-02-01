@@ -1,9 +1,14 @@
+#include <chrono>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
 
+using namespace std::chrono;
+
 bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
-                                   bbts::reservation_station_ptr_t _rs) : _comm(std::move(_comm)),
-                                                                          _rs(std::move(_rs)) {
+                                   bbts::reservation_station_ptr_t _rs,
+                                   bbts::logger_ptr_t _logger) : _comm(std::move(_comm)),
+                                                             _rs(std::move(_rs)),
+                                                             _logger(std::move(_logger)) {
   _is_down = false;
 }
 
@@ -21,6 +26,7 @@ void bbts::coordinator_t::accept() {
       case coordinator_op_types_t::CLEAR : { _clear(); break; }
       case coordinator_op_types_t::SCHEDULE : { _schedule(op); break; }
       case coordinator_op_types_t::SHUTDOWN : { _shutdown(); break; }
+      case coordinator_op_types_t::VERBOSE : { _set_verbose(static_cast<bool>(op._val)); break; }
     }
 
     // sync all nodes
@@ -31,7 +37,7 @@ void bbts::coordinator_t::accept() {
 std::tuple<bool, std::string> bbts::coordinator_t::schedule_commands(const std::vector<command_ptr_t>& cmds) {
 
   if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::SCHEDULE,
-                                                .num_cmds = cmds.size()})) {
+                                                ._val = cmds.size()})) {
     return {false, "Could not schedule commands!\n"};
   }
 
@@ -52,7 +58,9 @@ std::tuple<bool, std::string> bbts::coordinator_t::schedule_commands(const std::
 
 std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
 
-  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::RUN, .num_cmds = 0 })) {
+  auto start = high_resolution_clock::now();
+
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::RUN, ._val = 0 })) {
     return {false, "Could not run the commands!\n"};
   }
 
@@ -62,7 +70,10 @@ std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
   // sync everything
   _comm->barrier();
 
-  return {true, "Finished running commands\n"};
+  auto end = high_resolution_clock::now();
+  auto duration = (double) duration_cast<microseconds>(end - start).count() / (double) duration_cast<microseconds>(1s).count();
+
+  return {true, "Finished running commands in " + std::to_string(duration) + "s \n"};
 }
 
 void bbts::coordinator_t::shutdown() {
@@ -80,7 +91,7 @@ void bbts::coordinator_t::_schedule(coordinator_op_t op) {
 
   // expect all the commands
   std::vector<command_ptr_t> cmds;
-  if(!_comm->expect_coord_cmds(op.num_cmds, cmds)) {
+  if(!_comm->expect_coord_cmds(op._val, cmds)) {
     std::cout << bbts::red << "Could not receive the scheduled commands!\n" << bbts::reset;
     return;
   }
@@ -113,6 +124,22 @@ void bbts::coordinator_t::_run() {
   _rs->stop_executing();
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
+
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::VERBOSE,
+                                                ._val = static_cast<size_t>(val) })) {
+    return {false, "Failed to set the verbose flag!\n"};
+  }
+
+  // run everything
+  _set_verbose(val);
+
+  // sync everything
+  _comm->barrier();
+
+  return {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
+}
+
 void bbts::coordinator_t::_clear() {
   std::cout << "CLEAR\n";
 }
@@ -121,3 +148,6 @@ void bbts::coordinator_t::_shutdown() {
   std::cout << "SHUTDOWN\n";
 }
 
+void bbts::coordinator_t::_set_verbose(bool val) {
+  _logger->set_enabled(val);
+}

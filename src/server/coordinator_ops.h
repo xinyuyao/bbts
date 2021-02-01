@@ -9,7 +9,7 @@ enum class coordinator_op_types_t : int32_t {
   RUN, // runs all the commands
   CLEAR, // clear the storage
   SHUTDOWN, // clear the storage
-
+  VERBOSE, // turn on or off the debug messages
 };
 
 struct coordinator_op_t {
@@ -18,7 +18,7 @@ struct coordinator_op_t {
   coordinator_op_types_t _type;
 
   // used by schedule
-  size_t num_cmds;
+  size_t _val;
 };
 
 

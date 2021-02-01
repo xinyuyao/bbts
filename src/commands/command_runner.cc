@@ -9,8 +9,10 @@ bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
                                          bbts::tensor_factory_ptr_t tf,
                                          bbts::udf_manager_ptr udm,
                                          bbts::reservation_station_ptr_t rs,
-                                         bbts::communicator_ptr_t comm)
-    : _ts(std::move(ts)), _tf(std::move(tf)), _udm(std::move(udm)), _rs(std::move(rs)), _comm(std::move(comm)) {}
+                                         bbts::communicator_ptr_t comm,
+                                         bbts::logger_ptr_t logger)
+    : _ts(std::move(ts)), _tf(std::move(tf)), _udm(std::move(udm)),
+      _rs(std::move(rs)), _comm(std::move(comm)), _logger(std::move(logger)) {}
 
 void bbts::command_runner_t::local_command_runner() {
 
@@ -29,7 +31,7 @@ void bbts::command_runner_t::local_command_runner() {
     if (cmd->type == command_t::MOVE) {
 
       // move the
-//      std::cout << "MOVE " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
+      _logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
       // it is a point to point move
       if(cmd->is_move()) {
@@ -54,7 +56,7 @@ void bbts::command_runner_t::local_command_runner() {
       // it is a broadcast
       else {
 
-        //std::cout << "BROADCAST\n";
+        _logger->message("BROADCAST\n");
 
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
@@ -79,7 +81,7 @@ void bbts::command_runner_t::local_command_runner() {
 
     } else if (cmd->type == command_t::APPLY) {
 
-//      std::cout << "APPLY " << cmd->id << " on my_node : " << _comm->get_rank() << " Executed...\n" << std::flush;
+      _logger->message("APPLY " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
       // return me that matcher for matrix addition
       auto ud = _udm->get_fn_impl(cmd->fun_id);
@@ -173,7 +175,7 @@ void bbts::command_runner_t::local_command_runner() {
         // do the apply
         op.apply();
 
-//        std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << _comm->get_rank() << '\n' << std::flush;
+        _logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
 
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
@@ -218,7 +220,7 @@ void bbts::command_runner_t::local_command_runner() {
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
 
-//        std::cout << "REMOTE_REDUCE PROCESSED on node " << _comm->get_rank() << '\n' << std::flush;
+        _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
       }
     }
   }
