@@ -18,9 +18,6 @@ void bbts::command_runner_t::local_command_runner() {
 
   while (true) {
 
-    // wait until we get some commands
-    _rs->wait_for_local_commands();
-
     // get the command
     auto cmd = _rs->get_next_command();
     if (cmd == nullptr) {
@@ -183,6 +180,8 @@ void bbts::command_runner_t::local_command_runner() {
 
       } else {
 
+        _logger->message("REMOTE_REDUCE_SCHEDULED");
+
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
           throw std::runtime_error("Failed to forward reduce command.");
@@ -220,7 +219,7 @@ void bbts::command_runner_t::local_command_runner() {
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
 
-        _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
+        //_logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
       }
     }
   }
@@ -230,9 +229,6 @@ void bbts::command_runner_t::remote_command_handler() {
 
   // while we
   while (true) {
-
-    // wait for remote commands
-    _rs->wait_for_remote_commands();
 
     // get the remote command
     auto cmd = _comm->expect_op_request();
@@ -349,6 +345,9 @@ void bbts::command_runner_t::run_deleter() {
     // deleted
     _ts->remove_by_tid(id);
     _logger->message("Remove tensor : " + std::to_string(id) + '\n');
+
+    // remove it from the reservation station
+    _rs->retire_remove(id);
   }
 }
 

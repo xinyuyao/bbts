@@ -30,6 +30,8 @@ bool bbts::reservation_station_t::queue_command(bbts::command_ptr_t _command) {
   // figure out whether this is a local command or a remote command (started by this machine or a remote machine)
   bool success;
   if(_command->get_root_node() == _my_rank) {
+
+    // queue the local command
     success = _queue_local(std::move(_command));
   }
   else {
@@ -39,11 +41,6 @@ bool bbts::reservation_station_t::queue_command(bbts::command_ptr_t _command) {
   // if we succeeded we need to update the last command
   if(success) {
     _last_cmd = cmd_id;
-  }
-
-  // we have some new commands notify...
-  if(_is_executing) {
-    _has_commands_cv.notify_all();
   }
 
   // unlock here
@@ -75,11 +72,6 @@ bool bbts::reservation_station_t::retire_command(bbts::command_ptr_t _command) {
   }
   else {
     success = _retire_remote_command(std::move(_command));
-  }
-
-  // we retired a bunch of commands notify if we have no more
-  if(_local_commands.empty() && _num_remote_commands == 0) {
-    _has_commands_cv.notify_all();
   }
 
   // unlock here
@@ -209,7 +201,7 @@ bbts::command_ptr_t bbts::reservation_station_t::get_next_command() {
 
   // wait until we have something here
   std::unique_lock<std::mutex> lk(_m);
-  _cv.wait(lk, [&]{ return !_execute.empty()  || _shutdown; });
+  _cv.wait(lk, [&]{ return (!_execute.empty() && _is_executing)  || _shutdown ; });
 
   // if we have shutdown return null as we have no command left...
   if(_shutdown) {
@@ -245,6 +237,18 @@ bbts::tid_t bbts::reservation_station_t::get_to_remove() {
   // return the tensor we want to delete
   auto tmp = _to_delete.back(); _to_delete.pop_back();
   return tmp;
+}
+
+void bbts::reservation_station_t::retire_remove(tid_t _tid) {
+
+  // lock here
+  std::unique_lock<std::mutex> lk(_m);
+
+  // we got one less
+  _num_to_delete--;
+  if(_num_to_delete == 0 && _num_local_to_retire == 0 && _num_remote_to_retire == 0) {
+    _retire_cv.notify_all();
+  }
 }
 
 void bbts::reservation_station_t::shutdown() {
@@ -284,25 +288,13 @@ void bbts::reservation_station_t::clear() {
   _to_delete.clear();
 }
 
-void bbts::reservation_station_t::wait_for_local_commands() {
-
-  // wait until we have something here
-  std::unique_lock<std::mutex> lk(_m);
-  _has_commands_cv.wait(lk, [&]{ return !_local_commands.empty() && _is_executing; });
-}
-
-void bbts::reservation_station_t::wait_for_remote_commands() {
-
-  // wait until we have something here
-  std::unique_lock<std::mutex> lk(_m);
-  _has_commands_cv.wait(lk, [&]{ return _num_remote_commands != 0 && _is_executing; });
-}
-
 void bbts::reservation_station_t::wait_until_finished() {
 
   // wait until all the commands are run
   std::unique_lock<std::mutex> lk(_m);
-  _has_commands_cv.wait(lk, [&]{ return _num_remote_commands == 0 && _local_commands.empty(); });
+  _retire_cv.wait(lk, [&]{
+    return _num_local_to_retire == 0 && _num_remote_to_retire == 0 && _num_to_delete == 0;
+  });
 }
 
 void bbts::reservation_station_t::execute_scheduled_async() {
@@ -310,7 +302,7 @@ void bbts::reservation_station_t::execute_scheduled_async() {
   // kick off everything
   std::unique_lock<std::mutex> lk(_m);
   _is_executing = true;
-  _has_commands_cv.notify_all();
+  _cv.notify_all();
 }
 
 void bbts::reservation_station_t::stop_executing() {
@@ -383,8 +375,8 @@ bool bbts::reservation_station_t::_queue_remote(bbts::command_ptr_t _command) {
     }
   }
 
-  // we scheduled the remote command
-  _num_remote_commands++;
+  // we got another remote command
+  _num_remote_to_retire++;
 
   return true;
 }
@@ -415,6 +407,9 @@ bool bbts::reservation_station_t::_queue_local(bbts::command_ptr_t _command) {
         // ok the tensor is not ready for deletion schedule it
         s.scheduled_for_delition = true;
       }
+
+      // we got one more to delete
+      _num_to_delete++;
     }
 
     // finish delete processed
@@ -501,6 +496,9 @@ bool bbts::reservation_station_t::_queue_local(bbts::command_ptr_t _command) {
     auto cmd_id = _command->id;
     _local_commands[cmd_id] = { std::move(_command),  num_not_present };
   }
+
+  // we have more local command that we need to retire
+  _num_local_to_retire++;
 
   // we are done here
   return true;
@@ -622,6 +620,12 @@ bool bbts::reservation_station_t::_retire_command(bbts::command_ptr_t _command) 
   // remove the command
   _local_commands.erase(_command->id);
 
+  // we have one less to retire
+  _num_local_to_retire--;
+  if(_num_to_delete == 0 && _num_local_to_retire == 0 && _num_remote_to_retire == 0) {
+    _retire_cv.notify_all();
+  }
+
   return true;
 }
 bool bbts::reservation_station_t::_retire_remote_command(bbts::command_ptr_t _command) {
@@ -723,8 +727,11 @@ bool bbts::reservation_station_t::_retire_remote_command(bbts::command_ptr_t _co
     }
   }
 
-  // we finished running the command
-  _num_remote_commands--;
+  // remote command retired
+  _num_remote_to_retire--;
+  if(_num_to_delete == 0 && _num_local_to_retire == 0 && _num_remote_to_retire == 0) {
+    _retire_cv.notify_all();
+  }
 
   return true;
 }

@@ -169,7 +169,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::clear() {
   _comm->barrier();
 
   // we succeded
-  return {true, "Cleared the cluster!"};
+  return {true, "Cleared the cluster!\n"};
 }
 
 void bbts::coordinator_t::_clear() {

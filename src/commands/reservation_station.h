@@ -43,17 +43,14 @@ class reservation_station_t {
   // returns tensors that are scheduled to be remove from the storage
   tid_t get_to_remove();
 
+  // retire the remove command
+  void retire_remove(tid_t _tid);
+
   // shutdown the reservation station
   void shutdown();
 
   // clear the reservation station
   void clear();
-
-  // waits until we have some local commands to run
-  void wait_for_local_commands();
-
-  // wait until we have some remote commands to run
-  void wait_for_remote_commands();
 
   // wait until all commands remote and local are executed
   void wait_until_finished();
@@ -121,6 +118,14 @@ class reservation_station_t {
   // is executing
   bool _is_executing = false;
 
+  // the number of local commands to retire
+  size_t _num_local_to_retire = 0;
+  size_t _num_remote_to_retire = 0;
+  size_t _num_to_delete = 0;
+
+  // a conditional variable that keeps track of how many local commands are left
+  std::condition_variable _retire_cv;
+
   // is the node still running
   bool _shutdown = false;
 
@@ -135,9 +140,6 @@ class reservation_station_t {
 
   // commands ready to execute
   std::vector<command_ptr_t> _execute;
-
-  // the number of remote commands to be processed
-  size_t _num_remote_commands = 0;
 
   // the local commands and the number of tensors they are waiting for
   std::unordered_map<command_id_t, std::pair<command_ptr_t, int32_t>> _local_commands;
@@ -164,9 +166,6 @@ class reservation_station_t {
 
   // deletion cv
   std::condition_variable _deletion_cv;
-
-  // kick off once the commands
-  std::condition_variable _has_commands_cv;
 
   // the tensors we want to delete from storage
   std::vector<tid_t> _to_delete;
