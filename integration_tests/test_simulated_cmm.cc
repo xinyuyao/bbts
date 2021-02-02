@@ -277,11 +277,6 @@ std::vector<command_ptr_t> generate_commands(size_t split,
 
 int main(int argc, char **argv) {
 
-  // check if the hooks are enabled
-  if constexpr (!static_config::enable_hooks) {
-    std::cout << "You need to compile with hooks enabled to run this test add -DENABLE_HOOKS=ON when running cmake.\n";
-  }
-
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv, .num_threads = 8});
 

@@ -12,5 +12,4 @@ bin/test*
 bin/generate*
 bin/tra_sub_sys_barbatos
 lib/lib*
-third_party
 *.bbts
