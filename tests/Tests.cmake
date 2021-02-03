@@ -24,7 +24,7 @@ foreach(file ${files})
     add_executable(${fileName} ${file})
 
     # link the stuff we need
-    target_link_libraries(${fileName} ${GTEST_BOTH_LIBRARIES} gmock ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(${fileName} ${GTEST_BOTH_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
     target_link_libraries(${fileName} bbts-common)
     target_link_libraries(${fileName} ${MPI_LIBRARIES})
     target_compile_definitions(${fileName} PRIVATE -DGTEST_LINKED_AS_SHARED_LIBRARY )
