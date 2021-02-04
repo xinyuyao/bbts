@@ -15,6 +15,7 @@ foreach(file ${files})
 
     # create the test executable
     add_executable(${fileName} ${file})
+    set_target_properties(${fileName} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
     # link the stuff we need
     target_link_libraries(${fileName} ${CMAKE_THREAD_LIBS_INIT})

@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
-project(tra_sub_sys_barbatos)
+project(tra_sub_sys_barbatos LANGUAGES CXX CUDA)
 
-# set the c++ version
+# set the c++ and cuda version
+set(CMAKE_CUDA_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 
 # set the output directory
@@ -18,8 +19,8 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
     endif()
     set(CMAKE_CXX_FLAGS "-g3")
 
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    #set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    #set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
 # if we are compiling for release
 elseif(CMAKE_BUILD_TYPE MATCHES Release)
@@ -72,7 +73,7 @@ file(GLOB COMMUNICATION_SOURCE "src/communication/*.cc")
 add_library(communication OBJECT ${COMMUNICATION_SOURCE})
 
 # the ud functions
-file(GLOB UD_SOURCE "src/ud_functions/*.cc")
+file(GLOB UD_SOURCE "src/ud_functions/*.cc" "src/ud_functions/builtin/*.cc")
 add_library(ud_functions OBJECT ${UD_SOURCE})
 
 # link all modules up

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "../src/tensor/builtin_formats.h"
 #include "../src/ud_functions/builtin_functions.h"
 #include "../src/ud_functions/udf_manager.h"
 
