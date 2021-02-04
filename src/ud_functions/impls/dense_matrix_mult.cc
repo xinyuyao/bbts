@@ -3,19 +3,6 @@
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
-/// 2. Matrix Multiply
-bbts::ud_func_ptr_t bbts::get_matrix_mult_udf() {
-  return std::make_unique<ud_func_t>(
-      ud_func_t {
-          .ud_name = "matrix_mult",
-          .is_ass = true,
-          .is_com = false,
-          .num_in = 2,
-          .num_out = 1,
-          .impls = {},
-      }
-  );
-}
 bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
 
   // set the names

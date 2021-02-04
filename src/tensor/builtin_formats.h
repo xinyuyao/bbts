@@ -6,16 +6,17 @@ namespace bbts {
 
 struct dense_tensor_meta_t : public tensor_meta_t {
 
-  // returns the meta data struct
-  auto &m() const {
+  // the meta stucture
+  struct m_t {
+    uint32_t num_rows;
+    uint32_t num_cols;
+  };
 
-    struct m {
-      uint32_t num_rows;
-      uint32_t num_cols;
-    };
+  // returns the meta data struct
+  m_t &m() const {
 
     // we use it as the blob
-    return *((m*) _blob);
+    return *((m_t*) _blob);
   }
 
   // init the tensor with the format impl_id

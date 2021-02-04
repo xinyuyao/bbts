@@ -1,20 +1,6 @@
 #include "dense_matrix_add.h"
 #include "../../tensor/builtin_formats.h"
 
-/// 1. Matrix Add
-bbts::ud_func_ptr_t bbts::get_matrix_add_udf() {
-  return std::make_unique<ud_func_t>(
-      ud_func_t {
-          .ud_name = "matrix_add",
-          .is_ass = true,
-          .is_com = true,
-          .num_in = 2,
-          .num_out = 1,
-          .impls = {},
-      }
-  );
-}
-
 bbts::dense_matrix_add_t::dense_matrix_add_t() {
 
   // set the names

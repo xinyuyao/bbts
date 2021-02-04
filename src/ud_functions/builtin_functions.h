@@ -1,5 +1,20 @@
 #pragma once
 
-#include "builtin/dense_matrix_add.h"
-#include "builtin/dense_matrix_mult.h"
-#include "builtin/dense_uniform.h"
+#include "ud_function.h"
+#include "impls/dense_matrix_add.h"
+#include "impls/dense_matrix_gpu_add.h"
+#include "impls/dense_matrix_mult.h"
+#include "impls/dense_uniform.h"
+
+namespace bbts {
+
+/// 1. Matrix addition
+ud_func_ptr_t get_matrix_add_udf();
+
+/// 2. Matrix multiply
+ud_func_ptr_t get_matrix_mult_udf();
+
+/// 3. Uniform distribution
+ud_func_ptr_t get_matrix_uniform_udf();
+
+}

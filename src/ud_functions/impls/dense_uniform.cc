@@ -3,19 +3,6 @@
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
-bbts::ud_func_ptr_t bbts::get_matrix_uniform_udf() {
-  return std::make_unique<bbts::ud_func_t>(
-      bbts::ud_func_t {
-          .ud_name = "uniform",
-          .is_ass = false,
-          .is_com = false,
-          .num_in = 0,
-          .num_out = 1,
-          .impls = {},
-      }
-  );
-}
-
 bbts::dense_uniform_t::dense_uniform_t() {
 
   // set the names
