@@ -64,6 +64,9 @@ public:
     /// 1.1 add the dense implementation
     register_udf_impl(std::make_unique<dense_matrix_add_t>());
 
+    /// 1.2 add the gpu dense implementation
+    register_udf_impl(std::make_unique<dense_matrix_gpu_add_t>());
+
     /// 2. matrix multiplication
     register_udf(get_matrix_mult_udf());
 

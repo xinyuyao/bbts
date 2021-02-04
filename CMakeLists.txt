@@ -19,8 +19,8 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
     endif()
     set(CMAKE_CXX_FLAGS "-g3")
 
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    #set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    #set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
 # if we are compiling for release
 elseif(CMAKE_BUILD_TYPE MATCHES Release)
@@ -30,6 +30,9 @@ elseif(CMAKE_BUILD_TYPE MATCHES Release)
 
 endif()
 
+# set the cuda flags
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --default-stream per-thread")
+
 # forward the definitions ENABLE_HOOKS=ON/OFF
 if(${ENABLE_HOOKS})
     add_compile_definitions(ENABLE_HOOKS)
@@ -38,6 +41,9 @@ endif()
 # try to find mkl
 set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
+
+# try to find cuda
+find_package(CUDA REQUIRED)
 
 # try to find the mpi library
 find_package(MPI REQUIRED)

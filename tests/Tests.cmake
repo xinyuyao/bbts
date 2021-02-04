@@ -29,6 +29,9 @@ foreach(file ${files})
     target_link_libraries(${fileName} ${MPI_LIBRARIES})
     target_compile_definitions(${fileName} PRIVATE -DGTEST_LINKED_AS_SHARED_LIBRARY )
 
+    # enable cuda stuff
+    set_target_properties(${fileName} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
     # add the test as a dependency of the unit test target
     add_dependencies(unit-tests ${fileName})
 
