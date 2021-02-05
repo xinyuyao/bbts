@@ -13,3 +13,4 @@ bin/generate*
 bin/tra_sub_sys_barbatos
 lib/lib*
 *.bbts
+.cache

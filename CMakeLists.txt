@@ -31,7 +31,7 @@ elseif(CMAKE_BUILD_TYPE MATCHES Release)
 endif()
 
 # set the cuda flags
-set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --default-stream per-thread")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread")
 
 # forward the definitions ENABLE_HOOKS=ON/OFF
 if(${ENABLE_HOOKS})

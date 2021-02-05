@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace bbts {
 
 enum class coordinator_op_types_t : int32_t {
@@ -19,7 +21,7 @@ struct coordinator_op_t {
   coordinator_op_types_t _type;
 
   // used by schedule
-  size_t _val;
+  std::size_t _val;
 };
 
 
