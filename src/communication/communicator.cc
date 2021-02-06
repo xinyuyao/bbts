@@ -272,6 +272,23 @@ bool mpi_communicator_t::send_coord_cmds(const std::vector<command_ptr_t> &cmds)
   return true;
 }
 
+bool mpi_communicator_t::send_bytes(char* file, size_t file_size) {
+  // send it everywhere except the root node
+  std::vector<async_request_t> requests; requests.reserve(_num_nodes);
+  for(node_id_t node = 1; node < _num_nodes; ++node) {
+    async_request_t _req;
+    _req.success = MPI_Isend(file, file_size, MPI_CHAR, node, COORDINATOR_BCAST_BYTES, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+    requests.push_back(_req);
+  }
+
+  bool success = true;
+  for(auto &r : requests) {
+    success = r.success && MPI_Wait(&r.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS && success;
+  }
+
+  return success;  
+}
+
 // expect the a coord op
 bool mpi_communicator_t::expect_coord_cmds(size_t num_cmds, std::vector<command_ptr_t> &out) {
 
@@ -304,6 +321,30 @@ bool mpi_communicator_t::expect_coord_cmds(size_t num_cmds, std::vector<command_
 
     // store the command
     out.push_back(std::move(d));
+  }
+
+  return true;
+}
+
+bool mpi_communicator_t::expect_bytes(size_t num_bytes, std::vector<char> &out) {
+  out.reserve(num_bytes);
+
+  // wait for a request
+  sync_request_t _req;
+  auto mpi_errno = MPI_Mprobe(ANY_NODE, COORDINATOR_BCAST_BYTES, MPI_COMM_WORLD, &_req.message, &_req.status);
+
+  // check for errors
+  if(mpi_errno != MPI_SUCCESS) {
+    return false;
+  }
+
+  // get the size  and set the tag for the request
+  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
+  _req.message_tag = (com_tags) _req.status.MPI_TAG;
+
+  // receive the command
+  if(MPI_Mrecv (out.data(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
+    return false;
   }
 
   return true;

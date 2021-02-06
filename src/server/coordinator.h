@@ -5,6 +5,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <unistd.h>
+#include <dlfcn.h>
 #include "../server/coordinator_ops.h"
 #include "../server/logger.h"
 #include "../commands/command.h"
@@ -12,6 +14,8 @@
 #include "../commands/reservation_station.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
+#include "../tensor/tensor_factory.h"
+#include "../ud_functions/udf_manager.h"
 #include "coordinator.h"
 
 namespace bbts {
@@ -25,7 +29,9 @@ public:
                 bbts::logger_ptr_t _logger,
                 storage_ptr_t _storage,
                 bbts::command_runner_ptr_t _command_runner,
-                bbts::tensor_notifier_ptr_t _tensor_notifier);
+                bbts::tensor_notifier_ptr_t _tensor_notifier,
+                bbts::tensor_factory_ptr_t _tensor_factory,
+                bbts::udf_manager_ptr _udf_manager);
 
   // accept a request
   void accept();
@@ -48,6 +54,9 @@ public:
   // shutdown the cluster
   std::tuple<bool, std::string> shutdown_cluster();
 
+  // load the shared library contained in file_bytes
+  std::tuple<bool, std::string> load_shared_library(char* file_bytes, size_t file_size);
+
   // shutdown the coordinator
   void shutdown();
 
@@ -69,6 +78,10 @@ private:
 
   void _print_storage();
 
+  void _register(coordinator_op_t ops);
+
+  void _register_from_bytes(char* file_bytes, size_t file_size);
+
   // the communicator
   bbts::communicator_ptr_t _comm;
 
@@ -89,6 +102,31 @@ private:
 
   // the notifier
   bbts::tensor_notifier_ptr_t _tensor_notifier;
+
+  // the tensor factory
+  bbts::tensor_factory_ptr_t _tensor_factory;
+
+  // the udf manager
+  bbts::udf_manager_ptr _udf_manager;
+
+  // This struct will handle removing temporary files opened by 
+  // load_shared_library and hold onto the so_handle. 
+  // It isn't strictly necessary because the os will delete files 
+  // in /tmp/ periodically. 
+  // When barb exits, the shared library will be closed regardless 
+  // of calling dlclose.
+  struct shared_library_item_t {
+    shared_library_item_t(std::string const& filename, void* so_handle)
+      : filename(filename), so_handle(so_handle) {}
+    ~shared_library_item_t(){
+      // we no longer need the temporary file
+      unlink(filename.c_str());
+    }
+
+    std::string filename;
+    void* so_handle;
+  };
+  std::vector<shared_library_item_t> shared_libs;
 };
 
 // the pointer

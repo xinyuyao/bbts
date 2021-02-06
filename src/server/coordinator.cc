@@ -1,5 +1,6 @@
 #include <chrono>
 #include <utility>
+#include <unistd.h>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
 
@@ -10,14 +11,17 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    bbts::logger_ptr_t _logger,
                                    storage_ptr_t _storage,
                                    bbts::command_runner_ptr_t _command_runner,
-                                   bbts::tensor_notifier_ptr_t _tensor_notifier)
-
+                                   bbts::tensor_notifier_ptr_t _tensor_notifier,
+                                   bbts::tensor_factory_ptr_t _tensor_factory,
+                                   bbts::udf_manager_ptr _udf_manager)
     : _comm(std::move(_comm)),
       _rs(std::move(_rs)),
       _logger(std::move(_logger)),
       _storage(std::move(_storage)),
       _command_runner(std::move(_command_runner)),
-      _tensor_notifier(std::move(_tensor_notifier)) { _is_down = false; }
+      _tensor_notifier(std::move(_tensor_notifier)), 
+      _tensor_factory(std::move(_tensor_factory)),
+      _udf_manager(std::move(_udf_manager)) { _is_down = false; }
 
 void bbts::coordinator_t::accept() {
 
@@ -56,6 +60,11 @@ void bbts::coordinator_t::accept() {
         _print_storage();
         break;
       }
+      case coordinator_op_types_t::REGISTER : {
+        _register(op);
+        break;
+      }
+
     }
 
     // sync all nodes
@@ -215,6 +224,25 @@ std::tuple<bool, std::string> bbts::coordinator_t::shutdown_cluster() {
   return {true, "Cluster shutdown!\n"};
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::load_shared_library(char* file_bytes, size_t file_size) {
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::REGISTER, ._val = file_size})) {
+    return {false, "Failed to register library!\n"};
+  }
+
+  // send the data
+  if (!_comm->send_bytes(file_bytes, file_size)) {
+    return {false, "Could not send file to register!\n"};
+  }
+  
+  // do the actual registering, on this node
+  _register_from_bytes(file_bytes, file_size);
+
+  // sync everything
+  _comm->barrier();
+
+  return {true, "Registered library!\n"};
+}
+
 void bbts::coordinator_t::_clear() {
 
   // clear everything
@@ -261,3 +289,73 @@ void bbts::coordinator_t::_print_storage() {
   // final sync just in case
   _comm->barrier();
 }
+
+void bbts::coordinator_t::_register(coordinator_op_t op) {
+
+  std::vector<char> file_bytes;
+  file_bytes.reserve(op._val);
+
+  if(!_comm->expect_bytes(op._val, file_bytes)) {
+    std::cout << bbts::red << "Could not recieve the library file!\n" << bbts::reset;
+    return;
+  }
+
+  _register_from_bytes(file_bytes.data(), op._val);
+}
+
+void bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_size) {
+  int rank = _comm->get_rank();
+  std::string filename_template = "/tmp/register_from_bytes_" + std::to_string(rank) + "_XXXXXX";
+
+  auto filename = std::unique_ptr<char[]>(new char[filename_template.size()]);
+
+  std::copy(filename_template.begin(), filename_template.end(), filename.get());
+
+  // this will modify filename
+  int filedes = mkstemp(filename.get());
+
+  if(filedes == -1) {
+    std::cout << bbts::red << "Could not set temporary filename!\n" << bbts::reset;
+    return;
+  }
+  if(-1 == write(filedes,file_bytes,file_size)) {
+    std::cout << bbts::red << "Could not write shared library object!\n" << bbts::reset;
+    return;
+  }
+
+  // open the newly created temporary file
+  void* so_handle = dlopen(filename.get(), RTLD_LOCAL | RTLD_NOW);
+
+  if(!so_handle) {
+    std::cout << bbts::red << "Could not open temporary shared library object!\n" << bbts::reset;
+    return;
+  }
+
+  // The .so should have atleast one of the two (unmangled) functions, 
+  //  register_tensors, register_udfs. 
+  // Call them here.
+  bool did_register = false;
+  void* register_tensors_ = dlsym(so_handle, "register_tensors");
+  if(register_tensors_) {
+    did_register = true;
+    typedef void *register_tensors_f(tensor_factory_ptr_t);
+    auto *register_tensors = (register_tensors_f *) register_tensors_;
+    register_tensors(_tensor_factory);
+  }
+
+  void* register_udfs_ = dlsym(so_handle, "register_udfs");
+  if(register_udfs_) {
+    did_register = true;
+    typedef void *register_udfs_f(udf_manager_ptr);
+    auto *register_udfs = (register_udfs_f *) register_udfs_;
+    register_udfs(_udf_manager);
+  }
+
+  if(!did_register) {
+    std::cout << bbts::red << "Shared library object did not have a valid \"register_tensors\" or \"register_udfs\"!\n" << std::endl;
+  }  
+
+  // keep track of the stuff here so the system can clean it up later
+  shared_libs.emplace_back(filename.get(), so_handle);
+}
+

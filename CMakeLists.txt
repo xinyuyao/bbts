@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 # set the output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  "${PROJECT_SOURCE_DIR}/bin")
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/libraries")
+
 # set the location for cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -91,3 +93,4 @@ target_link_libraries(bbts-common ${BLAS_LIBRARIES})
 include(tests/Tests.cmake)
 include(integration_tests/Integration.cmake)
 include(applications/Applications.cmake)
+include(libraries/Libraries.cmake)
