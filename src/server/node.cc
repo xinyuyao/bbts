@@ -1,3 +1,4 @@
+#include <memory>
 #include <sstream>
 #include "node.h"
 #include "../commands/command_compiler.h"
@@ -9,6 +10,9 @@ void bbts::node_t::init() {
 
   // the logger
   _logger = std::make_shared<logger_t>(_config);
+
+  // create the tensor stats
+  _stats = std::make_shared<tensor_stats_t>();
 
   // create the storage
   _storage = std::make_shared<storage_t>();
@@ -25,14 +29,14 @@ void bbts::node_t::init() {
 
   // this runs commands
   _command_runner = std::make_shared<bbts::command_runner_t>(_storage, _factory, _udf_manager,
-                                                             _res_station, _comm, _logger);
+                                                             _res_station, _comm, _logger, _stats);
 
   // the tensor notifier
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
   _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger,
-                                                 _storage, _command_runner, _tensor_notifier);
+                                                 _storage, _command_runner, _tensor_notifier, _stats);
 }
 
 void bbts::node_t::run() {

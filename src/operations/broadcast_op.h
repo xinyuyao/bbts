@@ -4,6 +4,7 @@
 #include "../storage/storage.h"
 #include "../tensor/builtin_formats.h"
 #include "../ud_functions/udf_manager.h"
+#include "../commands/tensor_stats.h"
 
 #include <iostream>
 #include <algorithm>
@@ -17,7 +18,9 @@ public:
 
   // constructs the broadcast operation, the root node is assumed to be the first in the _nodes array
   broadcast_op_t(bbts::communicator_t &_comm,
-                 bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
+                 bbts::tensor_factory_t &_factory, 
+                 bbts::storage_t &_storage,
+                 bbts::tensor_stats_t &_stats,
                  const bbts::command_t::node_list_t &_nodes,
                  int32_t _tag, bbts::tensor_t *_in, bbts::tid_t _tid);
 
@@ -29,6 +32,9 @@ public:
 
   // the storage we use this to allocate the output and the intermediate tensors
   bbts::storage_t &_storage;
+
+  // the tensor stats
+  bbts::tensor_stats_t &_stats;
 
   // the nodes
   bbts::command_t::node_list_t _nodes;

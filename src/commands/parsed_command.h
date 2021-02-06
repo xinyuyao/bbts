@@ -22,6 +22,9 @@ struct parsed_command_t {
 
     // the output types
     std::vector<std::string> output_types;
+
+    // are we requesting a gpu based ud function
+    bool is_gpu = false;
   };
 
   // the type of the operation
@@ -144,6 +147,7 @@ struct parsed_command_list_t {
   void add_apply(const std::string &fn,
                  const std::vector<std::string> &in_types,
                  const std::vector<std::string> &out_types,
+                 bool is_gpu,
                  const std::vector<std::tuple<tid_t, node_id_t>> &in,
                  const std::vector<std::tuple<tid_t, node_id_t>> &out,
                  const std::vector<command_param_t> &params) {
@@ -151,7 +155,8 @@ struct parsed_command_list_t {
     _commands.push_back(parsed_command_t{.type = parsed_command_t::op_type_t::APPLY,
                                          .def = {.ud_name = fn,
                                                  .input_types = in_types,
-                                                 .output_types = out_types},
+                                                 .output_types = out_types,
+                                                 .is_gpu = is_gpu},
                                          .inputs = in,
                                          .outputs = out,
                                          .parameters = params});
@@ -160,6 +165,7 @@ struct parsed_command_list_t {
   void add_reduce(const std::string &fn,
                   const std::vector<std::string> &in_types,
                   const std::vector<std::string> &out_types,
+                  bool is_gpu,
                   const std::vector<std::tuple<tid_t, node_id_t>> &in,
                   const std::tuple<tid_t, node_id_t> &out,
                   const std::vector<command_param_t> &params) {
@@ -167,7 +173,8 @@ struct parsed_command_list_t {
     _commands.push_back(parsed_command_t{.type = parsed_command_t::op_type_t::REDUCE,
                                          .def = {.ud_name = fn,
                                                  .input_types = in_types,
-                                                 .output_types = out_types},
+                                                 .output_types = out_types,
+                                                 .is_gpu = is_gpu},
                                          .inputs = in,
                                          .outputs = { out },
                                          .parameters = params});
@@ -244,9 +251,10 @@ struct parsed_command_list_t {
 
     // write the command type
     serialize_val(file, cmd.type);
-
+    
     // write the ud function name
     serialize_string(file, cmd.def.ud_name);
+    serialize_val(file, cmd.def.is_gpu);
 
     // write the number of input and output types
     serialize_strings(file, cmd.def.input_types);
@@ -304,6 +312,7 @@ struct parsed_command_list_t {
 
     // write the ud function name
     cmd.def.ud_name = deserialize_string(file);
+    cmd.def.is_gpu = deserialize_val<decltype(cmd.def.is_gpu)>(file);
 
     // write the number of input and output types
     cmd.def.input_types = deserialize_strings(file);

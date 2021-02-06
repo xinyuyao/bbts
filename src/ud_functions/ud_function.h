@@ -1,8 +1,12 @@
 #pragma once
 
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <memory>
 #include "../tensor/tensor.h"
 #include "../commands/command_utils.h"
+
+#include "../../third_party/cuda/gpu.h"
 
 namespace bbts {
 
@@ -146,6 +150,29 @@ struct ud_impl_t {
 
   // make the virtual destructor
   virtual ~ud_impl_t() = default;
+
+  // this calls the function, it will do different things depending on whether the 
+  // ud function is using the GPU or not
+  void call_ud(const bbts::ud_impl_t::tensor_params_t &_params,
+               const tensor_args_t &_in,
+               tensor_args_t &_out) const {
+    
+    // check if this is a gpu based function
+    if(is_gpu) {
+
+      // call the function
+      fn(_params, _in, _out);
+
+      // sync the device
+      auto error = cudaDeviceSynchronize();
+      checkCudaErrors(error);
+    }
+    else {
+
+      // jut call the function
+      fn(_params, _in, _out);
+    }
+  }
 
   // this is a function pointer to the function that needs to be applied
   // we don't use virtual function on purpose applied function can be a free standing function

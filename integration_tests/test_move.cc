@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     auto size = factory->get_tensor_size(m);
     std::unique_ptr<char[]> a_mem(new char[size]);
 
-    // initi the tensor
+    // init the tensor
     auto &a = factory->init_tensor((bbts::tensor_t*) a_mem.get(), m).as<bbts::dense_tensor_t>();
 
     // get a reference to the metadata
@@ -48,14 +48,22 @@ int main(int argc, char **argv) {
       a.data()[i] = 1 + comm.get_rank() + i;
     }
 
-    // craete the move
-    auto move = move_op_t(comm, comm.get_rank(), &a, comm.get_rank(), true, *factory, storage, comm.get_rank() + 1);
+    // add some stats about the output
+    bbts::tensor_stats_t _stats;
+    _stats.add_tensor(comm.get_rank(), false);
+
+    // create the move
+    auto move = move_op_t(comm, comm.get_rank(), &a, _stats, comm.get_rank(), true, *factory, storage, comm.get_rank() + 1);
     auto mm = move.apply();
   }
   else {
 
+    // add some stats about the output
+    bbts::tensor_stats_t _stats;
+    _stats.add_tensor(comm.get_rank() - 1, false);
+
     // create the move
-    auto move = move_op_t(comm, comm.get_rank() - 1, nullptr, comm.get_rank() - 1, false, *factory, storage, comm.get_rank() - 1);
+    auto move = move_op_t(comm, comm.get_rank() - 1, nullptr, _stats, comm.get_rank() - 1, false, *factory, storage, comm.get_rank() - 1);
     auto m = move.apply();
 
     // get the dense tensor

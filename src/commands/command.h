@@ -225,7 +225,7 @@ struct command_t {
     return std::move(tmp);
   }
 
-  static command_ptr_t create_apply(command_id_t id, ud_impl_id_t fun_id, const std::vector<command_param_t> &params,
+  static command_ptr_t create_apply(command_id_t id, ud_impl_id_t fun_id, bool is_gpu, const std::vector<command_param_t> &params,
                                     const std::vector<tid_node_id_t> &in, const std::vector<tid_node_id_t> &out) {
 
     // make sure all of them are at the same node
@@ -239,6 +239,7 @@ struct command_t {
     tmp->id = id;
     tmp->type = APPLY;
     tmp->fun_id = fun_id;
+    tmp->is_gpu = is_gpu;
     tmp->_num_parameters = params.size();
     tmp->_num_nodes = 1;
     tmp->_num_inputs = in.size();
@@ -311,7 +312,8 @@ struct command_t {
     return std::move(tmp);
   }
 
-  static command_ptr_t create_reduce(command_id_t id, ud_impl_id_t fun_id, const std::vector<command_param_t> &params,
+  static command_ptr_t create_reduce(command_id_t id, ud_impl_id_t fun_id, bool is_gpu, 
+                                     const std::vector<command_param_t> &params,
                                      const std::vector<tid_node_id_t> &in, const tid_node_id_t &out) {
 
     // the nodes
@@ -334,6 +336,7 @@ struct command_t {
     tmp->id = id;
     tmp->type = REDUCE;
     tmp->fun_id = fun_id;
+    tmp->is_gpu = is_gpu;
     tmp->_num_parameters = params.size();
     tmp->_num_inputs = in.size();
     tmp->_num_outputs = 1;
@@ -429,6 +432,9 @@ struct command_t {
 
   // the function we want to execute
   ud_impl_id_t fun_id = {-1, -1};
+
+  // is this command using the gpu
+  bool is_gpu = false;
 
 private:
 

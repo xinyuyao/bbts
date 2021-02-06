@@ -40,7 +40,7 @@ TEST(TestStorage, Test1) {
         auto tensor_size = tf->get_tensor_size(dm);
 
         // crate the tensor
-        auto ts = storage->create_tensor(i + t * num_matrices, tensor_size);
+        auto ts = storage->create_tensor(i + t * num_matrices, tensor_size, false);
 
         // init the tensor
         auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();

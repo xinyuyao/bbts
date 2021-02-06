@@ -1,3 +1,7 @@
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <cuda_profiler_api.h>  
+
 #include "storage.h"
 #include "../server/static_config.h"
 #include "../utils/terminal_color.h"
@@ -9,7 +13,12 @@ storage_t::~storage_t() {
 
   // go through each allocated tensor and free it
   for(auto &it : _allocated_tensors) {
-    free(it.first);
+    if(it.second.is_gpu) {
+      cudaFree(it.first);
+    }
+    else {
+      free(it.first);
+    }
   }
 }
 
@@ -23,15 +32,22 @@ tensor_t *storage_t::get_by_tid(tid_t _id) {
   return it != _tensor_nfo.end() ? it->second.address : nullptr;
 }
 
-tensor_t *storage_t::create_tensor(tid_t _id, size_t num_bytes) {
+tensor_t *storage_t::create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu) {
   
   // lock this thing
   std::unique_lock<std::mutex> lck (_m);
 
   // malloc the tensor
-  auto ts = (tensor_t*) malloc(num_bytes);
-  _tensor_nfo[_id] = sto_tensor_nfo_t{.address = ts, .num_bytes = num_bytes};
-  _allocated_tensors[ts] = { _id, num_bytes };
+  tensor_t *ts;
+  if(used_by_gpu) {
+    cudaMallocManaged(&ts, num_bytes);
+  }
+  else {
+    ts = (tensor_t*) malloc(num_bytes); 
+  }
+
+  _tensor_nfo[_id] = sto_tensor_nfo_t{.address = ts, .num_bytes = num_bytes, .is_gpu = used_by_gpu};
+  _allocated_tensors[ts] = { .id=_id, .num_bytes=num_bytes, .is_gpu= used_by_gpu };
 
   lck.unlock();
 
@@ -42,14 +58,21 @@ tensor_t *storage_t::create_tensor(tid_t _id, size_t num_bytes) {
   return ts;
 }
 
-tensor_t *storage_t::create_tensor(size_t num_bytes) {
+tensor_t *storage_t::create_tensor(size_t num_bytes, bool used_by_gpu) {
 
   // lock this thing
   std::unique_lock<std::mutex> lck (_m);
 
   // malloc the tensor
-  auto ts = (tensor_t*) malloc(num_bytes);
-  _allocated_tensors[ts] = { TID_NONE, num_bytes };
+  tensor_t *ts;
+  if(used_by_gpu) {
+    cudaMallocManaged(&ts, num_bytes);
+  }
+  else {
+    ts = (tensor_t*) malloc(num_bytes); 
+  }
+
+  _allocated_tensors[ts] = { .id=TID_NONE, .num_bytes=num_bytes, .is_gpu=used_by_gpu };
 
   lck.unlock();
 
@@ -76,12 +99,17 @@ bool storage_t::remove_by_tensor(tensor_t &_tensor) {
   }
 
   // free the tensor
-  free(it->first);
+  if(it->second.is_gpu) {
+    cudaFree(it->first);
+  }
+  else {
+    free(it->first);
+  }
 
   // remove the it from the other mapping if necessary
-  auto _tid = std::get<0>(it->second);
-  if(std::get<0>(it->second) != TID_NONE) {
-    _tensor_nfo.erase(std::get<0>(it->second));
+  auto _tid = it->second.id;
+  if(it->second.id != TID_NONE) {
+    _tensor_nfo.erase(it->second.id);
   }
 
   // remove it from the allocated tensors
@@ -118,8 +146,8 @@ bool storage_t::assign_tid(tensor_t &_tensor, tid_t _tid) {
   }
 
   // set the new id
-  std::get<0>(it->second) = _tid;
-  _tensor_nfo[_tid] = sto_tensor_nfo_t{ .address = &_tensor, .num_bytes = std::get<1>(it->second) };
+  it->second.id = _tid;
+  _tensor_nfo[_tid] = sto_tensor_nfo_t{ .address = &_tensor, .num_bytes = it->second.num_bytes };
 
   return true;
 }
@@ -136,10 +164,16 @@ bool storage_t::remove_by_tid(tid_t _id) {
   }
 
   // free the tensor
-  free(it->second.address);
+  auto jt = _allocated_tensors.find(it->second.address);
+  if(jt->second.is_gpu) {
+    cudaFree(jt->first);
+  }
+  else {
+    free(jt->first);
+  }
 
   // remove the tensor
-  _allocated_tensors.erase(it->second.address);
+  _allocated_tensors.erase(jt);
   _tensor_nfo.erase(it);
 
   // unlock
@@ -171,7 +205,7 @@ void storage_t::print() {
   // print all the allocated tensors
   std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _allocated_tensors) {
-    std::cout << std::get<0>(t.second) << "\t" << std::get<1>(t.second) << "\t\t" << (void*) t.first << '\n';
+    std::cout << t.second.id << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.first << '\n';
   }
 }
 
@@ -182,7 +216,14 @@ void storage_t::clear() {
 
   // go through each allocated tensor and free it
   for(auto &it : _allocated_tensors) {
-    free(it.first);
+    
+    // is it gpu
+    if(it.second.is_gpu) {
+      cudaFree(it.first);
+    }
+    else {
+      free(it.first);
+    }
   }
   _allocated_tensors.clear();
   _tensor_nfo.clear();

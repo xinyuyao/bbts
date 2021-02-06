@@ -55,6 +55,7 @@ index_t create_matrix_tensors(char matrix,
       // store the command
       _cmds.emplace_back(command_t::create_apply(_cmds.size(),
                                                  ud->impl_id,
+                                                 false,
                                                  {command_param_t{.u = block_size},
                                                          command_param_t{.u = block_size},
                                                          command_param_t{.f = 0.0f},
@@ -178,6 +179,7 @@ to_agg_index_t create_multiply(fun fn,
         // add the command
         _cmds.emplace_back(command_t::create_apply(_cmds.size(),
                                                    ud->impl_id,
+                                                   false,
                                                    {},
                                                    { command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
                                                         command_t::tid_node_id_t{.tid = b_tid, .node = target_node}},
@@ -231,6 +233,7 @@ void generate_aggregation(const udf_manager_ptr &udm,
       // create the reduce command
       _cmds.emplace_back(command_t::create_reduce(_cmds.size(),
                                                   ud->impl_id,
+                                                  false,
                                                   {},
                                                   inputs,
                                                   {command_t::tid_node_id_t{.tid = tid_offset, .node = target_node}}));

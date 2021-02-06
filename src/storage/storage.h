@@ -31,16 +31,31 @@ struct storage_t {
 
     // the size of the tensor in bytes
     size_t num_bytes;
+
+    // is this the gpu 
+    bool is_gpu;
+  };
+
+  struct allocation_nfo_t {
+
+    // the id of the tensor
+    tid_t id = TID_NONE;
+
+    // the size of the tensor in bytes
+    size_t num_bytes;
+
+    // is this the gpu 
+    bool is_gpu;
   };
 
   // an existing tensor by tid
   tensor_t *get_by_tid(tid_t _id);
 
   // returns a tensor for the tid, the tensor is always not initialized
-  tensor_t *create_tensor(tid_t _id, size_t num_bytes);
+  tensor_t *create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu);
 
   // returns an anonymous tensor, the tensor is always not initialized
-  tensor_t *create_tensor(size_t num_bytes);
+  tensor_t *create_tensor(size_t num_bytes, bool used_by_gpu);
 
   // remove by address true if it succeeds
   bool remove_by_tensor(tensor_t &_tensor);
@@ -68,11 +83,13 @@ struct storage_t {
   // get the number of tensors in the system
   size_t get_num_tensors();
 
+private:
+  
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;
 
   // all allocated tensors
-  std::unordered_map<tensor_t*, std::tuple<tid_t, size_t>> _allocated_tensors;
+  std::unordered_map<tensor_t*, allocation_nfo_t> _allocated_tensors;
 
   // maps to the information
   std::unordered_map<tid_t, sto_tensor_nfo_t> _tensor_nfo;

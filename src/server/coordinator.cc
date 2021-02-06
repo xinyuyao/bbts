@@ -10,14 +10,16 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    bbts::logger_ptr_t _logger,
                                    storage_ptr_t _storage,
                                    bbts::command_runner_ptr_t _command_runner,
-                                   bbts::tensor_notifier_ptr_t _tensor_notifier)
+                                   bbts::tensor_notifier_ptr_t _tensor_notifier,
+                                   tensor_stats_ptr_t _stats)
 
     : _comm(std::move(_comm)),
       _rs(std::move(_rs)),
       _logger(std::move(_logger)),
       _storage(std::move(_storage)),
       _command_runner(std::move(_command_runner)),
-      _tensor_notifier(std::move(_tensor_notifier)) { _is_down = false; }
+      _tensor_notifier(std::move(_tensor_notifier)),
+      _stats(std::move(_stats)) { _is_down = false; }
 
 void bbts::coordinator_t::accept() {
 
@@ -132,6 +134,15 @@ void bbts::coordinator_t::_schedule(coordinator_op_t op) {
 
 void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds) {
 
+  // extract the stats from the commands
+  for (auto &_cmd : cmds) {
+
+    // if it uses the node
+    if (_cmd->uses_node(_comm->get_rank())) {
+      _stats->add_command(*_cmd);
+    }
+  }
+
   // schedule them all at once
   for (auto &_cmd : cmds) {
 
@@ -149,6 +160,9 @@ void bbts::coordinator_t::_run() {
 
   // wait for all the commands to be run
   _rs->wait_until_finished();
+
+  // reset all the stats as we are done executing
+  _stats->reset();
 
   // stop executing all the commands
   _rs->stop_executing();
@@ -189,7 +203,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::clear() {
     return {false, "Failed to clear the cluster!\n"};
   }
 
-  // print the storage
+  // claer the storage
   _clear();
 
   // sync everything
@@ -218,6 +232,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::shutdown_cluster() {
 void bbts::coordinator_t::_clear() {
 
   // clear everything
+  _stats->reset();
   _storage->clear();
   _rs->clear();
 }

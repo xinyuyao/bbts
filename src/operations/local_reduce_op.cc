@@ -2,11 +2,13 @@
 
 bbts::local_reduce_op_t::local_reduce_op_t(bbts::tensor_factory_t &_factory,
                                            bbts::storage_t &_storage,
+                                           bbts::tensor_stats_t &_stats,
                                            const std::vector<bbts::tensor_t *> &_inputs,
                                            const ud_impl_t::tensor_params_t &_params,
                                            bbts::tid_t _out_tid,
                                            const bbts::ud_impl_t &_reduce_op) : _factory(_factory),
                                                                                 _storage(_storage),
+                                                                                _stats(_stats),
                                                                                 _inputs(_inputs),
                                                                                 _params(_params),
                                                                                 _out_tid(_out_tid),
@@ -18,6 +20,9 @@ bbts::local_reduce_op_t::local_reduce_op_t(bbts::tensor_factory_t &_factory,
 
 
 bbts::tensor_t* bbts::local_reduce_op_t::apply() {
+
+  // is the output on the gpu (is this a gpu ud function)
+  bool is_gpu = _stats.is_gpu(_out_tid);
 
   // get the first left side
   bbts::tensor_t *lhs = _inputs.front();
@@ -41,7 +46,7 @@ bbts::tensor_t* bbts::local_reduce_op_t::apply() {
     auto output_size = _factory.get_tensor_size(_output_meta.get<0>());
 
     // allocate and init the output
-    auto out = _storage.create_tensor(output_size);
+    auto out = _storage.create_tensor(output_size, is_gpu);
     _factory.init_tensor(out, _out_meta);
 
     /// 1.3 run the ud function
@@ -54,7 +59,7 @@ bbts::tensor_t* bbts::local_reduce_op_t::apply() {
     _output_tensor.set<0>(*out);
 
     // run the function
-    _reduce_op.fn(_params, _input_tensors, _output_tensor);
+    _reduce_op.call_ud(_params, _input_tensors, _output_tensor);
 
     /// 1.4 deallocate the previous output tensor and swap
 

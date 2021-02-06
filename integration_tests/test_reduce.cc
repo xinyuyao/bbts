@@ -54,6 +54,10 @@ int main(int argc, char **argv) {
     a.data()[i] = 1 + comm.get_rank() + i;
   }
 
+  // add some stats about the output
+  bbts::tensor_stats_t _stats;
+  _stats.add_tensor(0, false);
+
   // we are only involving the even ranks in teh computation
   bool success = true;
   if (comm.get_rank() % 2 == 0) {
@@ -70,6 +74,7 @@ int main(int argc, char **argv) {
     auto reduce_op = bbts::reduce_op_t(comm,
                                        *factory,
                                        storage,
+                                       _stats,
                                        bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
                                        111,
                                        _inputs,

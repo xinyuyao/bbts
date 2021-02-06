@@ -8,6 +8,7 @@
 #include "../server/coordinator_ops.h"
 #include "../server/logger.h"
 #include "../commands/command.h"
+#include "../commands/tensor_stats.h"
 #include "../communication/communicator.h"
 #include "../commands/reservation_station.h"
 #include "../commands/command_runner.h"
@@ -25,7 +26,8 @@ public:
                 bbts::logger_ptr_t _logger,
                 storage_ptr_t _storage,
                 bbts::command_runner_ptr_t _command_runner,
-                bbts::tensor_notifier_ptr_t _tensor_notifier);
+                bbts::tensor_notifier_ptr_t _tensor_notifier,
+                tensor_stats_ptr_t _stats);
 
   // accept a request
   void accept();
@@ -77,6 +79,9 @@ private:
 
   // the reservation station
   bbts::reservation_station_ptr_t _rs;
+
+  // the statistics about the tensors for the current 
+  bbts::tensor_stats_ptr_t _stats;
 
   // the logger
   bbts::logger_ptr_t _logger;

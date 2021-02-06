@@ -40,6 +40,7 @@ index_t create_matrix_tensors(size_t num_nodes,
       _cmds.add_apply("uniform",
                       {},
                       {"dense"},
+                      false,
                       {},
                       {{cur_tid, target_node}},
                       {command_param_t{.u = block_size},
@@ -148,6 +149,7 @@ to_agg_index_t create_multiply(size_t split,
         _cmds.add_apply("matrix_mult",
                         {"dense", "dense"},
                         {"dense"},
+                        false,
                         {{a_tid, target_node}, {b_tid, target_node}},
                         {{tid_offset, target_node}}, {});
 
@@ -193,6 +195,7 @@ void generate_aggregation(size_t split,
       _cmds.add_reduce("matrix_add",
                        {"dense", "dense"},
                        {"dense"},
+                       false,
                        inputs,
                        {tid_offset, target_node}, {});
 
@@ -253,8 +256,8 @@ bbts::parsed_command_list_t generate_commands(size_t split,
 
 
   // create the multiply commands
-  auto multiplies = create_multiply(split, num_nodes,
-                                        a_idx, b_idx, tid_offset, _cmds, to_del);
+  auto multiplies = create_multiply(split, num_nodes, a_idx, b_idx, 
+                                    tid_offset, _cmds, to_del);
 
   // generate the aggregation
   generate_aggregation(split, num_nodes, tid_offset, multiplies, _cmds);

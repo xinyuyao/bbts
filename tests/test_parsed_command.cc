@@ -12,6 +12,7 @@ TEST(TestCommandParsing, Test1) {
     cmd_list.add_apply("bla",
                        {"dense", "sparse"},
                        {"sparse", "dense", "dense"},
+                       false,
                        {{0,0}, {0, 1}},
                        {{0,2}, {0, 3}, {0, 4}},
                        {command_param_t{.u = 1}, command_param_t{.i = 2}, command_param_t{.f = 3.0f}});
@@ -20,6 +21,7 @@ TEST(TestCommandParsing, Test1) {
     cmd_list.add_reduce("bla2",
                         {"dense1", "sparse1"},
                         {"sparse1", "dense2"},
+                        false,
                         {{0,0}, {0, 1}},
                         {0, 3},
                         {});

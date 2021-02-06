@@ -4,6 +4,7 @@
 #include "../tensor/builtin_formats.h"
 #include "../storage/storage.h"
 #include "../ud_functions/udf_manager.h"
+#include "../commands/tensor_stats.h"
 #include <mpi.h>
 #include <iostream>
 #include <algorithm>
@@ -71,7 +72,7 @@ public:
 
   // constructs the reduce operation
   reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
-              bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
+              bbts::storage_t &_storage, bbts::tensor_stats_t &_stats, const bbts::command_t::node_list_t &_nodes,
               int32_t _tag, const std::vector<bbts::tensor_t*> &_inputs, const ud_impl_t::tensor_params_t &_params,
               bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
 
@@ -99,6 +100,9 @@ public:
 
   // the id of the tensor format
   bbts::tfid_t _id;
+
+  // is this a gpu reduce
+  bool _is_gpu;
 
 };
 

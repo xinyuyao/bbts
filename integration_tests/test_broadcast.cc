@@ -56,6 +56,10 @@ int main(int argc, char **argv) {
   }
   std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
+  // add some stats about the output
+  bbts::tensor_stats_t _stats;
+  _stats.add_tensor(12, false);
+
   // if the rank is even this takes part
   bool success = (am.num_rows * am.num_cols) != 0;
   if (comm.get_rank() % 2 == 0) {
@@ -64,6 +68,7 @@ int main(int argc, char **argv) {
     bbts::broadcast_op_t bcst(comm,
                               *factory,
                               storage,
+                              _stats,
                               bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
                               888,
                               &a,

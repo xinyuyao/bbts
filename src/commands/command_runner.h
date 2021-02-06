@@ -2,6 +2,7 @@
 
 #include <memory>
 #include "reservation_station.h"
+#include "../commands/tensor_stats.h"
 #include "../ud_functions/udf_manager.h"
 #include "../communication/communicator.h"
 #include "../server/logger.h"
@@ -16,7 +17,8 @@ public:
                    udf_manager_ptr udm,
                    reservation_station_ptr_t rs,
                    communicator_ptr_t comm,
-                   logger_ptr_t logger);
+                   logger_ptr_t logger,
+                   tensor_stats_ptr_t stats);
 
   // runs local command
   void local_command_runner();
@@ -44,6 +46,9 @@ private:
 
   // reservation station
   bbts::reservation_station_ptr_t _rs;
+
+  // gives insight into how tensors are going to be used in the future, based on the scheduled commands
+  tensor_stats_ptr_t _stats;
 
   // the communicator
   bbts::communicator_ptr_t _comm;

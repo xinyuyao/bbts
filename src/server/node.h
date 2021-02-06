@@ -146,8 +146,13 @@ public:
   // runs commands
   command_runner_ptr_t _command_runner;
 
+  // gives insight into how tensors are going to be used in the future, based on the scheduled commands
+  tensor_stats_ptr_t _stats;
+
   // the notifier
   tensor_notifier_ptr_t _tensor_notifier;
+
+
 };
 
 

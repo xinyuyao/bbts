@@ -47,7 +47,7 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
         auto tensor_size = node._factory->get_tensor_size(dm);
 
         // crate the tensor
-        auto t = node._storage->create_tensor(cur_tid, tensor_size);
+        auto t = node._storage->create_tensor(cur_tid, tensor_size, false);
 
         // init the tensor
         auto &dt = node._factory->init_tensor(t, dm).as<dense_tensor_t>();
@@ -143,6 +143,7 @@ to_agg_index_t create_multiply(const udf_manager_ptr &udm,
         // add the command
         _cmds.emplace_back(command_t::create_apply(cur_cmd++,
                                                    ud->impl_id,
+                                                   false,
                                                    {},
                                                     { command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
                                                          command_t::tid_node_id_t{.tid = b_tid, .node = target_node}},
@@ -197,6 +198,7 @@ void generate_aggregation(const udf_manager_ptr &udm,
       // create the reduce command
       _cmds.emplace_back(command_t::create_reduce(cur_cmd++,
                                                   ud->impl_id,
+                                                  false,
                                                   {},
                                                   inputs,
                                                   {command_t::tid_node_id_t{.tid = tid_offset, .node = target_node}}));

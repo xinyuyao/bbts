@@ -2,6 +2,8 @@
 
 #include "../ud_functions/udf_manager.h"
 #include "../tensor/tensor_factory.h"
+#include "../commands/command.h"
+#include "../commands/parsed_command.h"
 
 namespace bbts {
 
@@ -109,7 +111,7 @@ class command_compiler_t {
         }
 
         // get the ud object
-        auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, false);
+        auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, cmd.def.is_gpu);
 
         std::vector<command_t::tid_node_id_t> inputs;
         for(auto &in : cmd.inputs) {
@@ -125,6 +127,7 @@ class command_compiler_t {
 
         return command_t::create_apply(cur_cmd++,
                                        ud->impl_id,
+                                       cmd.def.is_gpu,
                                        cmd.parameters,
                                        inputs,
                                        outputs);
@@ -144,7 +147,11 @@ class command_compiler_t {
         }
 
         // get the ud object
-        auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, false);
+        auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, cmd.def.is_gpu);
+
+        if(cmd.def.is_gpu) {
+          std::cout << "GPU\n";
+        }
 
         // make the inputs
         std::vector<command_t::tid_node_id_t> inputs;
@@ -156,10 +163,11 @@ class command_compiler_t {
         // create the reduce
         return command_t::create_reduce(cur_cmd++,
                                         ud->impl_id,
+                                        cmd.def.is_gpu,
                                         cmd.parameters,
                                         inputs,
                                         command_t::tid_node_id_t{.tid = std::get<0>(cmd.outputs[0]),
-                                                                     .node = std::get<1>(cmd.outputs[0])});
+                                                                 .node = std::get<1>(cmd.outputs[0])});
       }
     }
   }

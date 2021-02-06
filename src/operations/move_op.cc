@@ -3,11 +3,13 @@
 namespace bbts {
 
   // constructs the reduce operation
-  move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor,
+  move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, 
+                       bbts::tensor_t *_tensor, bbts::tensor_stats_t &_stats,
                        tid_t _tid, bool _is_sender, bbts::tensor_factory_t &_factory,
                        bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
                                                                            _tag(_tag),
                                                                            _tensor(_tensor),
+                                                                           _stats(_stats),
                                                                            _tid(_tid),
                                                                            _is_sender(_is_sender),
                                                                            _factory(_factory),
@@ -39,7 +41,7 @@ namespace bbts {
       }
 
       // allocate a buffer for the tensor
-      _tensor = _storage.create_tensor(_tid, req.num_bytes);
+      _tensor = _storage.create_tensor(_tid, req.num_bytes, _stats.is_gpu(_tid));
 
       // recieve the request and check if there is an error
       if (!_comm.receive_request_sync(_tensor, req)) {

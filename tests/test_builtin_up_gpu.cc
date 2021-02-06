@@ -79,7 +79,7 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
         ud_impl_t::tensor_args_t output_args = {{&c}};
 
         // call the addition
-        ud->fn({ ._params = bbts::command_param_list_t {._data = nullptr, ._num_elements = 0} }, input_args, output_args);
+        ud->call_ud({ ._params = bbts::command_param_list_t {._data = nullptr, ._num_elements = 0} }, input_args, output_args);
 
         // sync the device
         auto error = cudaDeviceSynchronize();

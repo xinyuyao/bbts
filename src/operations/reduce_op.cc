@@ -3,7 +3,7 @@
 namespace bbts {
 
 reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
-                         bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
+                         bbts::storage_t &_storage, bbts::tensor_stats_t &_stats, const bbts::command_t::node_list_t &_nodes,
                          int32_t _tag, const std::vector<bbts::tensor_t*> &_inputs, const ud_impl_t::tensor_params_t &_params,
                          bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op) : _comm(_comm),
                                                                                     _factory(_factory),
@@ -21,6 +21,9 @@ reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_f
 
   // get the impl_id of the output
   _id = _factory.get_tensor_ftm(_reduce_op.outputTypes.front());
+
+  // check if this are gpu tensors
+  _is_gpu = _stats.is_gpu(_out_tid);
 }
 
 int32_t reduce_op_t::get_num_nodes() const {
@@ -71,7 +74,7 @@ bbts::tensor_t *reduce_op_t::apply() {
         }
 
         // allocate a buffer for the tensor
-        auto rhs = _storage.create_tensor(req.num_bytes);
+        auto rhs = _storage.create_tensor(req.num_bytes, _is_gpu);
 
         // recieve the request and check if there is an error
         if (!_comm.receive_request_sync(rhs, req)) {
@@ -92,7 +95,7 @@ bbts::tensor_t *reduce_op_t::apply() {
         auto output_size = _factory.get_tensor_size(_output_meta.get<0>());
 
         // allocate and init the output
-        auto out = _storage.create_tensor(output_size);
+        auto out = _storage.create_tensor(output_size, _is_gpu);
         _factory.init_tensor(out, _out_meta);
 
         // set the input tensors to the function
@@ -103,7 +106,7 @@ bbts::tensor_t *reduce_op_t::apply() {
         _output_tensor.set<0>(*out);
 
         // run the function
-        _reduce_op.fn(_params, _input_tensors, _output_tensor);
+        _reduce_op.call_ud(_params, _input_tensors, _output_tensor);
 
         // manage the memory
         if(lhs != _in) {
@@ -181,7 +184,7 @@ bbts::tensor_t *reduce_op_t::apply_preagg() {
     auto output_size = _factory.get_tensor_size(_output_meta.get<0>());
 
     // allocate and init the output
-    auto out = _storage.create_tensor(output_size);
+    auto out = _storage.create_tensor(output_size, _is_gpu);
     _factory.init_tensor(out, _out_meta);
 
     /// 1.3 run the ud function
@@ -194,7 +197,7 @@ bbts::tensor_t *reduce_op_t::apply_preagg() {
     _output_tensor.set<0>(*out);
 
     // run the function
-    _reduce_op.fn(_params, _input_tensors, _output_tensor);
+    _reduce_op.call_ud(_params, _input_tensors, _output_tensor);
 
     /// 1.4 deallocate the previous output tensor and swap
 

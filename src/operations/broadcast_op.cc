@@ -3,11 +3,14 @@
 namespace bbts {
 
 broadcast_op_t::broadcast_op_t(bbts::communicator_t &_comm,
-                               bbts::tensor_factory_t &_factory, bbts::storage_t &_storage,
+                               bbts::tensor_factory_t &_factory, 
+                               bbts::storage_t &_storage,
+                               bbts::tensor_stats_t &_stats,
                                const bbts::command_t::node_list_t &_nodes,
                                int32_t _tag, bbts::tensor_t *_in, bbts::tid_t _tid): _comm(_comm),
                                                                                      _factory(_factory),
                                                                                      _storage(_storage),
+                                                                                     _stats(_stats),
                                                                                      _nodes(_nodes),
                                                                                      _tag(_tag),
                                                                                      _in(_in),
@@ -54,7 +57,7 @@ bbts::tensor_t *broadcast_op_t::apply() {
     }
 
     // allocate a buffer for the tensor
-    _in = _storage.create_tensor(_tid, req.num_bytes);
+    _in = _storage.create_tensor(_tid, req.num_bytes, _stats.is_gpu(_tid));
 
     // recieve the request and check if there is an error
     if (!_comm.receive_request_sync(_in, req)) {

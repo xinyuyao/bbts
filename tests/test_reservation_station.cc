@@ -1,12 +1,12 @@
-#include <gtest/gtest.h>
-#include <thread>
-#include <atomic>
 #include "../src/commands/reservation_station.h"
 #include "../src/utils/concurent_queue.h"
+#include <atomic>
+#include <gtest/gtest.h>
+#include <thread>
 
 namespace bbts {
 
-using _remote_cmd_t = std::tuple<command_ptr_t, std::atomic<bool>*>;
+using _remote_cmd_t = std::tuple<command_ptr_t, std::atomic<bool> *>;
 
 struct fake_storage_t {
 
@@ -21,9 +21,7 @@ struct fake_storage_t {
     _sto.erase(tid);
   }
 
-  size_t num_tensors() const {
-    return _sto.size();
-  }
+  size_t num_tensors() const { return _sto.size(); }
 
   std::mutex _m;
 
@@ -31,25 +29,25 @@ struct fake_storage_t {
 };
 
 // the reservation station needs a deleter thread
-std::thread create_deleter_thread(reservation_station_ptr_t &_rs, fake_storage_t &_sto, int32_t _num_to_del) {
+std::thread create_deleter_thread(reservation_station_ptr_t &_rs,
+                                  fake_storage_t &_sto, int32_t _num_to_del) {
 
   // create the thread
 
   return std::thread([_rs, &_sto, _num_to_del]() {
-
     // while we have something remove
     tid_t id;
     auto to_deleted = _num_to_del;
-    while(true) {
+    while (true) {
 
       // check if done
-      if(to_deleted == 0) {
+      if (to_deleted == 0) {
         break;
       }
 
       // get the next tensor to remove
       id = _rs->get_to_remove();
-      if(id == -1) {
+      if (id == -1) {
         break;
       }
 
@@ -59,20 +57,19 @@ std::thread create_deleter_thread(reservation_station_ptr_t &_rs, fake_storage_t
       // deleted
       _sto.remove(id);
       _rs->retire_remove(id);
-      std::cout << "Remove tensor : " <<  id << '\n' << std::flush;
+      std::cout << "Remove tensor : " << id << '\n' << std::flush;
       to_deleted--;
     }
   });
 }
 
-std::thread create_remote_processing_thread(int32_t node,
-                                            std::vector<reservation_station_ptr_t> &rss,
-                                            std::vector<fake_storage_t> &sto,
-                                            std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds) {
+std::thread create_remote_processing_thread(
+    int32_t node, std::vector<reservation_station_ptr_t> &rss,
+    std::vector<fake_storage_t> &sto,
+    std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds) {
 
   // create the thread to pull
   std::thread t = std::thread([&remote_cmds, node, &rss, &sto]() {
-
     // process the remote commands
     while (true) {
 
@@ -81,7 +78,7 @@ std::thread create_remote_processing_thread(int32_t node,
       remote_cmds[node].wait_dequeue(_rc);
 
       // check if we are done...
-      if(std::get<0>(_rc) == nullptr) {
+      if (std::get<0>(_rc) == nullptr) {
         break;
       }
 
@@ -89,7 +86,7 @@ std::thread create_remote_processing_thread(int32_t node,
       usleep(rand() % 100);
 
       // we only have remote moves here
-      if(std::get<0>(_rc)->type == command_t::MOVE) {
+      if (std::get<0>(_rc)->type == command_t::MOVE) {
 
         // get the output tensor
         auto [out_tid, out_node] = std::get<0>(_rc)->get_output(0);
@@ -100,8 +97,7 @@ std::thread create_remote_processing_thread(int32_t node,
 
         // mark that the tensor is
         sto[node].insert(out_tid);
-      }
-      else if(std::get<0>(_rc)->type == command_t::REDUCE) {
+      } else if (std::get<0>(_rc)->type == command_t::REDUCE) {
 
         // std::cout << "REDUCE from \n" << std::flush;
       }
@@ -112,46 +108,46 @@ std::thread create_remote_processing_thread(int32_t node,
       // mark that we are done
       *std::get<1>(_rc) = true;
     }
-
   });
 
   return std::move(t);
 }
 
-std::thread remote_tensor_notification_sender(int32_t my_node,
-                                              int32_t out_node,
-                                              std::vector<reservation_station_ptr_t> &rss,
-                                              std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> &remote_notifications) {
+std::thread remote_tensor_notification_sender(
+    int32_t my_node, int32_t out_node,
+    std::vector<reservation_station_ptr_t> &rss,
+    std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>>
+        &remote_notifications) {
   // create the thread
-  std::thread t = std::thread([my_node, out_node, &rss, &remote_notifications]() {
+  std::thread t =
+      std::thread([my_node, out_node, &rss, &remote_notifications]() {
+        while (true) {
 
-    while (true) {
+          // get tensors to notify the other node
+          bool is_done;
+          auto tensors =
+              rss[my_node]->tensors_to_notify_node(out_node, is_done);
 
-      // get tensors to notify the other node
-      bool is_done;
-      auto tensors = rss[my_node]->tensors_to_notify_node(out_node, is_done);
+          // if it is node break out
+          if (is_done) {
+            break;
+          }
 
-      // if it is node break out
-      if (is_done) {
-        break;
-      }
-
-      // add the remote commands
-      std::pair<std::vector<tid_t>, int32_t> to_store = {tensors, my_node};
-      remote_notifications[out_node].enqueue(to_store);
-    }
-
-  });
+          // add the remote commands
+          std::pair<std::vector<tid_t>, int32_t> to_store = {tensors, my_node};
+          remote_notifications[out_node].enqueue(to_store);
+        }
+      });
 
   return std::move(t);
 }
 
-std::thread tensor_notifier(int32_t my_node,
-                            std::vector<reservation_station_ptr_t> &rss,
-                            std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> &remote_notifications) {
+std::thread tensor_notifier(
+    int32_t my_node, std::vector<reservation_station_ptr_t> &rss,
+    std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>>
+        &remote_notifications) {
   // create the thread
   std::thread t = std::thread([my_node, &rss, &remote_notifications]() {
-
     while (true) {
 
       // wait for the command
@@ -171,27 +167,29 @@ std::thread tensor_notifier(int32_t my_node,
   return std::move(t);
 }
 
-std::thread create_command_processing_thread(std::vector<reservation_station_ptr_t> &rss,
-                                             std::vector<fake_storage_t> &sto,
-                                             std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds,
-                                             int32_t node) {
+std::thread create_command_processing_thread(
+    std::vector<reservation_station_ptr_t> &rss,
+    std::vector<fake_storage_t> &sto,
+    std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds,
+    int32_t node) {
 
   // create the thread to pull
   std::thread t = std::thread([&rss, &remote_cmds, &sto, node]() {
-
     while (true) {
 
       // get the command
       auto cmd = rss[node]->get_next_command();
-      if(cmd == nullptr) {
+      if (cmd == nullptr) {
         break;
       }
 
       // if we have a move
-      if(cmd->type == command_t::MOVE) {
+      if (cmd->type == command_t::MOVE) {
 
         // move the
-        std::cout << "MOVE " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
+        std::cout << "MOVE " << cmd->id << " on my_node : " << node
+                  << " Executed...\n"
+                  << std::flush;
 
         // get the target node
         auto target = cmd->get_output(0);
@@ -201,7 +199,7 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
         done = false;
 
         // push the command
-        _remote_cmd_t c = {cmd->clone(), &done };
+        _remote_cmd_t c = {cmd->clone(), &done};
         remote_cmds[target.node].enqueue(c);
 
         // add some waiting to simulate running the command
@@ -211,90 +209,94 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
         rss[node]->retire_command(std::move(cmd));
 
         // wait for the remote command to be done
-        while(!done) {}
-      }
-      else if(cmd->type == command_t::APPLY) {
+        while (!done) {
+        }
+      } else if (cmd->type == command_t::APPLY) {
 
-        std::cout << "APPLY " << cmd->id << " on my_node : " << node << " Executed...\n" << std::flush;
+        std::cout << "APPLY " << cmd->id << " on my_node : " << node
+                  << " Executed...\n"
+                  << std::flush;
 
-        if(cmd->get_root_node() == node) {
+        if (cmd->get_root_node() == node) {
 
           // store the outputs so we can add it to the storage
           auto outputs = cmd->get_outputs();
 
           // update all the outputs in the storage
-          for(auto &o : outputs) {
+          for (auto &o : outputs) {
             sto[node].insert(o.tid);
           }
 
           // retire the command
           rss[node]->retire_command(std::move(cmd));
-        }
-        else {
+        } else {
 
           // all applies are local
           throw std::runtime_error("How did this happen!");
         }
-      }
-      else if(cmd->type == command_t::DELETE) {
+      } else if (cmd->type == command_t::DELETE) {
 
         // this should never happen
-        throw std::runtime_error("We should never get a delete to execute, delete is implicit...");
-      }
-      else if(cmd->type == command_t::REDUCE) {
+        throw std::runtime_error(
+            "We should never get a delete to execute, delete is implicit...");
+      } else if (cmd->type == command_t::REDUCE) {
 
         // check if the reduce is remote or local
-        if(cmd->is_local_reduce(node)) {
+        if (cmd->is_local_reduce(node)) {
 
-          // std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+          // std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node <<
+          // '\n' << std::flush;
 
           // store the outputs so we can add it to the storage
           auto outputs = cmd->get_outputs();
 
           // update all the outputs in the storage
-          for(auto &o : outputs) {
+          for (auto &o : outputs) {
             sto[node].insert(o.tid);
           }
 
           // retire the command
           rss[node]->retire_command(std::move(cmd));
-        }
-        else {
+        } else {
 
-          std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << node << '\n' << std::flush;
+          std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << node
+                    << '\n'
+                    << std::flush;
 
           // store the outputs so we can add it to the storage
           auto outputs = cmd->get_outputs();
 
           // update all the outputs in the storage
-          for(auto &o : outputs) {
+          for (auto &o : outputs) {
             sto[node].insert(o.tid);
           }
 
           // figure out the nodes we need to retire the command to
           std::unordered_set<node_id_t> nodes_to_retire;
-          for(auto &in : cmd->get_inputs()) {
+          for (auto &in : cmd->get_inputs()) {
             nodes_to_retire.insert(in.node);
           }
-          for(auto &out : cmd->get_outputs()) {
+          for (auto &out : cmd->get_outputs()) {
             nodes_to_retire.insert(out.node);
           }
 
           // we use this to busy wait
           std::vector<std::atomic<bool>> done(nodes_to_retire.size());
-          for(auto &d : done) { d = false; }
+          for (auto &d : done) {
+            d = false;
+          }
 
           // retire the command for each node
           int32_t i = 0;
-          for(auto n : nodes_to_retire) {
+          for (auto n : nodes_to_retire) {
 
-            if(n == node) {
+            if (n == node) {
               done[i++] = true;
               continue;
             }
 
             // push the command
-            _remote_cmd_t c = {cmd->clone(), &done[i++] };
+            _remote_cmd_t c = {cmd->clone(), &done[i++]};
             remote_cmds[n].enqueue(c);
           }
 
@@ -305,11 +307,13 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
           rss[node]->retire_command(std::move(cmd));
 
           // wait till all done
-          for(auto &d : done) { while(!d) {} }
+          for (auto &d : done) {
+            while (!d) {
+            }
+          }
         }
       }
     }
-
   });
 
   return std::move(t);
@@ -317,20 +321,17 @@ std::thread create_command_processing_thread(std::vector<reservation_station_ptr
 
 TEST(TestReservationStation, FewLocalCommands0) {
 
-  auto cmd = command_t::create_apply(0,
-                                     {0, 0},
-                                     {},
-                                     {command_t::tid_node_id_t{.tid = 0, .node = 0}},
-                                     {command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                          command_t::tid_node_id_t{.tid = 3, .node = 0}});
+  auto cmd = command_t::create_apply(
+      0, {0, 0}, false, {}, {command_t::tid_node_id_t{.tid = 0, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 2, .node = 0},
+       command_t::tid_node_id_t{.tid = 3, .node = 0}});
 
   auto cmd2 = cmd->clone();
 
   auto inputs = cmd2->get_outputs();
-  for(auto in : inputs) {
+  for (auto in : inputs) {
     std::cout << in.tid << "\n";
   }
-
 }
 
 TEST(TestReservationStation, FewLocalCommands1) {
@@ -359,28 +360,25 @@ TEST(TestReservationStation, FewLocalCommands1) {
   rs->register_tensor(1);
 
   // make a command that applies something to tensor 0
-  EXPECT_TRUE(rs->queue_command(command_t::create_apply(0,
-                                                        {0, 0},
-                                                        {},
-                                                        {command_t::tid_node_id_t{.tid = 0, .node = 0}},
-                                                        {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_apply(
+      0, {0, 0}, false, {}, {command_t::tid_node_id_t{.tid = 0, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
   // make a command that deletes tensor with tid 0
-  EXPECT_TRUE(rs->queue_command(command_t::create_delete(1,
-                                                                 {command_t::tid_node_id_t{.tid = 0, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_delete(
+      1, {command_t::tid_node_id_t{.tid = 0, .node = 0}})));
 
   // make a command that runs a reduce
-  EXPECT_TRUE(rs->queue_command(command_t::create_reduce(2,
-                                                                {0, 0},
-                                                                {},
-                                                                {command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                                 command_t::tid_node_id_t{.tid = 2, .node = 0}},
-                                                                {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_reduce(
+      2, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 1, .node = 0},
+       command_t::tid_node_id_t{.tid = 2, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
 
   // make a command that deletes all the tensors except for the tid = 3 tensor
-  EXPECT_TRUE(rs->queue_command(command_t::create_delete(3,
-                                                                 {command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                                  command_t::tid_node_id_t{.tid = 2, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_delete(
+      3, {command_t::tid_node_id_t{.tid = 1, .node = 0},
+          command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
   // kick off commands
   rs->execute_scheduled_async();
@@ -410,7 +408,6 @@ TEST(TestReservationStation, FewLocalCommands1) {
   rs->wait_until_finished();
 }
 
-
 TEST(TestReservationStation, FewLocalCommands2) {
 
   // tensors = { (0, 0), (1, 0) }
@@ -436,19 +433,16 @@ TEST(TestReservationStation, FewLocalCommands2) {
   rs->register_tensor(1);
 
   // make a command that applies something to tensor 0
-  EXPECT_TRUE(rs->queue_command(command_t::create_apply(0,
-                                                                {0, 0},
-                                                                {},
-                                                                {command_t::tid_node_id_t{.tid = 0, .node = 0}},
-                                                                {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_apply(
+      0, {0, 0}, false, {}, {command_t::tid_node_id_t{.tid = 0, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 2, .node = 0}})));
 
   // make a command that runs a reduce
-  EXPECT_TRUE(rs->queue_command(command_t::create_reduce(1,
-                                                                {0, 0},
-                                                                {},
-                                                                {command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                                 command_t::tid_node_id_t{.tid = 2, .node = 0}},
-                                                                {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_reduce(
+      1, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 1, .node = 0},
+       command_t::tid_node_id_t{.tid = 2, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 3, .node = 0}})));
 
   // kick off commands
   rs->execute_scheduled_async();
@@ -460,17 +454,17 @@ TEST(TestReservationStation, FewLocalCommands2) {
   storage.insert(2);
   EXPECT_TRUE(rs->retire_command(std::move(c1)));
 
-  // get the next command 
+  // get the next command
   auto c2 = rs->get_next_command();
   storage.insert(3);
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
   // make a command that deletes all the tensors except for the tid = 3 tensor
-  EXPECT_TRUE(rs->queue_command(command_t::create_delete(2,
-                                                         {command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                         command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                         command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                                         command_t::tid_node_id_t{.tid = 3, .node = 0}})));
+  EXPECT_TRUE(rs->queue_command(command_t::create_delete(
+      2, {command_t::tid_node_id_t{.tid = 0, .node = 0},
+          command_t::tid_node_id_t{.tid = 1, .node = 0},
+          command_t::tid_node_id_t{.tid = 2, .node = 0},
+          command_t::tid_node_id_t{.tid = 3, .node = 0}})));
 
   // shutdown the reservation station
   rs->shutdown();
@@ -484,7 +478,6 @@ TEST(TestReservationStation, FewLocalCommands2) {
   // wait for the reservation station to finish
   rs->wait_until_finished();
 }
-
 
 TEST(TestReservationStation, TwoNodesBMM) {
 
@@ -548,185 +541,175 @@ TEST(TestReservationStation, TwoNodesBMM) {
   /// 1.1 shuffle A.rowID
 
   // MOVE (.input = {(0, 1)}, .output = {(0, 0)})
-  _cmds.emplace_back(command_t::create_move(0,
-                                            command_t::tid_node_id_t{.tid = 0, .node = 1},
-                                            command_t::tid_node_id_t{.tid = 0, .node = 0}));
+  _cmds.emplace_back(
+      command_t::create_move(0, command_t::tid_node_id_t{.tid = 0, .node = 1},
+                             command_t::tid_node_id_t{.tid = 0, .node = 0}));
 
   // MOVE (.input = {(0, 2)}, .output = {(1, 2)})
-  _cmds.emplace_back(command_t::create_move(1,
-                                            command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                            command_t::tid_node_id_t{.tid = 2, .node = 1}));
+  _cmds.emplace_back(
+      command_t::create_move(1, command_t::tid_node_id_t{.tid = 2, .node = 0},
+                             command_t::tid_node_id_t{.tid = 2, .node = 1}));
 
   /// 1.2 broadcast B
 
   // MOVE (.input = {(4, 1)}, .output = {(4, 0)})
-  _cmds.emplace_back(command_t::create_move(2,
-                                            command_t::tid_node_id_t{.tid = 4, .node = 1},
-                                            command_t::tid_node_id_t{.tid = 4, .node = 0}));
-
+  _cmds.emplace_back(
+      command_t::create_move(2, command_t::tid_node_id_t{.tid = 4, .node = 1},
+                             command_t::tid_node_id_t{.tid = 4, .node = 0}));
 
   // MOVE (.input = {(5, 1)}, .output = {(5, 0)})
-  _cmds.emplace_back(command_t::create_move(3,
-                                            command_t::tid_node_id_t{.tid = 5, .node = 1},
-                                            command_t::tid_node_id_t{.tid = 5, .node = 0}));
+  _cmds.emplace_back(
+      command_t::create_move(3, command_t::tid_node_id_t{.tid = 5, .node = 1},
+                             command_t::tid_node_id_t{.tid = 5, .node = 0}));
 
   // MOVE (.input = {(6, 0)}, .output = {(6, 1)})
-  _cmds.emplace_back(command_t::create_move(4,
-                                            command_t::tid_node_id_t{.tid = 6, .node = 0},
-                                            command_t::tid_node_id_t{.tid = 6, .node = 1}));
+  _cmds.emplace_back(
+      command_t::create_move(4, command_t::tid_node_id_t{.tid = 6, .node = 0},
+                             command_t::tid_node_id_t{.tid = 6, .node = 1}));
 
   // MOVE (.input = {(7, 0)}, .output = {(7, 1)})
-  _cmds.emplace_back(command_t::create_move(5,
-                                            command_t::tid_node_id_t{.tid = 7, .node = 0},
-                                            command_t::tid_node_id_t{.tid = 7, .node = 1}));
+  _cmds.emplace_back(
+      command_t::create_move(5, command_t::tid_node_id_t{.tid = 7, .node = 0},
+                             command_t::tid_node_id_t{.tid = 7, .node = 1}));
 
   /// 2.1 Do the multiply
 
   // (0, 0) x (0, 0) - APPLY (.input = {(0, 0), (4, 0)}, .output = {(8, 0)})
-  _cmds.emplace_back(command_t::create_apply(6,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 4, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 8, .node = 0}}));
-
+  _cmds.emplace_back(
+      command_t::create_apply(6, {0, 0}, false, {},
+                              {command_t::tid_node_id_t{.tid = 0, .node = 0},
+                               command_t::tid_node_id_t{.tid = 4, .node = 0}},
+                              {command_t::tid_node_id_t{.tid = 8, .node = 0}}));
 
   // (0, 1) x (1, 0) - APPLY (.input = {(1, 0), (6, 0)}, .output = {(9, 0)})
-  _cmds.emplace_back(command_t::create_apply(7,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 6, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 9, .node = 0}}));
+  _cmds.emplace_back(
+      command_t::create_apply(7, {0, 0}, false, {},
+                              {command_t::tid_node_id_t{.tid = 1, .node = 0},
+                               command_t::tid_node_id_t{.tid = 6, .node = 0}},
+                              {command_t::tid_node_id_t{.tid = 9, .node = 0}}));
 
   // (1, 0) x (0, 0) - APPLY (.input = {(2, 1), (4, 1)}, .output = {(10, 1)})
-  _cmds.emplace_back(command_t::create_apply(8,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 2, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 4, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 10, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      8, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 2, .node = 1},
+       command_t::tid_node_id_t{.tid = 4, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 10, .node = 1}}));
 
   // (1, 1) x (1, 0) - APPLY (.input = {(3, 1), (6, 1)}, .output = {(11, 1)})
-  _cmds.emplace_back(command_t::create_apply(9,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 3, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 6, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 11, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      9, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 3, .node = 1},
+       command_t::tid_node_id_t{.tid = 6, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 11, .node = 1}}));
 
   // (0, 0) x (0, 1) - APPLY (.input = {(0, 0), (5, 0)}, .output = {(12, 0)})
-  _cmds.emplace_back(command_t::create_apply(10,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 5, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 12, .node = 0}}));
+  _cmds.emplace_back(command_t::create_apply(
+      10, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 0, .node = 0},
+       command_t::tid_node_id_t{.tid = 5, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 12, .node = 0}}));
 
   // (0, 1) x (1, 1) - APPLY (.input = {(1, 0), (7, 0)}, .output = {(13, 0)})
-  _cmds.emplace_back(command_t::create_apply(11,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 7, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 13, .node = 0}}));
+  _cmds.emplace_back(command_t::create_apply(
+      11, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 1, .node = 0},
+       command_t::tid_node_id_t{.tid = 7, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 13, .node = 0}}));
 
   // (1, 0) x (0, 1) - APPLY (.input = {(2, 1), (5, 1)}, .output = {(14, 1)})
-  _cmds.emplace_back(command_t::create_apply(12,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 2, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 5, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 14, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      12, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 2, .node = 1},
+       command_t::tid_node_id_t{.tid = 5, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 14, .node = 1}}));
 
   // (1, 1) x (1, 1) - APPLY (.input = {(3, 1), (7, 1)}, .output = {(15, 1)})
-  _cmds.emplace_back(command_t::create_apply(13,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 3, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 7, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 15, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      13, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 3, .node = 1},
+       command_t::tid_node_id_t{.tid = 7, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 15, .node = 1}}));
 
   /// 2.2 Do the reduce
 
+  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(8, 0), (9, 0)},
+  // .output = {(16, 0)})
+  _cmds.emplace_back(command_t::create_reduce(
+      14, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 8, .node = 0},
+       command_t::tid_node_id_t{.tid = 9, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 16, .node = 0}}));
 
-  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(8, 0), (9, 0)}, .output = {(16, 0)})
-  _cmds.emplace_back(command_t::create_reduce(14,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 8, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 9, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 16, .node = 0}}));
+  // (1, 0) x (0, 0) + (1, 1) x (1, 0) - REDUCE (.input = {(10, 1), (11, 1)},
+  // .output = {(17, 1)})
+  _cmds.emplace_back(command_t::create_reduce(
+      15, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 10, .node = 1},
+       command_t::tid_node_id_t{.tid = 11, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 17, .node = 1}}));
 
-  // (1, 0) x (0, 0) + (1, 1) x (1, 0) - REDUCE (.input = {(10, 1), (11, 1)}, .output = {(17, 1)})
-  _cmds.emplace_back(command_t::create_reduce(15,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 10, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 11, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 17, .node = 1}}));
+  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(12, 0), (13, 0)},
+  // .output = {(18, 0)})
+  _cmds.emplace_back(command_t::create_reduce(
+      16, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 12, .node = 0},
+       command_t::tid_node_id_t{.tid = 13, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 18, .node = 0}}));
 
-  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(12, 0), (13, 0)}, .output = {(18, 0)})
-  _cmds.emplace_back(command_t::create_reduce(16,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 12, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 13, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 18, .node = 0}}));
-
-  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(14, 1), (15, 1)}, .output = {(19, 1)})
-  _cmds.emplace_back(command_t::create_reduce(17,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 14, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 15, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 19, .node = 1}}));
-
+  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(14, 1), (15, 1)},
+  // .output = {(19, 1)})
+  _cmds.emplace_back(command_t::create_reduce(
+      17, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 14, .node = 1},
+       command_t::tid_node_id_t{.tid = 15, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 19, .node = 1}}));
 
   /// Remove the intermediate results
 
   // remove them from node 0
-  _cmds.emplace_back(command_t::create_delete(18,{command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 6, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 7, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 4, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 5, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 8, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 9, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 12, .node = 0},
-                                                    command_t::tid_node_id_t{.tid = 13, .node = 0}}));
+  _cmds.emplace_back(command_t::create_delete(
+      18, {command_t::tid_node_id_t{.tid = 1, .node = 0},
+           command_t::tid_node_id_t{.tid = 2, .node = 0},
+           command_t::tid_node_id_t{.tid = 6, .node = 0},
+           command_t::tid_node_id_t{.tid = 7, .node = 0},
+           command_t::tid_node_id_t{.tid = 0, .node = 0},
+           command_t::tid_node_id_t{.tid = 4, .node = 0},
+           command_t::tid_node_id_t{.tid = 5, .node = 0},
+           command_t::tid_node_id_t{.tid = 8, .node = 0},
+           command_t::tid_node_id_t{.tid = 9, .node = 0},
+           command_t::tid_node_id_t{.tid = 12, .node = 0},
+           command_t::tid_node_id_t{.tid = 13, .node = 0}}));
 
   // remove them from node 1
-  _cmds.emplace_back(command_t::create_delete(19,{command_t::tid_node_id_t{.tid = 0, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 3, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 4, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 5, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 2, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 6, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 7, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 10, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 11, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 14, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 15, .node = 1}}));
+  _cmds.emplace_back(command_t::create_delete(
+      19, {command_t::tid_node_id_t{.tid = 0, .node = 1},
+           command_t::tid_node_id_t{.tid = 3, .node = 1},
+           command_t::tid_node_id_t{.tid = 4, .node = 1},
+           command_t::tid_node_id_t{.tid = 5, .node = 1},
+           command_t::tid_node_id_t{.tid = 2, .node = 1},
+           command_t::tid_node_id_t{.tid = 6, .node = 1},
+           command_t::tid_node_id_t{.tid = 7, .node = 1},
+           command_t::tid_node_id_t{.tid = 10, .node = 1},
+           command_t::tid_node_id_t{.tid = 11, .node = 1},
+           command_t::tid_node_id_t{.tid = 14, .node = 1},
+           command_t::tid_node_id_t{.tid = 15, .node = 1}}));
 
   // schedule them all at once
-  for(auto &cmd : _cmds) {
+  for (auto &cmd : _cmds) {
 
     // if it uses node 0
-    if(cmd->uses_node(0)) {
+    if (cmd->uses_node(0)) {
       EXPECT_TRUE(rss[0]->queue_command(cmd->clone()));
     }
 
     // check if node 1 uses the command
-    if(cmd->uses_node(1)) {
+    if (cmd->uses_node(1)) {
       EXPECT_TRUE(rss[1]->queue_command(cmd->clone()));
     }
   }
 
   // kick off commands
-  for(const auto& rs : rss) {
+  for (const auto &rs : rss) {
     rs->execute_scheduled_async();
   }
 
@@ -736,18 +719,20 @@ TEST(TestReservationStation, TwoNodesBMM) {
   // these threads will process the remote move operations
   std::vector<std::thread> _remote_executor_threads;
   _remote_executor_threads.reserve(2);
-  for(node_id_t node = 0; node < 2; ++node) {
+  for (node_id_t node = 0; node < 2; ++node) {
 
     // store the thread
-    _remote_executor_threads.push_back(std::move(create_remote_processing_thread(node, rss, sto, remote_cmds)));
+    _remote_executor_threads.push_back(std::move(
+        create_remote_processing_thread(node, rss, sto, remote_cmds)));
   }
 
   // simulator threads
   std::vector<std::thread> _executor_threads;
   _executor_threads.reserve(2);
-  for(node_id_t node = 0; node < 2; ++node) {
+  for (node_id_t node = 0; node < 2; ++node) {
 
-    _executor_threads.push_back(std::move(create_command_processing_thread(rss, sto, remote_cmds, node)));
+    _executor_threads.push_back(std::move(
+        create_command_processing_thread(rss, sto, remote_cmds, node)));
   }
 
   // create the deleters
@@ -768,12 +753,12 @@ TEST(TestReservationStation, TwoNodesBMM) {
   remote_cmds[1].enqueue(c);
 
   // wait for remote executors to finish
-  for(auto &t : _remote_executor_threads) {
+  for (auto &t : _remote_executor_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _executor_threads) {
+  for (auto &t : _executor_threads) {
     t.join();
   }
 
@@ -782,7 +767,7 @@ TEST(TestReservationStation, TwoNodesBMM) {
   EXPECT_EQ(sto[1].num_tensors(), 2);
 
   // wait for the reservation station to finish
-  for(auto &rs : rss) {
+  for (auto &rs : rss) {
     rs->wait_until_finished();
   }
 }
@@ -792,7 +777,8 @@ TEST(TestReservationStation, TwoNodesCMM) {
   // create the storage
   std::vector<fake_storage_t> sto(2);
 
-  std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> remote_notifications(2);
+  std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>>
+      remote_notifications(2);
 
   // create the two reservation stations
   std::vector<reservation_station_ptr_t> rss;
@@ -848,179 +834,170 @@ TEST(TestReservationStation, TwoNodesCMM) {
   // we put the commands we want to schedule here
   std::vector<command_ptr_t> _cmds;
 
-
   /// 1.1 shuffle A.colID
 
   // MOVE (.input = {( 0,  1)}, .output = {( 0,  0)})
-  _cmds.emplace_back(command_t::create_move(0,
-                                            command_t::tid_node_id_t{.tid = 0, .node = 1},
-                                            command_t::tid_node_id_t{.tid = 0, .node = 0}));
+  _cmds.emplace_back(
+      command_t::create_move(0, command_t::tid_node_id_t{.tid = 0, .node = 1},
+                             command_t::tid_node_id_t{.tid = 0, .node = 0}));
 
   // MOVE (.input = {(1,  0)}, .output = {(1,  1)})
-  _cmds.emplace_back(command_t::create_move(1,
-                                            command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                            command_t::tid_node_id_t{.tid = 1, .node = 1}));
+  _cmds.emplace_back(
+      command_t::create_move(1, command_t::tid_node_id_t{.tid = 1, .node = 0},
+                             command_t::tid_node_id_t{.tid = 1, .node = 1}));
 
   /// 1.2 shuffle B.rowID
 
   // MOVE (.input = {(4, 1)}, .output = {(4, 0)})
-  _cmds.emplace_back(command_t::create_move(2,
-                                            command_t::tid_node_id_t{.tid = 4, .node = 1},
-                                            command_t::tid_node_id_t{.tid = 4, .node = 0}));
+  _cmds.emplace_back(
+      command_t::create_move(2, command_t::tid_node_id_t{.tid = 4, .node = 1},
+                             command_t::tid_node_id_t{.tid = 4, .node = 0}));
 
   // MOVE (.input = {(7, 0)}, .output = {(7, 1)})
-  _cmds.emplace_back(command_t::create_move(3,
-                                            command_t::tid_node_id_t{.tid = 7, .node = 0},
-                                            command_t::tid_node_id_t{.tid = 7, .node = 1}));
-
+  _cmds.emplace_back(
+      command_t::create_move(3, command_t::tid_node_id_t{.tid = 7, .node = 0},
+                             command_t::tid_node_id_t{.tid = 7, .node = 1}));
 
   /// 2.1 Do the multiply
 
   // (0, 0) x (0, 0) - APPLY (.input = {(0, 0), (4, 0)}, .output = {(8, 0)})
-  _cmds.emplace_back(command_t::create_apply(4,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 4, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 8, .node = 0}}));
-
+  _cmds.emplace_back(
+      command_t::create_apply(4, {0, 0}, false, {},
+                              {command_t::tid_node_id_t{.tid = 0, .node = 0},
+                               command_t::tid_node_id_t{.tid = 4, .node = 0}},
+                              {command_t::tid_node_id_t{.tid = 8, .node = 0}}));
 
   // (0, 1) x (1, 0) - APPLY (.input = {(1, 1), (6, 1)}, .output = {(9, 1)})
-  _cmds.emplace_back(command_t::create_apply(5,
-                                             {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 1, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 6, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 9, .node = 1}}));
+  _cmds.emplace_back(
+      command_t::create_apply(5, {0, 0}, false, {},
+                              {command_t::tid_node_id_t{.tid = 1, .node = 1},
+                               command_t::tid_node_id_t{.tid = 6, .node = 1}},
+                              {command_t::tid_node_id_t{.tid = 9, .node = 1}}));
 
   // (1, 0) x (0, 0) - APPLY (.input = {(2, 0), (4, 0)}, .output = {(10, 0)})
-  _cmds.emplace_back(command_t::create_apply(6,
-                                              {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 4, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 10, .node = 0}}));
+  _cmds.emplace_back(command_t::create_apply(
+      6, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 2, .node = 0},
+       command_t::tid_node_id_t{.tid = 4, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 10, .node = 0}}));
 
   // (1, 1) x (1, 0) - APPLY (.input = {(3, 1), (6, 1)}, .output = {(11, 1)})
-  _cmds.emplace_back(command_t::create_apply(7,
-                                              {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 3, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 6, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 11, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      7, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 3, .node = 1},
+       command_t::tid_node_id_t{.tid = 6, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 11, .node = 1}}));
 
   // (0, 0) x (0, 1) - APPLY (.input = {(0, 0), (5, 0)}, .output = {(12, 0)})
-  _cmds.emplace_back(command_t::create_apply(8,
-                                              {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 5, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 12, .node = 0}}));
+  _cmds.emplace_back(command_t::create_apply(
+      8, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 0, .node = 0},
+       command_t::tid_node_id_t{.tid = 5, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 12, .node = 0}}));
 
   // (0, 1) x (1, 1) - APPLY (.input = {(1, 0), (7, 0)}, .output = {(13, 0)})
-  _cmds.emplace_back(command_t::create_apply(9,
-                                              {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 1, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 7, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 13, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      9, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 1, .node = 1},
+       command_t::tid_node_id_t{.tid = 7, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 13, .node = 1}}));
 
   // (1, 0) x (0, 1) - APPLY (.input = {(2, 1), (5, 1)}, .output = {(14, 1)})
-  _cmds.emplace_back(command_t::create_apply(10,
-                                              {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 5, .node = 0}},
-                                              {command_t::tid_node_id_t{.tid = 14, .node = 0}}));
+  _cmds.emplace_back(command_t::create_apply(
+      10, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 2, .node = 0},
+       command_t::tid_node_id_t{.tid = 5, .node = 0}},
+      {command_t::tid_node_id_t{.tid = 14, .node = 0}}));
 
   // (1, 1) x (1, 1) - APPLY (.input = {(3, 1), (7, 1)}, .output = {(15, 1)})
-  _cmds.emplace_back(command_t::create_apply(11,
-                                              {0, 0},
-                                             {},
-                                              {command_t::tid_node_id_t{.tid = 3, .node = 1},
-                                                      command_t::tid_node_id_t{.tid = 7, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 15, .node = 1}}));
+  _cmds.emplace_back(command_t::create_apply(
+      11, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 3, .node = 1},
+       command_t::tid_node_id_t{.tid = 7, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 15, .node = 1}}));
 
   /// 2.2 Do the reduce
 
-  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(8, 0), (9, 1)}, .output = {(16, 0)})
-  _cmds.emplace_back(command_t::create_reduce(12,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 8, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 9, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 16, .node = 0}}));
+  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(8, 0), (9, 1)},
+  // .output = {(16, 0)})
+  _cmds.emplace_back(command_t::create_reduce(
+      12, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 8, .node = 0},
+       command_t::tid_node_id_t{.tid = 9, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 16, .node = 0}}));
 
-  // (1, 0) x (0, 0) + (1, 1) x (1, 0) - REDUCE (.input = {(10, 0), (11, 1)}, .output = {(17, 1)})
-  _cmds.emplace_back(command_t::create_reduce(13,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 10, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 11, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 17, .node = 1}}));
+  // (1, 0) x (0, 0) + (1, 1) x (1, 0) - REDUCE (.input = {(10, 0), (11, 1)},
+  // .output = {(17, 1)})
+  _cmds.emplace_back(command_t::create_reduce(
+      13, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 10, .node = 0},
+       command_t::tid_node_id_t{.tid = 11, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 17, .node = 1}}));
 
-  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(12, 0), (13, 0)}, .output = {(18, 0)})
-  _cmds.emplace_back(command_t::create_reduce(14,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 12, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 13, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 18, .node = 0}}));
+  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(12, 0), (13, 0)},
+  // .output = {(18, 0)})
+  _cmds.emplace_back(command_t::create_reduce(
+      14, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 12, .node = 0},
+       command_t::tid_node_id_t{.tid = 13, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 18, .node = 0}}));
 
-  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(14, 1), (15, 1)}, .output = {(19, 1)})
-  _cmds.emplace_back(command_t::create_reduce(15,
-                                              {0, 0},
-                                              {},
-                                              {command_t::tid_node_id_t{.tid = 14, .node = 0},
-                                                      command_t::tid_node_id_t{.tid = 15, .node = 1}},
-                                              {command_t::tid_node_id_t{.tid = 19, .node = 1}}));
+  // (0, 0) x (0, 0) + (0, 1) x (1, 0) - REDUCE (.input = {(14, 1), (15, 1)},
+  // .output = {(19, 1)})
+  _cmds.emplace_back(command_t::create_reduce(
+      15, {0, 0}, false, {},
+      {command_t::tid_node_id_t{.tid = 14, .node = 0},
+       command_t::tid_node_id_t{.tid = 15, .node = 1}},
+      {command_t::tid_node_id_t{.tid = 19, .node = 1}}));
 
   /// 3.0 Remove the intermediate results
 
   // remove them from node 0
-  _cmds.emplace_back(command_t::create_delete(16,{ command_t::tid_node_id_t{.tid = 1, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 2, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 5, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 7, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 0, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 4, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 8, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 10, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 12, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 14, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 16, .node = 0},
-                                                       command_t::tid_node_id_t{.tid = 18, .node = 0}}));
+  _cmds.emplace_back(command_t::create_delete(
+      16, {command_t::tid_node_id_t{.tid = 1, .node = 0},
+           command_t::tid_node_id_t{.tid = 2, .node = 0},
+           command_t::tid_node_id_t{.tid = 5, .node = 0},
+           command_t::tid_node_id_t{.tid = 7, .node = 0},
+           command_t::tid_node_id_t{.tid = 0, .node = 0},
+           command_t::tid_node_id_t{.tid = 4, .node = 0},
+           command_t::tid_node_id_t{.tid = 8, .node = 0},
+           command_t::tid_node_id_t{.tid = 10, .node = 0},
+           command_t::tid_node_id_t{.tid = 12, .node = 0},
+           command_t::tid_node_id_t{.tid = 14, .node = 0},
+           command_t::tid_node_id_t{.tid = 16, .node = 0},
+           command_t::tid_node_id_t{.tid = 18, .node = 0}}));
 
   // remove them from node 0
-  _cmds.emplace_back(command_t::create_delete(17,{  command_t::tid_node_id_t{.tid = 0, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 3, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 4, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 6, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 1, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 7, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 9, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 11, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 13, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 15, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 17, .node = 1},
-                                                        command_t::tid_node_id_t{.tid = 19, .node = 1}}));
+  _cmds.emplace_back(command_t::create_delete(
+      17, {command_t::tid_node_id_t{.tid = 0, .node = 1},
+           command_t::tid_node_id_t{.tid = 3, .node = 1},
+           command_t::tid_node_id_t{.tid = 4, .node = 1},
+           command_t::tid_node_id_t{.tid = 6, .node = 1},
+           command_t::tid_node_id_t{.tid = 1, .node = 1},
+           command_t::tid_node_id_t{.tid = 7, .node = 1},
+           command_t::tid_node_id_t{.tid = 9, .node = 1},
+           command_t::tid_node_id_t{.tid = 11, .node = 1},
+           command_t::tid_node_id_t{.tid = 13, .node = 1},
+           command_t::tid_node_id_t{.tid = 15, .node = 1},
+           command_t::tid_node_id_t{.tid = 17, .node = 1},
+           command_t::tid_node_id_t{.tid = 19, .node = 1}}));
 
   // schedule them all at once
-  for(auto &cmd : _cmds) {
+  for (auto &cmd : _cmds) {
 
     // if it uses node 0
-    if(cmd->uses_node(0)) {
+    if (cmd->uses_node(0)) {
       EXPECT_TRUE(rss[0]->queue_command(cmd->clone()));
     }
 
     // check if node 1 uses the command
-    if(cmd->uses_node(1)) {
+    if (cmd->uses_node(1)) {
       EXPECT_TRUE(rss[1]->queue_command(cmd->clone()));
     }
   }
 
   // kick off commands
-  for(const auto& rs : rss) {
+  for (const auto &rs : rss) {
     rs->execute_scheduled_async();
   }
 
@@ -1030,37 +1007,38 @@ TEST(TestReservationStation, TwoNodesCMM) {
   // these threads will process the remote move operations
   std::vector<std::thread> _remote_executor_threads;
   _remote_executor_threads.reserve(2);
-  for(node_id_t node = 0; node < 2; ++node) {
+  for (node_id_t node = 0; node < 2; ++node) {
 
     // store the thread
-    _remote_executor_threads.push_back(std::move(create_remote_processing_thread(node, rss, sto, remote_cmds)));
+    _remote_executor_threads.push_back(std::move(
+        create_remote_processing_thread(node, rss, sto, remote_cmds)));
   }
 
   // simulator threads
   std::vector<std::thread> _executor_threads;
   _executor_threads.reserve(2);
-  for(node_id_t node = 0; node < 2; ++node) {
+  for (node_id_t node = 0; node < 2; ++node) {
 
-    _executor_threads.push_back(std::move(create_command_processing_thread(rss, sto, remote_cmds, node)));
+    _executor_threads.push_back(std::move(
+        create_command_processing_thread(rss, sto, remote_cmds, node)));
   }
 
   //
   std::vector<std::thread> _notifier_threads;
   _notifier_threads.reserve(2);
-  for(node_id_t node = 0; node < 2; ++node) {
-    for(node_id_t out_node = 0; out_node < 2; ++out_node) {
-      _notifier_threads.push_back(std::move(remote_tensor_notification_sender(node,
-                                                                              out_node,
-                                                                              rss,
-                                                                              remote_notifications)));
+  for (node_id_t node = 0; node < 2; ++node) {
+    for (node_id_t out_node = 0; out_node < 2; ++out_node) {
+      _notifier_threads.push_back(std::move(remote_tensor_notification_sender(
+          node, out_node, rss, remote_notifications)));
     }
   }
 
   //
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(2);
-  for(node_id_t node = 0; node < 2; ++node) {
-    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
+  for (node_id_t node = 0; node < 2; ++node) {
+    _notification_handler_threads.push_back(
+        std::move(tensor_notifier(node, rss, remote_notifications)));
   }
 
   // create the deleters
@@ -1085,22 +1063,22 @@ TEST(TestReservationStation, TwoNodesCMM) {
   remote_notifications[1].enqueue(d);
 
   // wait for remote executors to finish
-  for(auto &t : _remote_executor_threads) {
+  for (auto &t : _remote_executor_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _executor_threads) {
+  for (auto &t : _executor_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _notifier_threads) {
+  for (auto &t : _notifier_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _notification_handler_threads) {
+  for (auto &t : _notification_handler_threads) {
     t.join();
   }
 
@@ -1109,27 +1087,26 @@ TEST(TestReservationStation, TwoNodesCMM) {
   EXPECT_EQ(sto[1].num_tensors(), 0);
 
   // wait for the reservation station to finish
-  for(auto &rs : rss) {
+  for (auto &rs : rss) {
     rs->wait_until_finished();
   }
 }
 
-std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> init_matrix(size_t split,
-                                                                                 size_t num_nodes,
-                                                                                 tid_t &cur_tid,
-                                                                                 std::vector<fake_storage_t> &sto,
-                                                                                 std::vector<reservation_station_ptr_t> &rss,
-                                                                                 std::vector<std::vector<int32_t>> &to_del) {
+std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>>
+init_matrix(size_t split, size_t num_nodes, tid_t &cur_tid,
+            std::vector<fake_storage_t> &sto,
+            std::vector<reservation_station_ptr_t> &rss,
+            std::vector<std::vector<int32_t>> &to_del) {
 
   std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> mat_a;
-  for(int32_t rowID = 0; rowID < split; ++rowID) {
-    for(int32_t colID = 0; colID < split; ++colID) {
+  for (int32_t rowID = 0; rowID < split; ++rowID) {
+    for (int32_t colID = 0; colID < split; ++colID) {
 
       // get the node
       node_id_t node = rand() % num_nodes;
-      mat_a[ { rowID, colID } ] = { node, cur_tid };
+      mat_a[{rowID, colID}] = {node, cur_tid};
 
-      if(cur_tid == 250) {
+      if (cur_tid == 250) {
         std::cout << "bla\n";
       }
       // register the tensor
@@ -1147,38 +1124,35 @@ std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> init_matrix
   return std::move(mat_a);
 }
 
-template<class fun>
-void create_shuffle(size_t num_nodes,
-                    size_t split,
-                    command_id_t &cur_cmd,
+template <class fun>
+void create_shuffle(size_t num_nodes, size_t split, command_id_t &cur_cmd,
                     fun fn,
-                    std::map<std::tuple<int32_t, int32_t>, std::tuple<node_id_t, tid_t>> &mat_locs,
+                    std::map<std::tuple<int32_t, int32_t>,
+                             std::tuple<node_id_t, tid_t>> &mat_locs,
                     std::vector<command_ptr_t> &_cmds,
                     std::vector<std::vector<int32_t>> &to_del) {
 
-
   // do the shuffle
-  for(int32_t rowID = 0; rowID < split; ++rowID) {
+  for (int32_t rowID = 0; rowID < split; ++rowID) {
     for (int32_t colID = 0; colID < split; ++colID) {
 
       // get the tid and the node of this block
-      auto &[node, tid] = mat_locs[ { rowID, colID } ];
+      auto &[node, tid] = mat_locs[{rowID, colID}];
 
       // no need to move here
-      auto target_node = (node_id_t) fn(rowID, colID, num_nodes);
-      if(node == target_node) {
+      auto target_node = (node_id_t)fn(rowID, colID, num_nodes);
+      if (node == target_node) {
         continue;
       }
 
-      if(tid == 250) {
+      if (tid == 250) {
         std::cout << "bla\n";
       }
 
       // move it
-      _cmds.emplace_back(command_t::create_move(cur_cmd++,
-                                                command_t::tid_node_id_t{.tid = tid, .node = node},
-                                                command_t::tid_node_id_t{.tid = tid, .node = target_node}));
-
+      _cmds.emplace_back(command_t::create_move(
+          cur_cmd++, command_t::tid_node_id_t{.tid = tid, .node = node},
+          command_t::tid_node_id_t{.tid = tid, .node = target_node}));
 
       // mark that we need to delete it later
       to_del[target_node].push_back(tid);
@@ -1198,12 +1172,13 @@ TEST(TestReservationStation, NNodesCMM) {
   std::vector<std::vector<int32_t>> to_del(num_nodes);
 
   // create the storage
-  std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>> remote_notifications(num_nodes);
+  std::vector<bbts::concurent_queue<std::pair<std::vector<tid_t>, int32_t>>>
+      remote_notifications(num_nodes);
   std::vector<fake_storage_t> sto(num_nodes);
 
   // create the two reservation stations
   std::vector<reservation_station_ptr_t> rss(num_nodes);
-  for(auto node = 0; node < num_nodes; ++node) {
+  for (auto node = 0; node < num_nodes; ++node) {
     rss[node] = std::make_shared<reservation_station_t>(node, num_nodes);
   }
 
@@ -1215,90 +1190,95 @@ TEST(TestReservationStation, NNodesCMM) {
   std::vector<command_ptr_t> _cmds;
 
   // do the shuffle for a
-  create_shuffle(num_nodes, split, cur_cmd,
-                 [](int32_t rowID, int32_t colID, size_t num_nodes) { return  colID % num_nodes; }, a_mat,_cmds, to_del);
+  create_shuffle(
+      num_nodes, split, cur_cmd,
+      [](int32_t rowID, int32_t colID, size_t num_nodes) {
+        return colID % num_nodes;
+      },
+      a_mat, _cmds, to_del);
 
   // do the shuffle for b
-  create_shuffle(num_nodes, split, cur_cmd,
-                 [](int32_t rowID, int32_t colID, size_t num_nodes) { return  rowID % num_nodes; }, b_mat,_cmds, to_del);
+  create_shuffle(
+      num_nodes, split, cur_cmd,
+      [](int32_t rowID, int32_t colID, size_t num_nodes) {
+        return rowID % num_nodes;
+      },
+      b_mat, _cmds, to_del);
 
   // create all the multiply commands
-  std::map<std::tuple<int32_t, int32_t>, std::vector<std::tuple<tid_t, node_id_t>>> multiplies;
-  for(int32_t i = 0; i < split; ++i) {
-    for(int32_t j = 0; j < split; ++j) {
-      for(int32_t k = 0; k < split; ++k) {
+  std::map<std::tuple<int32_t, int32_t>,
+           std::vector<std::tuple<tid_t, node_id_t>>>
+      multiplies;
+  for (int32_t i = 0; i < split; ++i) {
+    for (int32_t j = 0; j < split; ++j) {
+      for (int32_t k = 0; k < split; ++k) {
 
         // get the tid and the node
-        auto [a_node, a_tid] = a_mat[ { i, k } ];
-        auto [b_node, b_tid] = b_mat[ { k, j } ];
+        auto [a_node, a_tid] = a_mat[{i, k}];
+        auto [b_node, b_tid] = b_mat[{k, j}];
 
         // get the target node
-        auto target_node = (node_id_t) (k % num_nodes);
+        auto target_node = (node_id_t)(k % num_nodes);
 
         // add the command
-        _cmds.emplace_back(command_t::create_apply(cur_cmd++,
-                                                   { 0, 0 },
-                                                   {},
-                                                    { command_t::tid_node_id_t{ .tid = a_tid, .node = target_node },
-                                                             command_t::tid_node_id_t{ .tid = b_tid, .node = target_node } },
-                                                    { command_t::tid_node_id_t{.tid = cur_tid, .node = target_node} }));
-
+        _cmds.emplace_back(command_t::create_apply(
+            cur_cmd++, {0, 0}, false, {},
+            {command_t::tid_node_id_t{.tid = a_tid, .node = target_node},
+             command_t::tid_node_id_t{.tid = b_tid, .node = target_node}},
+            {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
 
         to_del[target_node].push_back(cur_tid);
-        multiplies[{i, j}].push_back({ cur_tid, target_node });
+        multiplies[{i, j}].push_back({cur_tid, target_node});
         cur_tid++;
       }
     }
   }
 
   // create the aggregate
-  for(int32_t rowID = 0; rowID < split; ++rowID) {
-    for(int32_t colID = 0; colID < split; ++colID) {
+  for (int32_t rowID = 0; rowID < split; ++rowID) {
+    for (int32_t colID = 0; colID < split; ++colID) {
 
       // all the multiplied tensors
-      auto &muls = multiplies[ { rowID, colID } ];
+      auto &muls = multiplies[{rowID, colID}];
 
       // get the target node
-      auto target_node = (node_id_t) ((rowID + colID * split) % num_nodes);
+      auto target_node = (node_id_t)((rowID + colID * split) % num_nodes);
 
       // figure out the inputs
       std::vector<bbts::command_t::tid_node_id_t> inputs;
-      for(auto &mul : muls) {
+      for (auto &mul : muls) {
         auto &[tid, node] = mul;
         inputs.push_back({.tid = tid, .node = node});
       }
 
       // create the reduce command
-      _cmds.emplace_back(command_t::create_reduce(cur_cmd++,
-                                                  {0, 0},
-                                                  {},
-                                                  inputs,
-                                                  {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
+      _cmds.emplace_back(command_t::create_reduce(
+          cur_cmd++, {0, 0}, false, {}, inputs,
+          {command_t::tid_node_id_t{.tid = cur_tid, .node = target_node}}));
 
       cur_tid++;
     }
   }
 
   // prepare the removes
-  for(int32_t node = 0; node < num_nodes; ++node) {
-
+  for (int32_t node = 0; node < num_nodes; ++node) {
 
     // store the number we need to delete
     std::vector<bbts::command_t::tid_node_id_t> _inputs;
     _inputs.reserve(to_del[node].size());
-    for(auto t : to_del[node]) {
+    for (auto t : to_del[node]) {
       _inputs.push_back(command_t::tid_node_id_t{.tid = t, .node = node});
     }
 
     // remove them from node
-    _cmds.emplace_back(command_t::create_delete(cur_cmd++,_inputs));
+    _cmds.emplace_back(command_t::create_delete(cur_cmd++, _inputs));
   }
 
   // schedule them all at once
-  for(auto & _cmd : _cmds) {
+  for (auto &_cmd : _cmds) {
 
     // if it uses node 0
-    for(int32_t node = 0; node < num_nodes; ++node) {
+    for (int32_t node = 0; node < num_nodes; ++node) {
       if (_cmd->uses_node(node)) {
         EXPECT_TRUE(rss[node]->queue_command(_cmd->clone()));
       }
@@ -1306,7 +1286,7 @@ TEST(TestReservationStation, NNodesCMM) {
   }
 
   // kick off commands
-  for(const auto& rs : rss) {
+  for (const auto &rs : rss) {
     rs->execute_scheduled_async();
   }
 
@@ -1316,96 +1296,98 @@ TEST(TestReservationStation, NNodesCMM) {
   // these threads will process the remote move operations
   std::vector<std::thread> _remote_executor_threads;
   _remote_executor_threads.reserve(num_nodes);
-  for(node_id_t node = 0; node < num_nodes; ++node) {
+  for (node_id_t node = 0; node < num_nodes; ++node) {
 
     // store the thread
-    _remote_executor_threads.push_back(std::move(create_remote_processing_thread(node, rss, sto, remote_cmds)));
+    _remote_executor_threads.push_back(std::move(
+        create_remote_processing_thread(node, rss, sto, remote_cmds)));
   }
 
   // simulator threads
   std::vector<std::thread> _executor_threads;
   _executor_threads.reserve(num_nodes);
-  for(node_id_t node = 0; node < num_nodes; ++node) {
-    _executor_threads.push_back(std::move(create_command_processing_thread(rss, sto, remote_cmds, node)));
+  for (node_id_t node = 0; node < num_nodes; ++node) {
+    _executor_threads.push_back(std::move(
+        create_command_processing_thread(rss, sto, remote_cmds, node)));
   }
 
   //
   std::vector<std::thread> _notifier_threads;
   _notifier_threads.reserve(num_nodes);
-  for(node_id_t node = 0; node < num_nodes; ++node) {
-    for(node_id_t out_node = 0; out_node < num_nodes; ++out_node) {
-      _notifier_threads.push_back(std::move(remote_tensor_notification_sender(node,
-                                                                              out_node,
-                                                                              rss,
-                                                                              remote_notifications)));
+  for (node_id_t node = 0; node < num_nodes; ++node) {
+    for (node_id_t out_node = 0; out_node < num_nodes; ++out_node) {
+      _notifier_threads.push_back(std::move(remote_tensor_notification_sender(
+          node, out_node, rss, remote_notifications)));
     }
   }
 
   //
   std::vector<std::thread> _notification_handler_threads;
   _notification_handler_threads.reserve(num_nodes);
-  for(node_id_t node = 0; node < num_nodes; ++node) {
-    _notification_handler_threads.push_back(std::move(tensor_notifier(node, rss, remote_notifications)));
+  for (node_id_t node = 0; node < num_nodes; ++node) {
+    _notification_handler_threads.push_back(
+        std::move(tensor_notifier(node, rss, remote_notifications)));
   }
 
   // create the deleters
   std::vector<std::thread> deleters;
   deleters.reserve(num_nodes);
-  for(node_id_t node = 0; node < num_nodes; ++node) {
-    deleters.push_back(std::move(create_deleter_thread(rss[node], sto[node], to_del[node].size())));
+  for (node_id_t node = 0; node < num_nodes; ++node) {
+    deleters.push_back(std::move(
+        create_deleter_thread(rss[node], sto[node], to_del[node].size())));
   }
 
   // wait for the deleters
-  for(node_id_t node = 0; node < num_nodes; ++node) {
+  for (node_id_t node = 0; node < num_nodes; ++node) {
     deleters[node].join();
   }
 
   // shutdown the rss
-  for(node_id_t node = 0; node < num_nodes; ++node) {
+  for (node_id_t node = 0; node < num_nodes; ++node) {
     rss[node]->shutdown();
   }
 
   _remote_cmd_t c = {nullptr, nullptr};
-  for(node_id_t node = 0; node < num_nodes; ++node) {
+  for (node_id_t node = 0; node < num_nodes; ++node) {
     remote_cmds[node].enqueue(c);
   }
 
   std::pair<std::vector<tid_t>, int32_t> d = {{}, -1};
-  for(node_id_t node = 0; node < num_nodes; ++node) {
+  for (node_id_t node = 0; node < num_nodes; ++node) {
     remote_notifications[node].enqueue(d);
   }
 
   // wait for remote executors to finish
-  for(auto &t : _remote_executor_threads) {
+  for (auto &t : _remote_executor_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _executor_threads) {
+  for (auto &t : _executor_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _notifier_threads) {
+  for (auto &t : _notifier_threads) {
     t.join();
   }
 
   // wait for the executors
-  for(auto &t : _notification_handler_threads) {
+  for (auto &t : _notification_handler_threads) {
     t.join();
   }
 
   size_t num = 0;
-  for(node_id_t node = 0; node < num_nodes; ++node) {
+  for (node_id_t node = 0; node < num_nodes; ++node) {
     num += sto[node].num_tensors();
   }
 
   EXPECT_EQ(num, split * split);
 
   // wait for the reservation station to finish
-  for(auto &rs : rss) {
+  for (auto &rs : rss) {
     rs->wait_until_finished();
   }
 }
 
-}
+} // namespace bbts
