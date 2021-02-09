@@ -11,6 +11,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    storage_ptr_t _storage,
                                    bbts::command_runner_ptr_t _command_runner,
                                    bbts::tensor_notifier_ptr_t _tensor_notifier,
+                                   bbts::tensor_factory_ptr_t _tf,
                                    tensor_stats_ptr_t _stats)
 
     : _comm(std::move(_comm)),
@@ -19,6 +20,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
       _storage(std::move(_storage)),
       _command_runner(std::move(_command_runner)),
       _tensor_notifier(std::move(_tensor_notifier)),
+      _tf(std::move(_tf)),
       _stats(std::move(_stats)) { _is_down = false; }
 
 void bbts::coordinator_t::accept() {
@@ -56,6 +58,10 @@ void bbts::coordinator_t::accept() {
       }
       case coordinator_op_types_t::PRINT_STORAGE : {
         _print_storage();
+        break;
+      }
+      case coordinator_op_types_t::PRINT_TENSOR : {
+        _print_tensor((tid_t)(op._val));
         break;
       }
     }
@@ -187,11 +193,24 @@ std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
 std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
 
   if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_STORAGE, ._val = 0})) {
-    return {false, "Failed to set the verbose flag!\n"};
+    return {false, "Failed to print storage!\n"};
   }
 
   // print the storage
   _print_storage();
+
+  // we succeded
+  return {true, ""};
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::print_tensor_info(bbts::tid_t id) {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_TENSOR, ._val = (size_t)(id) } )) {
+    return {false, "Failed to print tensor!\n"};
+  }
+
+  // print the storage
+  _print_tensor(id);
 
   // we succeded
   return {true, ""};
@@ -268,6 +287,31 @@ void bbts::coordinator_t::_print_storage() {
     if (node == _comm->get_rank()) {
       std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
       _storage->print();
+    }
+
+    _comm->barrier();
+  }
+
+  // final sync just in case
+  _comm->barrier();
+}
+
+void bbts::coordinator_t::_print_tensor(tid_t id) {
+
+  // each node gets a turn
+  for (node_id_t node = 0; node < _comm->get_num_nodes(); ++node) {
+
+    // check the rank of the node
+    if (node == _comm->get_rank()) {
+
+      // the get the tensor
+      auto ts = _storage->get_by_tid(id);
+      if(ts != nullptr) {
+        
+        // print the tensor since we found it
+        std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
+        _tf->print_tensor(ts);
+      }
     }
 
     _comm->barrier();

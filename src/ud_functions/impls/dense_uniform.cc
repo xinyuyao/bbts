@@ -73,6 +73,8 @@ void bbts::dense_uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t 
   // create a bunch of random numbers
   vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, (int32_t) (numRows * numCols), out.data(), left, right);
 
+  //for(int i = 0; i < numRows * numCols; ++i) { out.data()[i] = 1.0f; }
+
   // delete the stream
   vslDeleteStream(&stream);
 }

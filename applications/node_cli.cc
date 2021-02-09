@@ -1,4 +1,6 @@
+#include <bits/stdint-intn.h>
 #include <iostream>
+#include <memory>
 #include "../src/tensor/tensor.h"
 #include "../src/tensor/tensor_factory.h"
 #include "../src/server/node.h"
@@ -197,7 +199,16 @@ void prompt(bbts::node_t &node) {
     else if(what == "storage") {
       node.print_storage_info();
     }
-  },"Returns information about the cluster. Usage : info [cluster, storage] \n ");
+    
+  },"Returns information about the cluster. Usage : info [cluster, storage, tensor] \n ");
+
+  rootMenu->Insert("info",[&](std::ostream &out, const std::string &what, int32_t id) {
+
+    if(what == "tensor") {
+      node.print_tensor_info(static_cast<bbts::tid_t>(id));
+    }
+
+  },"Returns information about the cluster. Usage : info [cluster, storage, tensor] [tid] \n ");
 
   rootMenu->Insert("load",[&](std::ostream &out, const std::string &file) {
 

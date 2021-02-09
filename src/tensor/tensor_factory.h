@@ -24,6 +24,9 @@ public:
   // gets the size or at least the upper bound required to store a tensor
   size_t get_tensor_size(const tensor_meta_t& _meta);
 
+  // the tensor to print
+  void print_tensor(tensor_t* here);
+
   // initializes the tensor
   tensor_t& init_tensor(tensor_t* here, const tensor_meta_t& _meta);
 

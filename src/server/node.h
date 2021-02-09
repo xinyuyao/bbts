@@ -73,6 +73,9 @@ public:
   // print the info about the storage
   std::tuple<bool, std::string> print_storage_info();
 
+  // prints information about the tensor
+  std::tuple<bool, std::string> print_tensor_info(tid_t id);
+
   // resets the cluster
   std::tuple<bool, std::string> clear();
 

@@ -27,6 +27,7 @@ public:
                 storage_ptr_t _storage,
                 bbts::command_runner_ptr_t _command_runner,
                 bbts::tensor_notifier_ptr_t _tensor_notifier,
+                bbts::tensor_factory_ptr_t _tf,
                 tensor_stats_ptr_t _stats);
 
   // accept a request
@@ -43,6 +44,9 @@ public:
 
   // print the info abo
   std::tuple<bool, std::string> print_storage_info();
+
+  // print info about a tensor
+  std::tuple<bool, std::string> print_tensor_info(bbts::tid_t id);
 
   // clears the storage
   std::tuple<bool, std::string> clear();
@@ -71,6 +75,8 @@ private:
 
   void _print_storage();
 
+  void _print_tensor(tid_t);
+
   // the communicator
   bbts::communicator_ptr_t _comm;
 
@@ -94,6 +100,9 @@ private:
 
   // the notifier
   bbts::tensor_notifier_ptr_t _tensor_notifier;
+
+  // tensor factory
+  bbts::tensor_factory_ptr_t _tf;
 };
 
 // the pointer

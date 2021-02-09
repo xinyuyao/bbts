@@ -36,7 +36,7 @@ void bbts::node_t::init() {
 
   // the scheduler
   _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger,
-                                                 _storage, _command_runner, _tensor_notifier, _stats);
+                                                 _storage, _command_runner, _tensor_notifier, _factory,  _stats);
 }
 
 void bbts::node_t::run() {
@@ -167,6 +167,10 @@ std::tuple<bool, std::string> bbts::node_t::set_verbose(bool val) {
 
 std::tuple<bool, std::string> bbts::node_t::print_storage_info() {
   return _coordinator->print_storage_info();
+}
+
+std::tuple<bool, std::string> bbts::node_t::print_tensor_info(tid_t id) {
+  return _coordinator->print_tensor_info(id);
 }
 
 std::tuple<bool, std::string> bbts::node_t::clear() {
