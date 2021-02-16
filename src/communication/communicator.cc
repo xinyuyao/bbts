@@ -1,4 +1,5 @@
 #include "communicator.h"
+#include <mpi.h>
 
 namespace bbts {
 
@@ -195,6 +196,52 @@ void mpi_communicator_t::barrier() {
 
   // wait for every node
   MPI_Barrier(MPI_COMM_WORLD);
+}
+
+bool mpi_communicator_t::sync_resource_aquisition(command_id_t cmd, const std::vector<node_id_t> &nodes, bool my_val) {
+
+  // get the world group
+  MPI_Group world_group;
+  MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+  // the group that is syncing on the resource
+  MPI_Group resource_group;
+  MPI_Group_incl(world_group, nodes.size(), nodes.data(), &resource_group);
+
+  // the resource group
+  MPI_Comm resource_comm;
+  MPI_Comm_create_group(MPI_COMM_WORLD, resource_group, 0, &resource_comm);
+  
+  // get the result
+  bool out;
+  MPI_Allreduce(&my_val, &out, 1, MPI_C_BOOL, MPI_LAND, resource_comm);
+
+  // do a reduce on the value
+  MPI_Group_free(&world_group);
+  MPI_Group_free(&resource_group);
+  MPI_Comm_free(&resource_comm);
+
+  // return the result
+  return out;
+}
+
+bool mpi_communicator_t::sync_resource_aquisition_p2p(command_id_t cmd, node_id_t &node, bool my_val) {
+
+  // the requests
+  MPI_Request send_request_lr, recv_request_lr;
+
+  // exchange the values
+  bool its_val;
+  MPI_Irecv(&its_val, 1, MPI_C_BOOL, _rank, 0, MPI_COMM_WORLD, &send_request_lr);
+  MPI_Isend(&my_val,  1, MPI_C_BOOL, node,  0, MPI_COMM_WORLD, &recv_request_lr);
+
+  // sync everything
+  MPI_Status status;
+  MPI_Wait(&send_request_lr, &status);
+  MPI_Wait(&recv_request_lr, &status);
+
+  // return the result
+  return its_val && my_val;
 }
 
 bool mpi_communicator_t::send_coord_op(const bbts::coordinator_op_t &op) {

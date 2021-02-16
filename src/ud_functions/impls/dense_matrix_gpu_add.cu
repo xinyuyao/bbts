@@ -77,8 +77,6 @@ void bbts::dense_matrix_gpu_add_t::add(const bbts::ud_impl_t::tensor_params_t &p
     uint32_t n = I * J;
     uint32_t grid_size = (int) ceil ((float) n / block_size);
  
-    std::cout << "Running GPU\n";
-
     // Execute the kernel
     dense_add_kernel<<<grid_size, block_size>>>(a.data(), b.data(), out.data(), n);
 

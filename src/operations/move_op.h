@@ -19,9 +19,6 @@ public:
   int32_t _tag; 
 
   // the tensor of this node, either the input or the output
-  bbts::tensor_t *_tensor;
-
-  // the id of the tensor we are moving
   tid_t _tid;
 
   // is this node the sender
@@ -40,8 +37,8 @@ public:
   const bbts::tensor_stats_t &_stats;
 
   // constructs the reduce operation
-  move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor, 
-            bbts::tensor_stats_t &_stat, tid_t _tid, bool _is_sender, bbts::tensor_factory_t &_factory,
+  move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_stats_t &_stat, 
+            tid_t _tid, bool _is_sender, bbts::tensor_factory_t &_factory,
             bbts::storage_t &_storage, bbts::node_id_t _node);
 
   // apply this operation

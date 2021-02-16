@@ -1,41 +1,38 @@
+#include "storage.h"
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>  
 
-#include "storage.h"
 #include "../server/static_config.h"
 #include "../utils/terminal_color.h"
 #include <iostream>
+
 
 namespace bbts {
 
 storage_t::~storage_t() {
 
   // go through each allocated tensor and free it
-  for(auto &it : _allocated_tensors) {
+  for(auto &it : _tensor_nfo) {
     if(it.second.is_gpu) {
-      cudaFree(it.first);
+      cudaFree(it.second.address);
     }
     else {
-      free(it.first);
+      free(it.second.address);
     }
   }
 }
 
-tensor_t *storage_t::get_by_tid(tid_t _id) { 
-
-  // lock this thing
-  std::unique_lock<std::mutex> lck (_m);
+storage_t::tensor_ref_t storage_t::_get_by_tid(tid_t _id) { 
 
   // try to find the tensor if we find it return the address 
   auto it = _tensor_nfo.find(_id);
-  return it != _tensor_nfo.end() ? it->second.address : nullptr;
+  return it != _tensor_nfo.end() ? tensor_ref_t{ .id = _id, .tensor = it->second.address } : 
+                                   tensor_ref_t{ .id = _id, .tensor = nullptr };
 }
 
-tensor_t *storage_t::create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu) {
-  
-  // lock this thing
-  std::unique_lock<std::mutex> lck (_m);
+storage_t::tensor_ref_t storage_t::_create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu) {
 
   // malloc the tensor
   tensor_t *ts;
@@ -46,22 +43,19 @@ tensor_t *storage_t::create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu
     ts = (tensor_t*) malloc(num_bytes); 
   }
 
+  // store the info
   _tensor_nfo[_id] = sto_tensor_nfo_t{.address = ts, .num_bytes = num_bytes, .is_gpu = used_by_gpu};
-  _allocated_tensors[ts] = { .id=_id, .num_bytes=num_bytes, .is_gpu= used_by_gpu };
-
-  lck.unlock();
 
   // notify that the tensor is created
-  _tensor_create_hook(_id);
+  if constexpr (static_config::enable_hooks) {
+    _tensor_create_hook(_id);
+  }
 
   // return the tensor
-  return ts;
+  return {.id = _id, .tensor = ts};
 }
 
-tensor_t *storage_t::create_tensor(size_t num_bytes, bool used_by_gpu) {
-
-  // lock this thing
-  std::unique_lock<std::mutex> lck (_m);
+storage_t::tensor_ref_t storage_t::_create_tensor(size_t num_bytes, bool used_by_gpu) {
 
   // malloc the tensor
   tensor_t *ts;
@@ -72,9 +66,9 @@ tensor_t *storage_t::create_tensor(size_t num_bytes, bool used_by_gpu) {
     ts = (tensor_t*) malloc(num_bytes); 
   }
 
-  _allocated_tensors[ts] = { .id=TID_NONE, .num_bytes=num_bytes, .is_gpu=used_by_gpu };
-
-  lck.unlock();
+  // get a new tid for this
+  auto tid = _current_anon--;
+  _tensor_nfo[tid] = { .address=ts, .num_bytes=num_bytes, .is_gpu=used_by_gpu };
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
@@ -84,78 +78,10 @@ tensor_t *storage_t::create_tensor(size_t num_bytes, bool used_by_gpu) {
   }
 
   // return the tensor
-  return ts;
-}
-
-bool storage_t::remove_by_tensor(tensor_t &_tensor) {
-
-  // lock this thing
-  std::unique_lock<std::mutex> lck (_m);
-
-  // try to find the tensor
-  auto it = _allocated_tensors.find(&_tensor);
-  if(it == _allocated_tensors.end()) {
-    return false;
-  }
-
-  // free the tensor
-  if(it->second.is_gpu) {
-    cudaFree(it->first);
-  }
-  else {
-    free(it->first);
-  }
-
-  // remove the it from the other mapping if necessary
-  auto _tid = it->second.id;
-  if(it->second.id != TID_NONE) {
-    _tensor_nfo.erase(it->second.id);
-  }
-
-  // remove it from the allocated tensors
-  _allocated_tensors.erase(it);
-
-  // we are done with bookkeeping
-  lck.unlock();
-
-  // call the hook if necessary
-  if constexpr (static_config::enable_hooks) {
-
-    // call that the tensor is deleted
-    _tensor_delete_hook(_tid);
-  }
-
-  // we are out of here...
-  return true;
-}
-
-bool storage_t::assign_tid(tensor_t &_tensor, tid_t _tid) {
-
-  // lock this thing
-  std::unique_lock<std::mutex> lck (_m);
-
-  // try to find the tensor
-  auto it = _allocated_tensors.find(&_tensor);
-  if(it == _allocated_tensors.end()) {
-    return false;
-  }
-
-  // make sure that we don't already have a tensor with this tid
-  if(_tensor_nfo.find(_tid) != _tensor_nfo.end()) {
-    return false;
-  }
-
-  // set the new id
-  it->second.id = _tid;
-  _tensor_nfo[_tid] = sto_tensor_nfo_t{ .address = &_tensor, .num_bytes = it->second.num_bytes };
-
-  return true;
+  return {.id = tid, .tensor = ts};
 }
 
 bool storage_t::remove_by_tid(tid_t _id) {
-  
-  // lock this thing
-  std::unique_lock<std::mutex> lck (_m);
 
   // remove the tensor
   auto it = _tensor_nfo.find(_id);
@@ -164,20 +90,15 @@ bool storage_t::remove_by_tid(tid_t _id) {
   }
 
   // free the tensor
-  auto jt = _allocated_tensors.find(it->second.address);
-  if(jt->second.is_gpu) {
-    cudaFree(jt->first);
+  if(it->second.is_gpu) {
+    cudaFree(it->second.address);
   }
   else {
-    free(jt->first);
+    free(it->second.address);
   }
 
   // remove the tensor
-  _allocated_tensors.erase(jt);
   _tensor_nfo.erase(it);
-
-  // unlock
-  lck.unlock();
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
@@ -204,8 +125,8 @@ void storage_t::print() {
 
   // print all the allocated tensors
   std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
-  for(auto &t : _allocated_tensors) {
-    std::cout << t.second.id << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.first << '\n';
+  for(auto &t : _tensor_nfo) {
+    std::cout << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
   }
 }
 
@@ -215,18 +136,58 @@ void storage_t::clear() {
   std::unique_lock<std::mutex> lck (_m);
 
   // go through each allocated tensor and free it
-  for(auto &it : _allocated_tensors) {
+  for(auto &it : _tensor_nfo) {
     
     // is it gpu
     if(it.second.is_gpu) {
-      cudaFree(it.first);
+      cudaFree(it.second.address);
     }
     else {
-      free(it.first);
+      free(it.second.address);
     }
   }
-  _allocated_tensors.clear();
   _tensor_nfo.clear();
+}
+
+bool storage_t::_try_reserve(const std::vector<tid_t> &get,
+                             const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+
+  // TODO for now we always do this
+  return true;
+}
+
+storage_t::reservation_result_t storage_t::_create_reserved(const std::vector<tid_t> &get,
+                                                                   const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+
+  // get all the tensors
+  std::vector<tensor_ref_t> out_get;
+  out_get.reserve(get.size());
+  for (auto t : get) {
+    out_get.push_back(_get_by_tid(t));
+  }
+
+  // create all the tensors we need
+  std::vector<tensor_ref_t> out_create;
+  out_create.reserve(create.size());
+  for (auto ct : create) {
+
+    // create all the necessary tensors
+    auto [id, is_gpu, num_bytes] = ct;
+    if (id == TID_NONE) {
+      out_create.push_back(_create_tensor(id, num_bytes, is_gpu));
+    } else {
+      out_create.push_back(_create_tensor(num_bytes, is_gpu));
+    }
+  }
+
+  // return the result
+  return {.get = std::move(out_get), .create = std::move(out_create)};
+}
+
+// release the reserved tensors
+void storage_t::_release_reservation(const std::vector<tid_t> &get,
+                                        const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+  return;
 }
 
 }

@@ -61,10 +61,10 @@ struct raw_vector_t {
   raw_vector_iterator_t end() const { return raw_vector_iterator_t(_data + _num_elements); }
 
   // data
-  const T *_data;
+  const T *_data = nullptr;
 
   // then number of tensors in the list
-  size_t _num_elements;
+  size_t _num_elements = 0;
 };
 
 }

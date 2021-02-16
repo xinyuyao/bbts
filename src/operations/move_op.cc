@@ -4,11 +4,10 @@ namespace bbts {
 
   // constructs the reduce operation
   move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, 
-                       bbts::tensor_t *_tensor, bbts::tensor_stats_t &_stats,
-                       tid_t _tid, bool _is_sender, bbts::tensor_factory_t &_factory,
+                       bbts::tensor_stats_t &_stats, tid_t _tid, 
+                       bool _is_sender, bbts::tensor_factory_t &_factory,
                        bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
                                                                            _tag(_tag),
-                                                                           _tensor(_tensor),
                                                                            _stats(_stats),
                                                                            _tid(_tid),
                                                                            _is_sender(_is_sender),
@@ -22,15 +21,30 @@ namespace bbts {
     // is this the sender, if so we initiate a send request
     if(_is_sender) {
 
-      // get the number of bytes we need to send
-      auto num_bytes = _factory.get_tensor_size(_tensor->_meta);
+      // init the transaction
+      _storage.remote_transaction_p2p(_tag, _node, { _tid }, {}, [&](storage_t::reservation_result_t res) {
 
-      // do the sending
-      if(!_comm.send_sync(_tensor, num_bytes, _node, _tag)) {
-        std::cout << "Error 1\n";
-      }
+        // get the tensor
+        auto &tensor = res.get[0].tensor;
+
+        // get the number of bytes we need to send
+        auto num_bytes = _factory.get_tensor_size(tensor->_meta);
+
+        // do the sending
+        if(!_comm.send_sync(tensor, num_bytes, _node, _tag)) {
+          std::cout << "Error 1\n";
+        }
+
+      });
 
     } else {
+
+      // init the transaction
+      _storage.remote_transaction_p2p(_tag, _node, { }, { { _tid, num_bytes }}, [&](storage_t::reservation_result_t res) {
+        
+        
+
+      });
 
       // try to get the request
       auto req = _comm.expect_request_sync(_node, _tag);

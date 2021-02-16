@@ -121,6 +121,14 @@ public:
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();
 
+  // sync the resource aquisition
+  bool sync_resource_aquisition(command_id_t cmd,
+                                const std::vector<node_id_t> &nodes, 
+                                bool my_val);
+
+  // sync the resource aquisition between two nodes
+  bool sync_resource_aquisition_p2p(command_id_t cmd, node_id_t &node, bool my_val);
+
   // return the rank
   [[nodiscard]] int32_t get_rank() const;
 
