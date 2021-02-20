@@ -65,20 +65,21 @@ bbts::tensor_t *reduce_op_t::apply() {
         // wait till we get a message from the right node
         source = (source + lroot) % get_num_nodes();
 
-        // try to get the request
-        auto req = _comm.expect_request_sync(get_global_rank(source), _tag);
+        // try to get the number of bytes to recieve
+        auto rnk = get_global_rank(source);
+        auto [num_bytes, success] = _comm.recv_tensor_size(rnk, _tag);
 
         // check if there is an error
-        if (!req.success) {
-          std::cout << "Error 6\n";
+        if (!success) {
+          std::cout << "Failed to recieve the tensors size for a REDUCE operation\n";
         }
 
         // allocate a buffer for the tensor
-        auto rhs = _storage.create_tensor(req.num_bytes, _is_gpu);
+        auto rhs = _storage.create_tensor(num_bytes, _is_gpu);
 
         // recieve the request and check if there is an error
-        if (!_comm.receive_request_sync(rhs, req)) {
-          std::cout << "Error 5\n";
+        if (!_comm.receive_request_sync(rnk, _tag, rhs, num_bytes)) {
+          std::cout << "Failed to recieve the tensors for a REDUCE operation\n";
         }
 
         // how much do we need to allocated
@@ -126,9 +127,16 @@ bbts::tensor_t *reduce_op_t::apply() {
       // return the size of the tensor
       auto num_bytes = _factory.get_tensor_size(lhs->_meta);
 
-      // do the send and log the error if there was any
-      if (!_comm.send_sync(lhs, num_bytes, get_global_rank(source), _tag)) {        
-          std::cout << "Error 4\n";
+      // send the tensor size and check if there is any error
+      auto rnk = get_global_rank(source);
+      if(!_comm.send_tensor_size(rnk, _tag, num_bytes)) {
+        std::cout << "Communication failure, could not send the tensor size while REDUCING.\n";
+        exit(-1);
+      }
+
+      // send the tensor synchronously
+      if (!_comm.send_sync(lhs, num_bytes, rnk, _tag)) {        
+          std::cout << "Communication failure, could not send the tensor size while REDUCING.\n";
       }
 
       break;

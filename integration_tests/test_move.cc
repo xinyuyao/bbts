@@ -22,19 +22,20 @@ int main(int argc, char **argv) {
   // create the storage
   bbts::storage_t storage;
 
+  // get the impl_id
+  auto id = factory->get_tensor_ftm("dense");
+
+  // make the meta
+  bbts::dense_tensor_meta_t dm{id, 100, 200};
+  auto &m = dm.as<bbts::tensor_meta_t>();
+
+  // get how much we need to allocate
+  auto size = factory->get_tensor_size(m);
+
   // we are only involving the even ranks in teh computation
   bool success = true;
   if(comm.get_rank() % 2 == 0) {
 
-    // get the impl_id
-    auto id = factory->get_tensor_ftm("dense");
-
-    // make the meta
-    bbts::dense_tensor_meta_t dm{id, 100, 200};
-    auto &m = dm.as<bbts::tensor_meta_t>();
-
-    // get how much we need to allocate
-    auto size = factory->get_tensor_size(m);
     std::unique_ptr<char[]> a_mem(new char[size]);
 
     // init the tensor
@@ -53,7 +54,7 @@ int main(int argc, char **argv) {
     _stats.add_tensor(comm.get_rank(), false);
 
     // create the move
-    auto move = move_op_t(comm, comm.get_rank(), &a, _stats, comm.get_rank(), true, *factory, storage, comm.get_rank() + 1);
+    auto move = move_op_t(comm, comm.get_rank(), &a, size, _stats, comm.get_rank(), true, storage, comm.get_rank() + 1);
     auto mm = move.apply();
   }
   else {
@@ -63,7 +64,7 @@ int main(int argc, char **argv) {
     _stats.add_tensor(comm.get_rank() - 1, false);
 
     // create the move
-    auto move = move_op_t(comm, comm.get_rank() - 1, nullptr, _stats, comm.get_rank() - 1, false, *factory, storage, comm.get_rank() - 1);
+    auto move = move_op_t(comm, comm.get_rank() - 1, nullptr, size, _stats, comm.get_rank() - 1, false, storage, comm.get_rank() - 1);
     auto m = move.apply();
 
     // get the dense tensor

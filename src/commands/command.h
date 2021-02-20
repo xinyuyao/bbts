@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 #include <assert.h>
 #include <cstring>
@@ -239,7 +240,7 @@ struct command_t {
     tmp->id = id;
     tmp->type = APPLY;
     tmp->fun_id = fun_id;
-    tmp->is_gpu = is_gpu;
+    tmp->nfo.is_gpu = is_gpu;
     tmp->_num_parameters = params.size();
     tmp->_num_nodes = 1;
     tmp->_num_inputs = in.size();
@@ -336,7 +337,7 @@ struct command_t {
     tmp->id = id;
     tmp->type = REDUCE;
     tmp->fun_id = fun_id;
-    tmp->is_gpu = is_gpu;
+    tmp->nfo.is_gpu = is_gpu;
     tmp->_num_parameters = params.size();
     tmp->_num_inputs = in.size();
     tmp->_num_outputs = 1;
@@ -433,8 +434,16 @@ struct command_t {
   // the function we want to execute
   ud_impl_id_t fun_id = {-1, -1};
 
-  // is this command using the gpu
-  bool is_gpu = false;
+  // additional information about the command
+  union {
+
+    // this is used by the MOVE and broadcast command to send over the number of bytes
+    size_t num_bytes;
+
+    // is this command using the gpu
+    bool is_gpu = false;
+
+  } nfo;
 
 private:
 

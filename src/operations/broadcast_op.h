@@ -6,6 +6,7 @@
 #include "../ud_functions/udf_manager.h"
 #include "../commands/tensor_stats.h"
 
+#include <cstddef>
 #include <iostream>
 #include <algorithm>
 #include <mpi.h>
@@ -18,17 +19,16 @@ public:
 
   // constructs the broadcast operation, the root node is assumed to be the first in the _nodes array
   broadcast_op_t(bbts::communicator_t &_comm,
-                 bbts::tensor_factory_t &_factory, 
                  bbts::storage_t &_storage,
                  bbts::tensor_stats_t &_stats,
                  const bbts::command_t::node_list_t &_nodes,
-                 int32_t _tag, bbts::tensor_t *_in, bbts::tid_t _tid);
+                 int32_t _tag, 
+                 bbts::tensor_t *_in,
+                 size_t _num_bytes, 
+                 bbts::tid_t _tid);
 
   // the mpi communicator we are going to use to perform the communication
   bbts::communicator_t &_comm;
-
-  // we use the tensor factory to initialize the tensors and calculate the required size
-  bbts::tensor_factory_t &_factory;
 
   // the storage we use this to allocate the output and the intermediate tensors
   bbts::storage_t &_storage;
@@ -44,6 +44,9 @@ public:
 
   // the input tensor of this node
   bbts::tensor_t *_in;
+
+  // the number of bytes
+  size_t _num_bytes;
 
   // the tid
   bbts::tid_t _tid;

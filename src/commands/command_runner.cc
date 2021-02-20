@@ -34,16 +34,22 @@ void bbts::command_runner_t::local_command_runner() {
       // it is a point to point move
       if(cmd->is_move()) {
 
+        // get the tensor we want to sent
+        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
+
+        // get the size of the tensor
+        auto num_bytes = _tf->get_tensor_size(t->_meta);
+
+        // set it as a command extra info
+        cmd->nfo.num_bytes = num_bytes;
+
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
           throw std::runtime_error("Failed to forward the command.");
         }
 
-        // get the tensor we want to sent
-        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
-
         // create the move operation
-        move_op_t op(*_comm, cmd->id, t, *_stats, cmd->get_input(0).tid, true, *_tf, *_ts, cmd->get_output(0).node);
+        move_op_t op(*_comm, cmd->id, t, num_bytes, *_stats, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
 
         // do the apply
         op.apply();
@@ -56,6 +62,15 @@ void bbts::command_runner_t::local_command_runner() {
 
         _logger->message("BROADCAST\n");
 
+        // get the tensor we want to sent
+        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
+
+        // get the size of the tensor
+        auto num_bytes = _tf->get_tensor_size(t->_meta);
+
+        // set it as a command extra info
+        cmd->nfo.num_bytes = num_bytes;
+
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
           throw std::runtime_error("Failed to forward reduce command.");
@@ -64,11 +79,8 @@ void bbts::command_runner_t::local_command_runner() {
         // get the nodes involved
         auto nodes = cmd->get_nodes();
 
-        // get the tensor we want to sent
-        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
-
         // create the move operation
-        broadcast_op_t op(*_comm, *_tf, *_ts, *_stats, nodes, cmd->id, t, cmd->get_input(0).tid);
+        broadcast_op_t op(*_comm, *_ts, *_stats, nodes, cmd->id, t, num_bytes, cmd->get_input(0).tid);
 
         // do the apply
         op.apply();
@@ -245,8 +257,12 @@ void bbts::command_runner_t::remote_command_handler() {
         // kick off a thread to process the request
         std::thread child = std::thread([this, c = std::move(cmd)]() mutable {
 
+          if(c->nfo.num_bytes == 0) {
+            std::cout << "Empty tensor " << '\n' << std::flush;
+          }
+
           // create the move operation
-          move_op_t op(*_comm, c->id, nullptr, *_stats, c->get_input(0).tid, false, *_tf, *_ts, c->get_input(0).node);
+          move_op_t op(*_comm, c->id, nullptr, c->nfo.num_bytes, *_stats, c->get_input(0).tid, false, *_ts, c->get_input(0).node);
 
           // do the apply
           op.apply();
@@ -268,7 +284,7 @@ void bbts::command_runner_t::remote_command_handler() {
           auto nodes = c->get_nodes();
 
           // create the move operation
-          broadcast_op_t op(*_comm, *_tf, *_ts, *_stats, nodes, c->id, nullptr, c->get_input(0).tid);
+          broadcast_op_t op(*_comm, *_ts, *_stats, nodes, c->id, nullptr, c->nfo.num_bytes, c->get_input(0).tid);
 
           // do the apply
           op.apply();

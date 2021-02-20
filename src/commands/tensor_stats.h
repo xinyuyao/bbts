@@ -22,7 +22,7 @@ public:
   void add_command(const command_t &_cmd) {
 
     // is this command using a gpu
-    bool is_gpu = _cmd.is_gpu;
+    bool is_gpu = _cmd.nfo.is_gpu;
 
     // go through all the inputs
     const auto &inputs = _cmd.get_inputs();

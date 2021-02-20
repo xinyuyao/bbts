@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <mpi.h>
 #include <cstdint>
 #include <unordered_map>
@@ -95,7 +96,7 @@ public:
   sync_request_t expect_request_sync(node_id_t _node, com_tags _tag);
 
   // recieves the request that we got from expect_request_sync
-  bool receive_request_sync(void *_bytes, sync_request_t &_req);
+  bool receive_request_sync(node_id_t node, com_tags tag, void *bytes, size_t num_bytes);
 
   // initiates the operation on all the specified nodes
   bool op_request(const command_ptr_t &_cmd);
@@ -117,6 +118,33 @@ public:
 
   // expect the a coord op
   bool expect_coord_cmds(size_t num_cmds, std::vector<command_ptr_t> &out);
+
+  // recieved the tensors size
+  std::tuple<uint64_t, bool> recv_tensor_size(node_id_t node, com_tags tag) {
+
+    // recieve the size
+    MPI_Status status;
+    std::uint64_t val;
+    auto ret = MPI_Recv(&val, 1, MPI_UINT64_T, node, tag + FREE_TAG, MPI_COMM_WORLD, &status);
+
+    // return the recieved
+    return {val, ret == MPI_SUCCESS };
+  }
+
+  async_request_t send_tensor_size_async(node_id_t _node, com_tags _tag, uint64_t val) {
+    
+    // initiate an asynchronous send request
+    async_request_t _req;
+    _req.success = MPI_Isend(&val, 1, MPI_UINT64_T, _node, _tag + FREE_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+
+    // return the request handle
+    return _req;
+  }
+
+  // send the tensor size
+  bool send_tensor_size(node_id_t node, com_tags tag, uint64_t val) {
+    return MPI_Ssend(&val, 1, MPI_UINT64_T, node, tag + FREE_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;  
+  }
 
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();

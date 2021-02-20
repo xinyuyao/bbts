@@ -3,6 +3,7 @@
 #include "../storage/storage.h"
 #include "../commands/tensor_stats.h"
 #include "../ud_functions/udf_manager.h"
+#include <cstddef>
 #include <mpi.h>
 #include <iostream>
 #include <algorithm>
@@ -21,15 +22,15 @@ public:
   // the tensor of this node, either the input or the output
   bbts::tensor_t *_tensor;
 
+  // the number of bytes
+  size_t _num_bytes;
+
   // the id of the tensor we are moving
   tid_t _tid;
 
   // is this node the sender
   bool _is_sender;
 
-  // we use this to initialize the tensors, and the the size of the tensor
-  bbts::tensor_factory_t &_factory;
-  
   // we use this to allocate the tensors
   bbts::storage_t &_storage;
 
@@ -40,9 +41,10 @@ public:
   const bbts::tensor_stats_t &_stats;
 
   // constructs the reduce operation
-  move_op_t(bbts::communicator_t &_comm, int32_t _tag, bbts::tensor_t *_tensor, 
-            bbts::tensor_stats_t &_stat, tid_t _tid, bool _is_sender, bbts::tensor_factory_t &_factory,
-            bbts::storage_t &_storage, bbts::node_id_t _node);
+  move_op_t(bbts::communicator_t &_comm, int32_t _tag, 
+            bbts::tensor_t *_tensor, size_t _num_bytes, 
+            bbts::tensor_stats_t &_stats, tid_t _tid, 
+            bool _is_sender, bbts::storage_t &_storage, bbts::node_id_t _node);
 
   // apply this operation
   bbts::tensor_t *apply();

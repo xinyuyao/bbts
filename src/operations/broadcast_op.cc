@@ -3,18 +3,20 @@
 namespace bbts {
 
 broadcast_op_t::broadcast_op_t(bbts::communicator_t &_comm,
-                               bbts::tensor_factory_t &_factory, 
                                bbts::storage_t &_storage,
                                bbts::tensor_stats_t &_stats,
                                const bbts::command_t::node_list_t &_nodes,
-                               int32_t _tag, bbts::tensor_t *_in, bbts::tid_t _tid): _comm(_comm),
-                                                                                     _factory(_factory),
-                                                                                     _storage(_storage),
-                                                                                     _stats(_stats),
-                                                                                     _nodes(_nodes),
-                                                                                     _tag(_tag),
-                                                                                     _in(_in),
-                                                                                     _tid(_tid) {}
+                               int32_t _tag, 
+                               bbts::tensor_t *_in, 
+                               size_t _num_bytes,
+                               bbts::tid_t _tid): _comm(_comm),
+                                                  _storage(_storage),
+                                                  _stats(_stats),
+                                                  _nodes(_nodes),
+                                                  _tag(_tag),
+                                                  _in(_in),
+                                                  _num_bytes(_num_bytes),
+                                                  _tid(_tid) {}
 
 int32_t broadcast_op_t::get_num_nodes() const {
   return _nodes.size();
@@ -48,20 +50,12 @@ bbts::tensor_t *broadcast_op_t::apply() {
     assert(hibit >= 0);
     int peer = ((vrank & ~(1 << hibit))) % size;
 
-    // try to get the request
-    auto req = _comm.expect_request_sync(get_global_rank(peer), _tag);
-
-    // check if there is an error
-    if (!req.success) {
-      std::cout << "Error 1\n";
-    }
-
     // allocate a buffer for the tensor
-    _in = _storage.create_tensor(_tid, req.num_bytes, _stats.is_gpu(_tid));
+    _in = _storage.create_tensor(_tid, _num_bytes, _stats.is_gpu(_tid));
 
     // recieve the request and check if there is an error
-    if (!_comm.receive_request_sync(_in, req)) {
-      std::cout << "Error 2\n";
+    if (!_comm.receive_request_sync(get_global_rank(peer), _tag, _in, _num_bytes)) {
+      std::cout << "Failed to recieve the tensor for node " << _comm.get_rank() << " \n";
     }
   }
 
@@ -77,11 +71,8 @@ bbts::tensor_t *broadcast_op_t::apply() {
       // figure out where we need to send it
       peer = peer % size;
 
-      // return the size of the tensor
-      auto output_size = _factory.get_tensor_size(_in->_meta);
-
       // send the tensor async
-      requests.emplace_back(_comm.send_async(_in, output_size, get_global_rank(peer), _tag));
+      requests.emplace_back(_comm.send_async(_in, _num_bytes, get_global_rank(peer), _tag));
 
       // we failed here return null
       if(!requests.back().request) {

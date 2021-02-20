@@ -66,12 +66,12 @@ int main(int argc, char **argv) {
 
     // make a broadcast
     bbts::broadcast_op_t bcst(comm,
-                              *factory,
                               storage,
                               _stats,
                               bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
                               888,
                               &a,
+                              size,
                               12);
 
     // execute the broadcast
