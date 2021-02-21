@@ -149,10 +149,6 @@ class command_compiler_t {
         // get the ud object
         auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, cmd.def.is_gpu);
 
-        if(cmd.def.is_gpu) {
-          std::cout << "GPU\n";
-        }
-
         // make the inputs
         std::vector<command_t::tid_node_id_t> inputs;
         for(auto &in : cmd.inputs) {

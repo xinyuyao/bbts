@@ -29,7 +29,7 @@ void bbts::command_runner_t::local_command_runner() {
     if (cmd->type == command_t::MOVE) {
 
       // move the
-      //_logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
+      _logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
       // it is a point to point move
       if(cmd->is_move()) {
@@ -57,7 +57,7 @@ void bbts::command_runner_t::local_command_runner() {
       // it is a broadcast
       else {
 
-        //_logger->message("BROADCAST\n");
+        _logger->message("BROADCAST\n");
 
         // get the size of the tensor
         auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
@@ -165,8 +165,6 @@ void bbts::command_runner_t::local_command_runner() {
         ud->call_ud(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
       });
 
-      _logger->message("FINISHED " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
-
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));
 
@@ -202,7 +200,7 @@ void bbts::command_runner_t::local_command_runner() {
         // do the apply
         op.apply();
 
-        //_logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
+        _logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
 
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
@@ -210,7 +208,7 @@ void bbts::command_runner_t::local_command_runner() {
 
       } else {
 
-        //_logger->message("REMOTE_REDUCE_SCHEDULED");
+        _logger->message("REMOTE_REDUCE_SCHEDULED");
 
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
@@ -248,7 +246,7 @@ void bbts::command_runner_t::local_command_runner() {
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
 
-        //_logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
+        _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
       }
     }
   }

@@ -6,6 +6,7 @@
 
 #include "../server/static_config.h"
 #include "../utils/terminal_color.h"
+#include <driver_types.h>
 #include <iostream>
 
 
@@ -37,7 +38,7 @@ storage_t::tensor_ref_t storage_t::_create_tensor(tid_t _id, size_t num_bytes, b
   // malloc the tensor
   tensor_t *ts;
   if(used_by_gpu) {
-    cudaMallocManaged(&ts, num_bytes);
+    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
   }
   else {
     ts = (tensor_t*) malloc(num_bytes); 
@@ -60,7 +61,7 @@ storage_t::tensor_ref_t storage_t::_create_tensor(size_t num_bytes, bool used_by
   // malloc the tensor
   tensor_t *ts;
   if(used_by_gpu) {
-    cudaMallocManaged(&ts, num_bytes);
+    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
   }
   else {
     ts = (tensor_t*) malloc(num_bytes); 

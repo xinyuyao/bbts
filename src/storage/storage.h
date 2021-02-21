@@ -49,6 +49,7 @@ struct storage_t {
     // the tensors we want to create
     std::vector<tensor_ref_t> create;
   };
+  
 
   // make sure that all the tensors created or requested are aquired at the same time
   template<class fn>

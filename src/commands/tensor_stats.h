@@ -24,7 +24,6 @@ public:
 
     // is this command using a gpu
     bool is_gpu = (_cmd.is_apply() || _cmd.is_reduce()) && _cmd.nfo.is_gpu;
-    assert(is_gpu == false);
 
     // go through all the inputs
     const auto &inputs = _cmd.get_inputs();
