@@ -12,16 +12,16 @@ int main(int argc, char **argv) {
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
 
   // init the communicator with the configuration
-  bbts::communicator_t comm(config);
+  bbts::communicator_ptr_t comm = std::make_shared<bbts::communicator_t>(config);
 
   // check the number of nodes
-  if (root_node >= comm.get_num_nodes()) {
+  if (root_node >= comm->get_num_nodes()) {
     std::cerr << "Can not run add more nodes or change the root node\n";
     return -1;
   }
 
   // create the storage
-  bbts::storage_t storage;
+  bbts::storage_t storage(comm);
 
   // get the impl_id
   auto id = factory->get_tensor_ftm("dense");
@@ -41,18 +41,25 @@ int main(int argc, char **argv) {
 
   // get how much we need to allocate
   auto size = factory->get_tensor_size(m);
-  std::unique_ptr<char[]> a_mem(new char[size]);
 
-  // initi the tensor
-  auto &a = factory->init_tensor((bbts::tensor_t *) a_mem.get(), m).as<bbts::dense_tensor_t>();
+  // init the tensor
+  bbts::tid_t input_tid = comm->get_rank() + 1;
+  storage.local_transaction({}, {{input_tid, false, size}}, [&](const bbts::storage_t::reservation_result_t &res) {
 
-  // get a reference to the metadata
-  auto &am = a.meta().m();
+    // get the craeted tensor
+    auto &t = res.create[0].tensor;
 
-  // init the matrix
-  for (int i = 0; i < am.num_rows * am.num_cols; ++i) {
-    a.data()[i] = 1 + comm.get_rank() + i;
-  }
+    // init the tensor
+    auto &a = factory->init_tensor(t, m).as<bbts::dense_tensor_t>();
+
+    // get a reference to the metadata
+    auto &am = a.meta().m();
+
+    // init the matrix
+    for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
+      a.data()[i] = 1 + comm->get_rank() + i;
+    }
+  });
 
   // add some stats about the output
   bbts::tensor_stats_t _stats;
@@ -60,18 +67,19 @@ int main(int argc, char **argv) {
 
   // we are only involving the even ranks in teh computation
   bool success = true;
-  if (comm.get_rank() % 2 == 0) {
+  if (comm->get_rank() % 2 == 0) {
 
     // pick all the nodes with an even rank, for testing purpouses 
     std::vector<bbts::node_id_t> nodes;
-    for (bbts::node_id_t i = 0; i < comm.get_num_nodes(); i += 2) {
+    for (bbts::node_id_t i = 0; i < comm->get_num_nodes(); i += 2) {
       nodes.push_back(i);
     }
     std::swap(nodes[0], *std::find(nodes.begin(), nodes.end(), root_node));
 
     // craete the reduce
-    std::vector<bbts::tensor_t*> _inputs = { &a.as<bbts::tensor_t>() };
-    auto reduce_op = bbts::reduce_op_t(comm,
+    std::vector<bbts::tid_t> _inputs = { input_tid };
+
+    auto reduce_op = bbts::reduce_op_t(*comm,
                                        *factory,
                                        storage,
                                        _stats,
@@ -81,27 +89,37 @@ int main(int argc, char **argv) {
                                        { ._params = bbts::command_param_list_t {._data = nullptr, ._num_elements = 0} },
                                        0,
                                        *ud);
-    auto b = reduce_op.apply();
+    reduce_op.apply();
 
-    if (comm.get_rank() == root_node) {
+    if (comm->get_rank() == root_node) {
 
-      auto &bb = b->as<bbts::dense_tensor_t>();
-      for (int i = 0; i < am.num_rows * am.num_cols; ++i) {
+      storage.local_transaction({0}, {}, [&](const bbts::storage_t::reservation_result_t &res) {
+        
+        auto b = res.get[0].tensor;
 
-        int32_t val = 0;
-        for (int rank = 0; rank < comm.get_num_nodes(); rank += 2) {
-          val += 1 + rank + i;
+        auto &bb = b->as<bbts::dense_tensor_t>();
+
+        // get a reference to the metadata
+        auto &bm = bb.meta().m();
+
+        for (int i = 0; i < bm.num_rows * bm.num_cols; ++i) {
+
+          int32_t val = 0;
+          for (int rank = 0; rank < comm->get_num_nodes(); rank += 2) {
+            val += 1 + rank + i;
+          }
+          if (bb.data()[i] != val) {
+            success = false;
+            std::cout << "not ok " << val << " " << bb.data()[i] << '\n';
+          }
         }
-        if (bb.data()[i] != val) {
-          success = false;
-          std::cout << "not ok " << val << " " << bb.data()[i] << '\n';
-        }
-      }
+
+      });
     }
   }
 
   // wait for all
-  comm.barrier();
+  comm->barrier();
 
   // if works
   if (success) {

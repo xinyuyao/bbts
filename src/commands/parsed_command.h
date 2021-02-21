@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <fstream>
 #include "../server/node_config.h"
 #include "../tensor/tensor.h"
@@ -89,7 +90,8 @@ struct parsed_command_t {
         out << ",";
         print_string_list(def.output_types, out);
         out << ",";
-
+        out << def.is_gpu;
+        out << ",";
         print_tensor_list(inputs, out);
         out << ',';
         print_tensor_list(outputs, out);
@@ -104,7 +106,8 @@ struct parsed_command_t {
         out << ",";
         print_string_list(def.output_types, out);
         out << ",";
-
+        out << def.is_gpu;
+        out << ",";
         print_tensor_list(inputs, out);
         out << ',';
         print_tensor_list(outputs, out);

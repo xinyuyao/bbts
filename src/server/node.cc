@@ -15,7 +15,7 @@ void bbts::node_t::init() {
   _stats = std::make_shared<tensor_stats_t>();
 
   // create the storage
-  _storage = std::make_shared<storage_t>();
+  _storage = std::make_shared<storage_t>(_comm);
 
   // init the factory
   _factory = std::make_shared<bbts::tensor_factory_t>();

@@ -16,12 +16,12 @@ public:
   local_reduce_op_t(bbts::tensor_factory_t &_factory, 
                     bbts::storage_t &_storage,
                     bbts::tensor_stats_t &_stats,
-                    const std::vector<bbts::tensor_t*> &_inputs,
+                    const std::vector<tid_t> &_inputs,
                     const ud_impl_t::tensor_params_t &_params,
                     bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
 
   // apply this operation
-  bbts::tensor_t *apply();
+  void apply();
 
   bbts::tensor_factory_t &_factory;
 
@@ -29,7 +29,7 @@ public:
 
   bbts::tensor_stats_t &_stats;
 
-  const std::vector<bbts::tensor_t *> &_inputs;
+  const std::vector<tid_t> &_inputs;
 
   const ud_impl_t::tensor_params_t &_params;
 
@@ -37,6 +37,8 @@ public:
 
   const bbts::ud_impl_t &_reduce_op;
 
+  // is this a gpu reduce
+  bool _is_gpu;
 
   // make empty input arguments
   bbts::tensor_meta_t _out_meta{};

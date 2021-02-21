@@ -6,12 +6,10 @@
 namespace bbts {
 
   // constructs the reduce operation
-  move_op_t::move_op_t(bbts::communicator_t &_comm, int32_t _tag, 
-                       bbts::tensor_t *_tensor, size_t _num_bytes, 
-                       bbts::tensor_stats_t &_stats, tid_t _tid, 
+  move_op_t::move_op_t(bbts::communicator_t &_comm, command_id_t _cmd_id, 
+                       size_t _num_bytes, bbts::tensor_stats_t &_stats, tid_t _tid, 
                        bool _is_sender, bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
-                                                                                            _tag(_tag),
-                                                                                            _tensor(_tensor),
+                                                                                            _cmd_id(_cmd_id),
                                                                                             _num_bytes(_num_bytes),
                                                                                             _stats(_stats),
                                                                                             _tid(_tid),
@@ -20,31 +18,38 @@ namespace bbts {
                                                                                             _node(_node) {}
 
   // apply this operation
-  bbts::tensor_t *move_op_t::apply() {
+  void move_op_t::apply() {
     
     // is this the sender, if so we initiate a send request
     if(_is_sender) {
 
       // do the sending
-      if(!_comm.send_sync(_tensor, _num_bytes, _node, _tag)) {
-        std::cout << "Failed to send the tensor, in a MOVE operation.\n";
-        exit(-1);
-      }
-      
+      _storage.remote_transaction_p2p(_cmd_id, _node, {_tid}, {}, 
+      [&](const storage_t::reservation_result_t &res) {
+        
+        auto out = res.get[0].tensor;
+        if(!_comm.send_sync(out, _num_bytes, _node, _cmd_id)) {
+          std::cout << "Failed to send the tensor, in a MOVE operation.\n";
+          exit(-1);
+        }
+      });
+
     } else {
 
-      // allocate a buffer for the tensor
-      _tensor = _storage.create_tensor(_tid, _num_bytes, _stats.is_gpu(_tid));
+      // do the recieving
+      _storage.remote_transaction_p2p(_cmd_id, _node, {}, {{_tid, _stats.is_gpu(_tid), _num_bytes}}, 
+      [&](const storage_t::reservation_result_t &res) {
 
-      // recieve the request and check if there is an error
-      if (!_comm.receive_request_sync(_node, _tag, _tensor, _num_bytes)) {
-        std::cout << "Failed to recieve the tensor, in a MOVE operation.\n";
-        exit(-1);
-      }
+        // allocate a buffer for the tensor
+        auto out = res.create.front().tensor;
+
+        // recieve the request and check if there is an error
+        if (!_comm.receive_request_sync(_node, _cmd_id, out, _num_bytes)) {
+          std::cout << "Failed to recieve the tensor, in a MOVE operation.\n";
+          exit(-1);
+        }
+      });
     }
-
-    // return the tensor
-    return _tensor;
   }
 
 }

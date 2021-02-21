@@ -29,16 +29,13 @@ void bbts::command_runner_t::local_command_runner() {
     if (cmd->type == command_t::MOVE) {
 
       // move the
-      _logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
+      //_logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
       // it is a point to point move
       if(cmd->is_move()) {
 
-        // get the tensor we want to sent
-        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
-
         // get the size of the tensor
-        auto num_bytes = _tf->get_tensor_size(t->_meta);
+        auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
 
         // set it as a command extra info
         cmd->nfo.num_bytes = num_bytes;
@@ -49,7 +46,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the move operation
-        move_op_t op(*_comm, cmd->id, t, num_bytes, *_stats, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
+        move_op_t op(*_comm, cmd->id, num_bytes, *_stats, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
 
         // do the apply
         op.apply();
@@ -60,13 +57,10 @@ void bbts::command_runner_t::local_command_runner() {
       // it is a broadcast
       else {
 
-        _logger->message("BROADCAST\n");
-
-        // get the tensor we want to sent
-        auto t = _ts->get_by_tid(cmd->get_input(0).tid);
+        //_logger->message("BROADCAST\n");
 
         // get the size of the tensor
-        auto num_bytes = _tf->get_tensor_size(t->_meta);
+        auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
 
         // set it as a command extra info
         cmd->nfo.num_bytes = num_bytes;
@@ -80,7 +74,7 @@ void bbts::command_runner_t::local_command_runner() {
         auto nodes = cmd->get_nodes();
 
         // create the move operation
-        broadcast_op_t op(*_comm, *_ts, *_stats, nodes, cmd->id, t, num_bytes, cmd->get_input(0).tid);
+        broadcast_op_t op(*_comm, *_ts, *_stats, nodes, cmd->id, num_bytes, cmd->get_input(0).tid);
 
         // do the apply
         op.apply();
@@ -90,66 +84,88 @@ void bbts::command_runner_t::local_command_runner() {
       }
 
     } else if (cmd->type == command_t::APPLY) {
-
-      _logger->message("APPLY " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
-
+      
       // return me that matcher for matrix addition
       auto ud = _udm->get_fn_impl(cmd->fun_id);
 
-      /// 1. Figure out the meta data for the output
-
-      // make the input meta arguments
-      ud_impl_t::meta_args_t input_meta_args(cmd->get_num_inputs());
+      // setup the inputs
+      std::vector<tid_t> inputs; inputs.reserve(cmd->get_num_inputs());
       for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
-
-        // store it
-        auto t = _ts->get_by_tid(cmd->get_input(idx).tid);
-        assert(t != nullptr);
-        input_meta_args.set(idx, t->_meta);
+        inputs.push_back(cmd->get_input(idx).tid);
       }
 
-      // figure out the output arguments
-      std::vector<tensor_meta_t> arguments(cmd->get_num_outputs());
-      ud_impl_t::meta_args_t output_meta_args(arguments);
+      // reserver the outputs
+      std::vector<std::tuple<tid_t, bool, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
 
-      // get the output meta
-      ud->get_out_meta({ ._params = cmd->get_parameters() }, input_meta_args, output_meta_args);
+      // calculate the output size
+      _ts->local_transaction(inputs, {}, [&](const storage_t::reservation_result_t &res) {
 
-      /// 2. Prepare the output arguments
+        // make the input meta arguments
+        ud_impl_t::meta_args_t input_meta_args(cmd->get_num_inputs());
+        for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
-      // make the input arguments
-      ud_impl_t::tensor_args_t input_args(cmd->get_num_inputs());
-      for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+          // store it
+          auto t = res.get[0].tensor;
+          assert(t != nullptr);
+          input_meta_args.set(idx, t->_meta);
+        }
 
-        // store it
-        auto t = _ts->get_by_tid(cmd->get_input(idx).tid);
-        input_args.set(idx, *t);
-      }
+        // figure out the output arguments
+        std::vector<tensor_meta_t> arguments(cmd->get_num_outputs());
+        ud_impl_t::meta_args_t output_meta_args(arguments);
 
-      // setup the output arguments
-      ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
-      for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
+        // get the output meta
+        ud->get_out_meta({ ._params = cmd->get_parameters() }, input_meta_args, output_meta_args);
 
-        // the size of the tensor
-        auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
+        // setup the output arguments
+        ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
+        for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
 
-        // create it
-        auto tid = cmd->get_output(idx).tid;
-        auto is_gpu = _stats->is_gpu(tid);
-        auto t = _ts->create_tensor(tid, ts_size, is_gpu);
+          // the size of the tensor, tid and whether it is on the GPU
+          auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
+          auto tid = cmd->get_output(idx).tid;
+          auto is_gpu = _stats->is_gpu(tid);
 
-        // get the type of the output
-        auto &type = ud->outputTypes[idx];
-        t->_meta.fmt_id = _tf->get_tensor_ftm(type);
+          // store the outputs
+          outputs.push_back({tid, is_gpu, ts_size});
+        }
 
-        // set the output arg
-        output_args.set(idx, *t);
-      }
+      });
 
-      /// 3. Run the actual UD Function
+      // log what is happening
+      _logger->message("APPLY " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
-      // apply the ud function
-      ud->call_ud(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
+      // create the outputs and run the ud 
+      _ts->local_transaction(inputs, outputs, [&](const storage_t::reservation_result_t &res) {
+
+        // make the input arguments
+        ud_impl_t::tensor_args_t input_args(cmd->get_num_inputs());
+        for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+
+          // store it
+          auto t = res.get[idx].tensor;
+          input_args.set(idx, *t);
+        }
+
+        // setup the output arguments
+        ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
+        for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
+
+          auto t = res.create[idx].tensor;
+
+          // get the type of the output
+          auto &type = ud->outputTypes[idx];
+          t->_meta.fmt_id = _tf->get_tensor_ftm(type);
+
+          // set the output arg
+          output_args.set(idx, *t);
+        }
+        
+        // apply the ud function
+        ud->call_ud(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
+      });
+
+      _logger->message("FINISHED " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));
@@ -169,15 +185,14 @@ void bbts::command_runner_t::local_command_runner() {
 
         // preallocate the input pointers
         auto cmd_inputs = cmd->get_inputs();
-        std::vector<bbts::tensor_t*> inputs;
+        std::vector<tid_t> inputs;
         inputs.reserve(cmd_inputs.size());
 
         // get all the tensors we need
         for(const auto& in : cmd_inputs) {
 
           // get the source tensor
-          auto t = _ts->get_by_tid(in.tid);
-          inputs.push_back(t);
+          inputs.push_back(in.tid);
         }
 
         // create the reduce op
@@ -187,7 +202,7 @@ void bbts::command_runner_t::local_command_runner() {
         // do the apply
         op.apply();
 
-        _logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
+        //_logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
 
         // retire the command so it knows that we have processed the tensors
         _rs->retire_command(std::move(cmd));
@@ -195,7 +210,7 @@ void bbts::command_runner_t::local_command_runner() {
 
       } else {
 
-        _logger->message("REMOTE_REDUCE_SCHEDULED");
+        //_logger->message("REMOTE_REDUCE_SCHEDULED");
 
         // forward the command to the right nodes
         if(!_comm->op_request(cmd)) {
@@ -210,7 +225,7 @@ void bbts::command_runner_t::local_command_runner() {
 
         // preallocate the input pointers
         auto cmd_inputs = cmd->get_inputs();
-        std::vector<bbts::tensor_t*> inputs;
+        std::vector<tid_t> inputs;
         inputs.reserve(cmd_inputs.size());
 
         // get all the tensors we need
@@ -220,8 +235,7 @@ void bbts::command_runner_t::local_command_runner() {
           if(in.node == _comm->get_rank()) {
 
             // get the source tensor
-            auto t = _ts->get_by_tid(in.tid);
-            inputs.push_back(t);
+            inputs.push_back(in.tid);
           }
         }
 
@@ -262,7 +276,7 @@ void bbts::command_runner_t::remote_command_handler() {
           }
 
           // create the move operation
-          move_op_t op(*_comm, c->id, nullptr, c->nfo.num_bytes, *_stats, c->get_input(0).tid, false, *_ts, c->get_input(0).node);
+          move_op_t op(*_comm, c->id, c->nfo.num_bytes, *_stats, c->get_input(0).tid, false, *_ts, c->get_input(0).node);
 
           // do the apply
           op.apply();
@@ -284,7 +298,7 @@ void bbts::command_runner_t::remote_command_handler() {
           auto nodes = c->get_nodes();
 
           // create the move operation
-          broadcast_op_t op(*_comm, *_ts, *_stats, nodes, c->id, nullptr, c->nfo.num_bytes, c->get_input(0).tid);
+          broadcast_op_t op(*_comm, *_ts, *_stats, nodes, c->id, c->nfo.num_bytes, c->get_input(0).tid);
 
           // do the apply
           op.apply();
@@ -310,7 +324,7 @@ void bbts::command_runner_t::remote_command_handler() {
 
         // preallocate the input pointers
         auto cmd_inputs = c->get_inputs();
-        std::vector<bbts::tensor_t*> inputs;
+        std::vector<bbts::tid_t> inputs;
         inputs.reserve(cmd_inputs.size());
 
         // get all the tensors we need
@@ -320,8 +334,7 @@ void bbts::command_runner_t::remote_command_handler() {
           if(in.node == _comm->get_rank()) {
 
             // get the source tensor
-            auto t = _ts->get_by_tid(in.tid);
-            inputs.push_back(t);
+            inputs.push_back(in.tid);
           }
         }
 

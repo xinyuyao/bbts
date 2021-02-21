@@ -1,6 +1,7 @@
 #pragma once
 
 #include "command.h"
+#include <cassert>
 #include <cstddef>
 #include <unordered_map>
 
@@ -22,7 +23,8 @@ public:
   void add_command(const command_t &_cmd) {
 
     // is this command using a gpu
-    bool is_gpu = _cmd.nfo.is_gpu;
+    bool is_gpu = (_cmd.is_apply() || _cmd.is_reduce()) && _cmd.nfo.is_gpu;
+    assert(is_gpu == false);
 
     // go through all the inputs
     const auto &inputs = _cmd.get_inputs();

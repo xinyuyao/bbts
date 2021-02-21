@@ -23,7 +23,6 @@ public:
                  bbts::tensor_stats_t &_stats,
                  const bbts::command_t::node_list_t &_nodes,
                  int32_t _tag, 
-                 bbts::tensor_t *_in,
                  size_t _num_bytes, 
                  bbts::tid_t _tid);
 
@@ -92,7 +91,7 @@ public:
   [[nodiscard]] int32_t get_global_rank(int32_t local_rank) const;
 
   // runs the broadcast
-  bbts::tensor_t *apply();
+  void apply();
 };
 
 }

@@ -304,14 +304,18 @@ void bbts::coordinator_t::_print_tensor(tid_t id) {
     // check the rank of the node
     if (node == _comm->get_rank()) {
 
-      // the get the tensor
-      auto ts = _storage->get_by_tid(id);
-      if(ts != nullptr) {
-        
-        // print the tensor since we found it
-        std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
-        _tf->print_tensor(ts);
-      }
+      _storage->local_transaction({id}, {}, [&](const storage_t::reservation_result_t &res) {
+
+        // the get the tensor
+        auto ts = res.get[0].tensor;
+        if(ts != nullptr) {
+          
+          // print the tensor since we found it
+          std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
+          _tf->print_tensor(ts);
+        }
+      });
+
     }
 
     _comm->barrier();

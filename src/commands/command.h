@@ -93,6 +93,9 @@ struct command_t {
   // is this an apply
   [[nodiscard]] bool is_apply() const { return type == op_type_t::APPLY; }
 
+    // is this a reuce
+  [[nodiscard]] bool is_reduce() const { return type == op_type_t::REDUCE; }
+
   // get all the nodes included in the reduce
   [[nodiscard]] node_list_t get_nodes() const {
     return { ._data = _nodes(), ._num_elements = _num_nodes };

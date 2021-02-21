@@ -11,16 +11,16 @@ int main(int argc, char **argv) {
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
 
   // init the communicator with the configuration
-  bbts::communicator_t comm(config);
+  bbts::communicator_ptr_t comm = std::make_shared<bbts::communicator_t>(config);
 
   // check the number of nodes
-  if(comm.get_num_nodes() % 2 != 0) {
+  if(comm->get_num_nodes() % 2 != 0) {
     std::cerr << "Must use an even number of nodes.\n";
     return -1;
   }
 
   // create the storage
-  bbts::storage_t storage;
+  bbts::storage_t storage(comm);
 
   // get the impl_id
   auto id = factory->get_tensor_ftm("dense");
@@ -34,59 +34,68 @@ int main(int argc, char **argv) {
 
   // we are only involving the even ranks in teh computation
   bool success = true;
-  if(comm.get_rank() % 2 == 0) {
-
-    std::unique_ptr<char[]> a_mem(new char[size]);
+  if(comm->get_rank() % 2 == 0) {
 
     // init the tensor
-    auto &a = factory->init_tensor((bbts::tensor_t*) a_mem.get(), m).as<bbts::dense_tensor_t>();
+    storage.local_transaction({}, {{comm->get_rank(), false, size}}, [&](const storage_t::reservation_result_t &res) {
 
-    // get a reference to the metadata
-    auto &am = a.meta().m();
+      // get the craeted tensor
+      auto &t = res.create[0].tensor;
 
-    // init the matrix
-    for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
-      a.data()[i] = 1 + comm.get_rank() + i;
-    }
+      // init the tensor
+      auto &a = factory->init_tensor(t, m).as<bbts::dense_tensor_t>();
+
+      // get a reference to the metadata
+      auto &am = a.meta().m();
+
+      // init the matrix
+      for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
+        a.data()[i] = 1 + comm->get_rank() + i;
+      }
+    });
 
     // add some stats about the output
     bbts::tensor_stats_t _stats;
-    _stats.add_tensor(comm.get_rank(), false);
+    _stats.add_tensor(comm->get_rank(), false);
 
     // create the move
-    auto move = move_op_t(comm, comm.get_rank(), &a, size, _stats, comm.get_rank(), true, storage, comm.get_rank() + 1);
-    auto mm = move.apply();
+    auto move = move_op_t(*comm, comm->get_rank(), size, _stats, comm->get_rank(), true, storage, comm->get_rank() + 1);
+    move.apply();
   }
   else {
 
     // add some stats about the output
     bbts::tensor_stats_t _stats;
-    _stats.add_tensor(comm.get_rank() - 1, false);
+    _stats.add_tensor(comm->get_rank() - 1, false);
 
     // create the move
-    auto move = move_op_t(comm, comm.get_rank() - 1, nullptr, size, _stats, comm.get_rank() - 1, false, storage, comm.get_rank() - 1);
-    auto m = move.apply();
+    auto move = move_op_t(*comm, comm->get_rank() - 1, size, _stats, comm->get_rank() - 1, false, storage, comm->get_rank() - 1);
+    move.apply();
 
-    // get the dense tensor
-    auto &a = m->as<bbts::dense_tensor_t>();
-    
-    // get a reference to the metadata
-    auto &am = a.meta().m();
+    storage.local_transaction({comm->get_rank() - 1}, {}, [&](const storage_t::reservation_result_t &res) {
 
-    // check the values
-    for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
+      // get the dense tensor
+      auto t = res.get[0].tensor;
+      auto &a = t->as<bbts::dense_tensor_t>();
+      
+      // get a reference to the metadata
+      auto &am = a.meta().m();
 
-      // the value
-      int32_t val = comm.get_rank() + i;
-      if(a.data()[i] != val) {
-        success = false;
-        std::cout << "not ok " << val << " " << a.data()[i] << '\n';
+      // check the values
+      for(int i = 0; i < am.num_rows * am.num_cols; ++i) {
+
+        // the value
+        int32_t val = comm->get_rank() + i;
+        if(a.data()[i] != val) {
+          success = false;
+          std::cout << "not ok " << val << " " << a.data()[i] << '\n';
+        }
       }
-    }
+    });
   }
 
   // wait for all
-  comm.barrier();
+  comm->barrier();
 
   // if works
   if(success) {

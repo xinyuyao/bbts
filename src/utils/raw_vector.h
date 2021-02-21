@@ -17,6 +17,9 @@ struct raw_vector_t {
   // is the vector empty
   bool empty() const { return _num_elements == 0; }
 
+  // return the data
+  const T *data() const { return _data; }
+
   // the iterator for the raw vector
   struct raw_vector_iterator_t {
 
