@@ -16,7 +16,7 @@ TEST(TestStorage, Test1) {
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>();
+  storage_ptr_t storage = std::make_shared<storage_t>(nullptr);
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
@@ -39,35 +39,38 @@ TEST(TestStorage, Test1) {
         // get the size of the tensor we need to crate
         auto tensor_size = tf->get_tensor_size(dm);
 
-        // crate the tensor
-        auto ts = storage->create_tensor(i + t * num_matrices, tensor_size, false);
+        storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
-        // init the tensor
-        auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();
+          // crate the tensor
+          auto ts = res.create[0].tensor;
 
-        // write some memory into it
-        for(int j = 0; j < (i * 100) * (i * 200); j++) {
-          dt.data()[j] = (float) j;
-        }
+          // init the tensor
+          auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();
+
+          // write some memory into it
+          for(int j = 0; j < (i * 100) * (i * 200); j++) {
+            dt.data()[j] = (float) j;
+          }
+        });
       }
 
       // get the tensors and check them
       for(size_t i = 0; i < num_matrices; i++) {
 
-        // get the dense tensor
-        auto &dt = storage->get_by_tid(i + t * num_matrices)->as<dense_tensor_t>();
+        storage->local_transaction({ (tid_t) (i + t * num_matrices) }, {}, [&](const storage_t::reservation_result_t &res) {
+          
+          // get the dense tensor
+          auto &dt = res.get[0].tensor->as<dense_tensor_t>();;
 
-        // write some memory into it
-        for(int j = 0; j < (i * 100) * (i * 200); j++) {
-          EXPECT_LE(std::abs(dt.data()[j]  - (float) j), 0.0001f);
-        }
+          // write some memory into it
+          for(int j = 0; j < (i * 100) * (i * 200); j++) {
+            EXPECT_LE(std::abs(dt.data()[j]  - (float) j), 0.0001f);
+          }
+
+        });
 
         // remove the tensor
-        if(t % 1 == 0) {
-          storage->remove_by_tensor(dt);
-        } else {
-          storage->remove_by_tid(i + t * num_matrices);
-        }
+        storage->remove_by_tid((tid_t) (i + t * num_matrices));
       }
     });
   }
