@@ -48,7 +48,10 @@ struct lru_t {
 
     // remove it from the index and the queue
     auto it = index.find(id);
-    queue.erase(it->second);
+    if(it != index.end()) {
+      queue.erase(it->second);
+      index.erase(it);
+    }
   }
 
   // evict one tensor

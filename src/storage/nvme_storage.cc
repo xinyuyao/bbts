@@ -79,6 +79,8 @@ void nvme_storage_t::request_thread() {
           required += it->second.num_bytes; 
       }
 
+      // if the tensor is loaded 
+
       // store the future
       // this is valid for UNLOADING, LOADING, LOADED
       out.get.push_back(it->second.data);
@@ -256,9 +258,6 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
     if(it->second.num_ref == 0) {
       required += it->second.num_bytes;
     } 
-
-    // mark tha we are using this one
-    it->second.num_ref++;
   }
 
   // go through all the tensors we want to create
@@ -271,14 +270,17 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
   // check if we have enough memory
   if(cur_reserved + required >= max_allocated) {
 
-    // we need to reverse reference counts
-    for(auto &t : get) {
-      auto it = _tensor_nfo.find(t);
-      it->second.num_ref--;
-    }
-
     // we failed
     return false;
+  }
+
+  // we need to reverse reference counts
+  for(auto &t : get) {
+
+    // remove it from the lru if it is there and increment the reference count
+    auto it = _tensor_nfo.find(t);
+    _lru.remove(it->second.id);
+    it->second.num_ref++;
   }
 
   // assign a tid to the anonymous tensor
