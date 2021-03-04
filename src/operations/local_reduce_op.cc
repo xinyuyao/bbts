@@ -41,8 +41,8 @@ void bbts::local_reduce_op_t::apply() {
     size_t output_size;
     _storage.local_transaction({lhs, rhs}, {}, [&](const storage_t::reservation_result_t &res) {
 
-      auto l = res.get[0];
-      auto r = res.get[1];
+      auto l = res.get[0].get();
+      auto r = res.get[1].get();
 
       // how much do we need to allocated
       _input_meta.set<0>(l.tensor->_meta);
@@ -60,12 +60,12 @@ void bbts::local_reduce_op_t::apply() {
     _storage.local_transaction({lhs, rhs}, {{TID_NONE, _is_gpu, output_size}}, [&](const storage_t::reservation_result_t &res) {
     
       // init the output tensor
-      auto &out = res.create[0].tensor;
+      auto &out = res.create[0].get().tensor;
       _factory.init_tensor(out, _out_meta);
 
       // get the left and right tensor
-      auto l = res.get[0].tensor;
-      auto r = res.get[1].tensor;
+      auto l = res.get[0].get().tensor;
+      auto r = res.get[1].get().tensor;
 
       // set the input tensors to the function
       _input_tensors.set<0>(*l);
@@ -78,7 +78,7 @@ void bbts::local_reduce_op_t::apply() {
       _reduce_op.call_ud(_params, _input_tensors, _output_tensor);
 
       // set the output tid
-      out_tid = res.create[0].id;
+      out_tid = res.create[0].get().id;
     });
 
     // remove additionally every allocated tensor

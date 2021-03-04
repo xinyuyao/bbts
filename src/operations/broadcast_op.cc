@@ -66,7 +66,7 @@ void broadcast_op_t::apply() {
       int peer = ((vrank & ~(1 << hibit))) % size;
 
       // allocate a buffer for the tensor
-      _in = res.create[0].tensor;
+      _in = res.create[0].get().tensor;
 
       // recieve the request and check if there is an error
       if (!_comm.receive_request_sync(get_global_rank(peer), _tag, _in, _num_bytes)) {
@@ -76,7 +76,7 @@ void broadcast_op_t::apply() {
     else {
 
       // get the tensors we need to
-      _in = res.get[0].tensor;
+      _in = res.get[0].get().tensor;
     }
 
     // allocate the requests

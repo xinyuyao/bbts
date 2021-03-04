@@ -6,20 +6,80 @@
 
 namespace bbts {
 
-TEST(TestStorage, Test1) {
+TEST(TestStorage, TestTwoTransactionSingleThreaded) {
+
+  // 
+  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+
+  tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
+
+  auto fmt_id = tf->get_tensor_ftm("dense");
+
+  // make the meta
+  dense_tensor_meta_t dm{fmt_id, 100, 100};
+
+  // get the size of the tensor we need to crate
+  auto tensor_size = tf->get_tensor_size(dm);
+
+  // kick of a single request thread
+  std::thread t = std::thread([&]() {
+    storage->request_thread();
+  });
+
+  // run the local transaction to create the tensor
+  storage->local_transaction({}, {{0, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+
+    // create the tensor
+    auto ts = res.create[0].get().tensor;
+
+    // init the tensor
+    auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();
+
+    // write some memory into it
+    for(int j = 0; j < 100 * 100; j++) {
+      dt.data()[j] = (float) j;
+    }
+  });
+
+  // run the local transaction to 
+  storage->local_transaction({ (tid_t) 0 }, {}, [&](const storage_t::reservation_result_t &res) {
+    
+    // get the dense tensor
+    auto &dt = res.get[0].get().tensor->as<dense_tensor_t>();;
+
+    // write some memory into it
+    for(int j = 0; j < 100 * 100; j++) {
+      EXPECT_LE(std::abs(dt.data()[j]  - (float) j), 0.0001f);
+    }
+  });
+
+  // shutdown the storage
+  storage->shutdown();
+
+  // wait for the thread to finish
+  t.join();
+}
+
+
+TEST(TestStorage, TestNoEvictionMultiThreaded) {
 
   // how many threads are going to be hammering the storage
-  const int32_t num_threads = 5;
+  const int32_t num_threads = 8;
   const int32_t num_matrices = 10;
 
   // the thraeds that are going to hammer it
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr);
+  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024 * 800);
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
+
+  // kick of a single request thread
+  std::thread rt = std::thread([&]() {
+    storage->request_thread();
+  });
 
   // grab the format impl_id of the dense tensor
   auto fmt_id = tf->get_tensor_ftm("dense");
@@ -42,7 +102,7 @@ TEST(TestStorage, Test1) {
         storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
           // crate the tensor
-          auto ts = res.create[0].tensor;
+          auto ts = res.create[0].get().tensor;
 
           // init the tensor
           auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();
@@ -60,7 +120,7 @@ TEST(TestStorage, Test1) {
         storage->local_transaction({ (tid_t) (i + t * num_matrices) }, {}, [&](const storage_t::reservation_result_t &res) {
           
           // get the dense tensor
-          auto &dt = res.get[0].tensor->as<dense_tensor_t>();;
+          auto &dt = res.get[0].get().tensor->as<dense_tensor_t>();;
 
           // write some memory into it
           for(int j = 0; j < (i * 100) * (i * 200); j++) {
@@ -79,6 +139,193 @@ TEST(TestStorage, Test1) {
   for(auto &t : threads) {
     t.join();
   }
+
+    // shutdown the storage
+  storage->shutdown();
+
+  // wait for the thread to finish
+  rt.join();
+}
+
+
+TEST(TestStorage, TestEvictionMultiThreaded) {
+
+  // how many threads are going to be hammering the storage
+  const int32_t num_threads = 10;
+  const int32_t num_matrices = 40;
+
+  // the thraeds that are going to hammer it
+  std::vector<std::thread> threads;
+
+  // create the storage
+  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+
+  // make a tensor factory
+  tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
+
+  // kick of a single request thread
+  std::thread rt = std::thread([&]() {
+    storage->request_thread();
+  });
+
+  // grab the format impl_id of the dense tensor
+  auto fmt_id = tf->get_tensor_ftm("dense");
+
+  // make the threads
+  threads.reserve(num_threads);
+  for(int t = 0; t < num_threads; ++t) {
+
+    // run a bunch of threads
+    threads.emplace_back([&storage, &tf, &num_matrices, fmt_id, t]() {
+
+      for(uint32_t i = 0; i < num_matrices; i++) {
+        
+        // make the meta
+        dense_tensor_meta_t dm{fmt_id, 100, 100};
+
+        // get the size of the tensor we need to crate
+        auto tensor_size = tf->get_tensor_size(dm);
+
+        storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+
+          // crate the tensor
+          auto ts = res.create[0].get().tensor;
+
+          // init the tensor
+          auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();
+
+          // write some memory into it
+          for(int j = 0; j < 100 * 100; j++) {
+            dt.data()[j] = (float) (j + i);
+          }
+        });
+      }
+
+      // get the tensors and check them
+      for(size_t i = 0; i < num_matrices; i++) {
+
+        storage->local_transaction({ (tid_t) (i + t * num_matrices) }, {}, [&](const storage_t::reservation_result_t &res) {
+          
+          // get the dense tensor
+          auto &dt = res.get[0].get().tensor->as<dense_tensor_t>();;
+
+          // write some memory into it
+          for(int j = 0; j < 100 * 100; j++) {
+            EXPECT_LE(std::abs(dt.data()[j]  - (float) (j + i)), 0.0001f);
+          }
+
+        });
+
+        // remove the tensor
+        storage->remove_by_tid((tid_t) (i + t * num_matrices));
+      }
+    });
+  }
+
+  // wait for all the threads to finish
+  for(auto &t : threads) {
+    t.join();
+  }
+
+    // shutdown the storage
+  storage->shutdown();
+
+  // wait for the thread to finish
+  rt.join();
+}
+
+
+TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads) {
+
+  // how many threads are going to be hammering the storage
+  const int32_t num_threads = 60;
+  const int32_t num_matrices = 40;
+  const int32_t num_req_threads = 50;
+
+  // the thraeds that are going to hammer it
+  std::vector<std::thread> threads;
+
+  // create the storage
+  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+
+  // make a tensor factory
+  tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
+
+  // kick of a single request thread
+  std::vector<std::thread> rts; rts.reserve(num_req_threads);
+  for(auto i = 0; i < num_req_threads; ++i) {
+      rts.push_back(std::move(std::thread([&]() {
+      storage->request_thread();
+    })));
+  }
+
+  // grab the format impl_id of the dense tensor
+  auto fmt_id = tf->get_tensor_ftm("dense");
+
+  // make the threads
+  threads.reserve(num_threads);
+  for(int t = 0; t < num_threads; ++t) {
+
+    // run a bunch of threads
+    threads.emplace_back([&storage, &tf, &num_matrices, fmt_id, t]() {
+
+      for(uint32_t i = 0; i < num_matrices; i++) {
+        
+        // make the meta
+        dense_tensor_meta_t dm{fmt_id, 100, 100};
+
+        // get the size of the tensor we need to crate
+        auto tensor_size = tf->get_tensor_size(dm);
+
+        storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+
+          // crate the tensor
+          auto ts = res.create[0].get().tensor;
+
+          // init the tensor
+          auto &dt = tf->init_tensor(ts, dm).as<dense_tensor_t>();
+
+          // write some memory into it
+          for(int j = 0; j < 100 * 100; j++) {
+            dt.data()[j] = (float) (j + i);
+          }
+        });
+      }
+
+      // get the tensors and check them
+      for(size_t i = 0; i < num_matrices; i++) {
+
+        storage->local_transaction({ (tid_t) (i + t * num_matrices) }, {}, [&](const storage_t::reservation_result_t &res) {
+          
+          // get the dense tensor
+          auto &dt = res.get[0].get().tensor->as<dense_tensor_t>();;
+
+          // write some memory into it
+          for(int j = 0; j < 100 * 100; j++) {
+            EXPECT_LE(std::abs(dt.data()[j]  - (float) (j + i)), 0.0001f);
+          }
+
+        });
+
+        // remove the tensor
+        storage->remove_by_tid((tid_t) (i + t * num_matrices));
+      }
+    });
+  }
+
+  // wait for all the threads to finish
+  for(auto &t : threads) {
+    t.join();
+  }
+
+    // shutdown the storage
+  storage->shutdown();
+
+  // wait for the thread to finish
+  for(auto &rt : rts) {
+    rt.join();
+  }
+
 }
 
 }

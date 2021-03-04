@@ -27,7 +27,7 @@ namespace bbts {
       _storage.remote_transaction_p2p(_cmd_id, _node, {_tid}, {}, 
       [&](const storage_t::reservation_result_t &res) {
         
-        auto out = res.get[0].tensor;
+        auto out = res.get[0].get().tensor;
         if(!_comm.send_sync(out, _num_bytes, _node, _cmd_id)) {
           std::cout << "Failed to send the tensor, in a MOVE operation.\n";
           exit(-1);
@@ -41,7 +41,7 @@ namespace bbts {
       [&](const storage_t::reservation_result_t &res) {
 
         // allocate a buffer for the tensor
-        auto out = res.create.front().tensor;
+        auto out = res.create.front().get().tensor;
 
         // recieve the request and check if there is an error
         if (!_comm.receive_request_sync(_node, _cmd_id, out, _num_bytes)) {

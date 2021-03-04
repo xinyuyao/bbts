@@ -307,7 +307,7 @@ void bbts::coordinator_t::_print_tensor(tid_t id) {
       _storage->local_transaction({id}, {}, [&](const storage_t::reservation_result_t &res) {
 
         // the get the tensor
-        auto ts = res.get[0].tensor;
+        auto ts = res.get[0].get().tensor;
         if(ts != nullptr) {
           
           // print the tensor since we found it

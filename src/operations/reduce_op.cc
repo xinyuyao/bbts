@@ -86,10 +86,10 @@ void reduce_op_t::apply() {
         [&](const storage_t::reservation_result_t &res) {
           
           // get the left tensor as we need it for the output
-          auto l = res.get[0].tensor;
+          auto l = res.get[0].get().tensor;
           
           // allocate a buffer for the tensor we are recieving
-          auto r = res.create[0].tensor;
+          auto r = res.create[0].get().tensor;
 
           // recieve the request and check if there is an error
           if (!_comm.receive_request_sync(rnk, _tag, r, rhs_size)) {
@@ -110,22 +110,22 @@ void reduce_op_t::apply() {
           output_size = _factory.get_tensor_size(_output_meta.get<0>());
 
           // store the tid for later
-          rhs = res.create[0].id;
+          rhs = res.create[0].get().id;
         });
 
         tid_t out_tid;
         _storage.local_transaction({lhs, rhs}, {{TID_NONE, _is_gpu, output_size}}, [&](const storage_t::reservation_result_t &res) {
         
           // get the left and right tensor so we can apply the kernel
-          auto l = res.get[0].tensor;
-          auto r = res.get[1].tensor;
+          auto l = res.get[0].get().tensor;
+          auto r = res.get[1].get().tensor;
 
           // allocate and init the output
-          auto out = res.create[0].tensor;
+          auto out = res.create[0].get().tensor;
           _factory.init_tensor(out, _out_meta);
 
           // store the tid for later
-          out_tid = res.create[0].id;
+          out_tid = res.create[0].get().id;
 
           // set the input tensors to the function
           _input_tensors.set<0>(*l);
@@ -170,7 +170,7 @@ void reduce_op_t::apply() {
       [&](const storage_t::reservation_result_t &res) {
 
         // send the tensor synchronously
-        auto l  = res.get[0].tensor;
+        auto l  = res.get[0].get().tensor;
         if (!_comm.send_sync(l, num_bytes, rnk, _tag)) {        
             std::cout << "Communication failure, could not send the tensor size while REDUCING.\n";
         }
@@ -216,8 +216,8 @@ bbts::tid_t reduce_op_t::apply_preagg() {
     size_t output_size;
     _storage.local_transaction({lhs, rhs}, {}, [&](const storage_t::reservation_result_t &res) {
 
-      auto l = res.get[0];
-      auto r = res.get[1];
+      auto l = res.get[0].get();
+      auto r = res.get[1].get();
 
       // how much do we need to allocated
       _input_meta.set<0>(l.tensor->_meta);
@@ -235,12 +235,12 @@ bbts::tid_t reduce_op_t::apply_preagg() {
     _storage.local_transaction({lhs, rhs}, {{TID_NONE, _is_gpu, output_size}}, [&](const storage_t::reservation_result_t &res) {
     
       // init the output tensor
-      auto &out = res.create[0].tensor;
+      auto &out = res.create[0].get().tensor;
       _factory.init_tensor(out, _out_meta);
 
       // get the left and right tensor
-      auto l = res.get[0].tensor;
-      auto r = res.get[1].tensor;
+      auto l = res.get[0].get().tensor;
+      auto r = res.get[1].get().tensor;
 
       // set the input tensors to the function
       _input_tensors.set<0>(*l);
@@ -250,7 +250,7 @@ bbts::tid_t reduce_op_t::apply_preagg() {
       _output_tensor.set<0>(*out);
 
       // set the tid
-      out_tid = res.create[0].id;
+      out_tid = res.create[0].get().id;
 
       // run the function
       _reduce_op.call_ud(_params, _input_tensors, _output_tensor);

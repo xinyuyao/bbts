@@ -94,7 +94,7 @@ void bbts::command_runner_t::local_command_runner() {
         inputs.push_back(cmd->get_input(idx).tid);
       }
 
-      // reserver the outputs
+      // reserve the outputs
       std::vector<std::tuple<tid_t, bool, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
 
       // calculate the output size
@@ -105,7 +105,7 @@ void bbts::command_runner_t::local_command_runner() {
         for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
           // store it
-          auto t = res.get[0].tensor;
+          auto t = res.get[0].get().tensor;
           assert(t != nullptr);
           input_meta_args.set(idx, t->_meta);
         }
@@ -143,7 +143,7 @@ void bbts::command_runner_t::local_command_runner() {
         for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
           // store it
-          auto t = res.get[idx].tensor;
+          auto t = res.get[idx].get().tensor;
           input_args.set(idx, *t);
         }
 
@@ -151,7 +151,7 @@ void bbts::command_runner_t::local_command_runner() {
         ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
         for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
 
-          auto t = res.create[idx].tensor;
+          auto t = res.create[idx].get().tensor;
 
           // get the type of the output
           auto &type = ud->outputTypes[idx];
