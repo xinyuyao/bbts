@@ -18,7 +18,15 @@
 
 namespace bbts {
 
-nvme_storage_t::~nvme_storage_t() {}
+nvme_storage_t::~nvme_storage_t() {
+
+  // free all the tensors
+  for(auto &nfo : _tensor_nfo) {
+    if(nfo.second.state == tensor_state_t::LOADED) {
+      free_tensor(nfo.second.data.get().tensor, nfo.second.is_gpu);
+    }
+  } 
+}
 
 void nvme_storage_t::request_thread() {
 
@@ -46,7 +54,7 @@ void nvme_storage_t::request_thread() {
     reservation_result_t out(res.get->size(), res.create->size());
 
     // we load the tensors here
-    std::vector<sto_tensor_nfo_t*> to_load;
+    std::vector<std::tuple<sto_tensor_nfo_t*, tensor_t*>> to_load;
     to_load.reserve(res.get->size());
 
     // go through all the tensor we need to get
@@ -63,20 +71,20 @@ void nvme_storage_t::request_thread() {
       // we will take care of it later but just not freeing the memory
       if(it->second.state == tensor_state_t::NOT_LOADED) {
 
-          // make a new promise
-          it->second.promise = std::promise<tensor_ref_t>();
+        // make a new promise
+        it->second.promise = std::promise<tensor_ref_t>();
 
-          // turn in into a new shared future
-          it->second.data = std::shared_future<tensor_ref_t>(it->second.promise.get_future());
-          
-          // mark that we are the one loading this tensor
-          it->second.state = tensor_state_t::LOADING;
+        // turn in into a new shared future
+        it->second.data = std::shared_future<tensor_ref_t>(it->second.promise.get_future());
+        
+        // mark that we are the one loading this tensor
+        it->second.state = tensor_state_t::LOADING;
 
-          // mark that we are loading this
-          to_load.push_back(&it->second);
+        // mark that we are loading this
+        to_load.push_back({&it->second, nullptr});
 
-          // increment the number of bytes reqired
-          required += it->second.num_bytes; 
+        // increment the number of bytes reqired
+        required += it->second.num_bytes; 
       }
 
       // if the tensor is loaded 
@@ -136,23 +144,33 @@ void nvme_storage_t::request_thread() {
     // load all the tensors
     for(auto &l : to_load) {
       
+      // get the info and where we want to allocate the tensor
+      auto &[nfo, t] = l;
+    
       // allocate the tensor
-      l->promise.set_value(tensor_ref_t{.id = l->id, 
-                                        .tensor = _allocate_tensor(l->num_bytes, l->is_gpu)});
+      t = _allocate_tensor(nfo->num_bytes, nfo->is_gpu);
 
       // we just allocated
-      cur_allocated += l->num_bytes;
+      cur_allocated += nfo->num_bytes;
     }
 
     for(auto &l : to_load) {
 
+      // get the info and where we want to allocate the tensor
+      auto &[nfo, t] = l;
+
+      auto num_bytes = nfo->num_bytes;
+      auto offset = nfo->file_offset;
+
       // read the tensor
       lck.unlock();
-      pread(fp, l->data.get().tensor, l->num_bytes, l->file_offset);
-      l->state = tensor_state_t::LOADED;
+      pread(fp, t, num_bytes, offset);
       lck.lock();
-    }
 
+      // allocate the tensor
+      nfo->state = tensor_state_t::LOADED;
+      nfo->promise.set_value(tensor_ref_t{.id = nfo->id, .tensor = t});
+    }
 
     // set the value
     val.set_value(out);
@@ -239,6 +257,9 @@ void nvme_storage_t::print() {}
 void nvme_storage_t::clear() {}
 
 void nvme_storage_t::shutdown() {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
 
   // shutdown the storage
   is_shutdown = true;
@@ -418,7 +439,7 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
       // ok we can not release this 
       it->second.state = tensor_state_t::LOADED;
     }
-    if(it->second.state == tensor_state_t::DELETED) {
+    else if(it->second.state == tensor_state_t::DELETED) {
       
       // free the memory
       free_tensor(it->second.data.get().tensor, it->second.is_gpu);
