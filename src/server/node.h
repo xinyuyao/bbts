@@ -8,6 +8,7 @@
 
 #include "logger.h"
 #include "node_config.h"
+#include "static_config.h"
 #include "coordinator.h"
 #include "../ud_functions/udf_manager.h"
 #include "../commands/command_runner.h"

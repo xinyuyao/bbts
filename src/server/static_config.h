@@ -17,14 +17,14 @@ struct static_config {
 #ifdef ENABLE_GPU
   static const bool enable_gpu = true;
 #else 
-  static const bool enable_gpu = true;
+  static const bool enable_gpu = false;
 #endif
 
 // are we using a buffer manager that relies on storage
 #ifdef ENABLE_STORAGE
   static const bool enable_storage = true;
 #else
-  static const bool enable_storage = true;
+  static const bool enable_storage = false;
 #endif
 
 };

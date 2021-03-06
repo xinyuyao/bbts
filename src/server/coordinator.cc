@@ -284,33 +284,8 @@ void bbts::coordinator_t::_clear() {
   _rs->clear();
 }
 
-void bbts::coordinator_t::_shutdown() {
-
-  // sync
-  _comm->barrier();
-
-  // shutdown the command runner
-  _command_runner->shutdown();
-
-  // shutdown the reservation station
-  _rs->shutdown();
-
-  // shutdown the storage
-  _storage->shutdown();
-
-  // shutdown the tensor notifier
-  _tensor_notifier->shutdown();
-
-  // mark that the coordinator is down
-  _is_down = true;
-}
-
 void bbts::coordinator_t::_set_verbose(bool val) {
   _logger->set_enabled(val);
-}
-
-void bbts::coordinator_t::_set_max_storage(size_t val) {
-  _storage->set_max_storage(val);
 }
 
 void bbts::coordinator_t::_print_storage() {

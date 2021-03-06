@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <thread>
 #include <queue>
 #include <mutex>
@@ -15,6 +16,7 @@
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
 #include "coordinator.h"
+#include "static_config.h"
 
 namespace bbts {
 
@@ -76,11 +78,38 @@ private:
 
   void _clear();
 
-  void _shutdown();
+  template<class T = storage_t>
+  void _shutdown() {
+
+    // sync
+    _comm->barrier();
+
+    // shutdown the command runner
+    _command_runner->shutdown();
+
+    // shutdown the reservation station
+    _rs->shutdown();
+
+    // shutdown the storage
+    if constexpr(static_config::enable_storage) {
+      std::static_pointer_cast<T>(_storage)->shutdown();
+    }
+
+    // shutdown the tensor notifier
+    _tensor_notifier->shutdown();
+
+    // mark that the coordinator is down
+    _is_down = true;
+  }
 
   void _set_verbose(bool val);
 
-  void _set_max_storage(size_t val);
+  template<class T = storage_t>
+  void _set_max_storage(size_t val) {
+    if constexpr(static_config::enable_storage) {
+      std::static_pointer_cast<T>(_storage)->set_max_storage(val);
+    }
+  } 
 
   void _print_storage();
 

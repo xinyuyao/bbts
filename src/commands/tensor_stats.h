@@ -1,8 +1,10 @@
 #pragma once
 
 #include "command.h"
+#include "../server/static_config.h"
 #include <cassert>
 #include <cstddef>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace bbts {
@@ -25,6 +27,13 @@ public:
     // is this command using a gpu
     bool is_gpu = (_cmd.is_apply() || _cmd.is_reduce()) && _cmd.nfo.is_gpu;
 
+    // check if we acutally support GPUs
+    if(!static_config::enable_gpu && is_gpu) {
+
+      // TODO handle this gracefully...
+      throw std::runtime_error("Not compiled with GPU support yet somehow a GPU command was scheduled!\n");
+    }
+    
     // go through all the inputs
     const auto &inputs = _cmd.get_inputs();
     for (const auto &in : inputs) {

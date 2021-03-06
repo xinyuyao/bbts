@@ -38,6 +38,10 @@ struct memory_storage_t {
 
     // tensor 
     tensor_t *tensor;
+
+    // this is added to be complient with the interface of the nvme storage
+    // where a shared_future is used for the tensor reference
+    const tensor_ref_t &get() const { return *this; }
   };
 
   // the result of a reservation
@@ -189,6 +193,12 @@ struct memory_storage_t {
     }
   }
 
+  // allocate the tensor
+  tensor_t *_allocate_tensor(size_t num_bytes, bool used_by_gpu);
+
+  // free the allocated tensor
+  void free_tensor(tensor_t *tensor, bool used_by_gpu);
+  
   // remove by tid
   bool remove_by_tid(tid_t _id);
 

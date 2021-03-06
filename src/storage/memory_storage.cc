@@ -16,12 +16,7 @@ memory_storage_t::~memory_storage_t() {
 
   // go through each allocated tensor and free it
   for(auto &it : _tensor_nfo) {
-    if(it.second.is_gpu) {
-      cudaFree(it.second.address);
-    }
-    else {
-      free(it.second.address);
-    }
+    free_tensor(it.second.address, it.second.is_gpu);
   }
 }
 
@@ -80,6 +75,57 @@ memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(size_t num_bytes
 
   // return the tensor
   return {.id = tid, .tensor = ts};
+}
+
+tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes, bool used_by_gpu) {
+
+  // malloc the tensor
+  tensor_t *ts;
+  if(used_by_gpu) {
+
+    // check if we even support the GPU
+    if constexpr(static_config::enable_gpu) {
+      
+      // allocate the GPU
+      checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
+    }
+    else {
+
+      // we can not do this
+      throw std::runtime_error("Somehow a GPU tensor was requested but,"
+                               " TOS was not compiled with GPU support.");
+    }
+  }
+  else {
+    ts = (tensor_t*) malloc(num_bytes); 
+  }
+
+  return ts;
+}
+
+void memory_storage_t::free_tensor(tensor_t *tensor, bool used_by_gpu) {
+
+  // is this used by the GPU
+  if(used_by_gpu) {
+
+    // check if we even support the GPU
+    if constexpr(static_config::enable_gpu) {
+      
+      // free the GPU
+      checkCudaErrors(cudaFree(tensor));
+    }
+    else {
+
+      // we can not do this
+      throw std::runtime_error("Somehow a GPU tensor was requested but,"
+                               " TOS was not compiled with GPU support.");
+    }
+  }
+  else {
+
+    // free the regular tensor
+    free(tensor);
+  }
 }
 
 bool memory_storage_t::remove_by_tid(tid_t _id) {

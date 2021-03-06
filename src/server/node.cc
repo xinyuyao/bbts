@@ -16,10 +16,19 @@ void bbts::node_t::init() {
   // create the tensor stats
   _stats = std::make_shared<tensor_stats_t>();
 
-  // create the storage with 90% of the total ram
-  _storage = std::make_shared<storage_t>(_comm, 
-                                         (size_t) (0.9f * (float) _config->total_ram),
-                                         "./tmp.ts" + std::to_string(_comm->get_rank()));
+  // init the storage
+  if constexpr(static_config::enable_storage) {
+
+    // create the storage with 90% of the total ram
+    _storage = std::make_shared<storage_t>(_comm, 
+                                          (size_t) (0.9f * (float) _config->total_ram),
+                                          "./tmp.ts" + std::to_string(_comm->get_rank()));
+  }
+  else {
+
+    // memory storage is not limited
+    _storage = std::make_shared<storage_t>(_comm);
+  }
 
   // init the factory
   _factory = std::make_shared<bbts::tensor_factory_t>();
@@ -43,6 +52,7 @@ void bbts::node_t::init() {
                                                  _storage, _command_runner, _tensor_notifier, _factory,  _stats);
 }
 
+
 void bbts::node_t::run() {
 
   /// 1.0 Kick off all the stuff that needs to run
@@ -57,13 +67,8 @@ void bbts::node_t::run() {
     command_processing_threads.push_back(std::move(create_command_processing_thread()));
   }
 
-  // create all the request threads
-  std::vector<std::thread> storage_req_threads; storage_req_threads.reserve(_config->num_threads);
-  for (node_id_t t = 0; t < _config->num_threads; ++t) {
-    storage_req_threads.push_back(std::thread([&]() {
-      _storage->request_thread();
-    }));
-  }
+  // create all the request threads if we are using storage
+  auto storage_req_threads = create_storage_threads(_config->num_threads, *_storage);
 
   // this will get all the notifications about tensors
   auto tsn_thread = tensor_notifier();

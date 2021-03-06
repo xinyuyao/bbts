@@ -214,7 +214,7 @@ bool nvme_storage_t::remove_by_tid(tid_t _id) {
   _cur_allocated -= it->second.num_bytes;
 
   // free the memory allocated
-  free(it->second.data.get().tensor);
+  free_tensor(it->second.data.get().tensor, it->second.is_gpu);
 
   // remove it
   _tensor_nfo.erase(it);
@@ -435,7 +435,19 @@ tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes, bool used_by_gpu) {
   // malloc the tensor
   tensor_t *ts;
   if(used_by_gpu) {
-    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
+
+    // check if we even support the GPU
+    if constexpr(static_config::enable_gpu) {
+      
+      // allocate the GPU
+      checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
+    }
+    else {
+
+      // we can not do this
+      throw std::runtime_error("Somehow a GPU tensor was requested but,"
+                               " TOS was not compiled with GPU support.");
+    }
   }
   else {
     ts = (tensor_t*) malloc(num_bytes); 
@@ -445,10 +457,26 @@ tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes, bool used_by_gpu) {
 }
 
 void nvme_storage_t::free_tensor(tensor_t *tensor, bool used_by_gpu) {
+
+  // is this used by the GPU
   if(used_by_gpu) {
-    checkCudaErrors(cudaFree(tensor));
+
+    // check if we even support the GPU
+    if constexpr(static_config::enable_gpu) {
+      
+      // free the GPU
+      checkCudaErrors(cudaFree(tensor));
+    }
+    else {
+
+      // we can not do this
+      throw std::runtime_error("Somehow a GPU tensor was requested but,"
+                               " TOS was not compiled with GPU support.");
+    }
   }
   else {
+
+    // free the regular tensor
     free(tensor);
   }
 }

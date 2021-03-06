@@ -40,6 +40,16 @@ if(${ENABLE_HOOKS})
     add_compile_definitions(ENABLE_HOOKS)
 endif()
 
+# forward the definitions ENABLE_GPU=ON/OFF
+if(${ENABLE_GPU})
+    add_compile_definitions(ENABLE_GPU)
+endif()
+
+# forward the definitions ENABLE_STORAGE=ON/OFF
+if(${ENABLE_STORAGE})
+    add_compile_definitions(ENABLE_STORAGE)
+endif()
+
 # try to find mkl
 set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
