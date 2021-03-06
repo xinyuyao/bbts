@@ -1,4 +1,5 @@
 #include <bits/stdint-intn.h>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include "../src/tensor/tensor.h"
@@ -132,6 +133,89 @@ void clear(bbts::node_t &node) {
   }
 }
 
+void set(bbts::node_t &node, const std::string &what, const std::string &value) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message("Setting", b);
+
+  // parse the number of threads
+  if(what == "no_threads") {
+    
+    // check the value
+    if(value.empty()) {
+      std::cout << "You must provide a number of threads.\n";
+    }
+
+    // get the value
+    char *p; auto val = strtoul(value.c_str(), &p, 10);
+    auto [did_load, message] = node.set_num_threads(val);
+
+    // finish the loading message
+    b = true; t.join();
+
+    // did we fail
+    if(!did_load) {
+      std::cout << bbts::red << "Failed to set : \"" << message << "\"\n" << bbts::reset;
+    }
+    else {
+      std::cout << bbts::green << message << bbts::reset;
+    }
+  }
+  else if(what == "max_mem") {
+
+    // check the value
+    if(value.empty()) {
+      std::cout << "You must provide a number of threads.\n";
+      return;
+    }
+
+    // seperate the unit from the value
+    auto num = value; num.pop_back();
+    char unit = value.back();
+
+    // check the unit
+    if(!(unit == 'K' || unit == 'M' || unit == 'G') || num.empty()) {
+      std::cout << "The value must be a positive number followed by [K|M|G].\n";
+      return;
+    }
+
+    // get the value
+    char *p; auto val = strtoull(num.c_str(), &p, 10);
+
+    // apply the unit
+    switch(unit) {
+      case 'K' : val *= 1024; break; 
+      case 'M' : val *= (1024 * 1024); break; 
+      case 'G' : val *= (1024 * 1024 * 1024); break;
+      default : break; 
+    }
+
+    // set the value
+    auto [did_load, message] = node.set_max_storage(val);
+
+    // finish the loading message
+    b = true; t.join();
+
+    // did we fail
+    if(!did_load) {
+      std::cout << bbts::red << "Failed to set : \"" << message << "\"\n" << bbts::reset;
+    }
+    else {
+      std::cout << bbts::green << message << bbts::reset;
+    }
+  }
+  else {
+
+    // finish the loading message
+    b = true; t.join();
+
+    std::cout << bbts::red << "You can only set :\n" << bbts::reset;
+    std::cout << bbts::red << "no_threads - the number of threads\n" << bbts::reset;
+    std::cout << bbts::red << "max_mem - the maximum memory\n" << bbts::reset;
+  }
+}
+
 void verbose(bbts::node_t &node, bool val) {
 
   // kick of a loading message
@@ -240,6 +324,13 @@ void prompt(bbts::node_t &node) {
     clear(node);
 
   },"Clears the tensor operating system.\n");
+
+  rootMenu->Insert("set",[&](std::ostream &out, const std::string &what, const std::string &val) {
+
+    set(node, what, val);
+
+  },"Sets a value in the system. Usage : set <no_threads, max_mem> <value>.\n");
+
 
   // init the command line interface
   Cli cli(std::move(rootMenu));

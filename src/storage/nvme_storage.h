@@ -92,17 +92,20 @@ struct nvme_storage_t {
     _tensor_delete_hook = [](tid_t _) {};
     
     // open the file for reading and writing
-    fp = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
+    _fp = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
   }
 
-  nvme_storage_t(communicator_ptr_t com, size_t max_allocated) :  _com(std::move(com)), max_allocated(max_allocated) {
+  nvme_storage_t(communicator_ptr_t com, 
+                 size_t max_allocated, 
+                 const std::string &file) :  _com(std::move(com)), 
+                                             _max_allocated(max_allocated) {
 
     // just empty hooks
     _tensor_create_hook = [](tid_t _) {};
     _tensor_delete_hook = [](tid_t _) {};
 
     // open the file for reading and writing
-    fp = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
+    _fp = open(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
   }
 
   // destructor
@@ -208,9 +211,9 @@ struct nvme_storage_t {
         return;
       }
 
-      // release the reservation and try to reaqire again
+      // release the reserved if necessary
       if(val) {
-        _release_reservation(get, create);
+        _cancel_reservation(get, create);
       }
 
       // maybe I will need to adjust this if it is firing to much
@@ -257,9 +260,9 @@ struct nvme_storage_t {
         return;
       }
 
-      // release the reservation and try to reaqire again
+      // release the reserved if necessary
       if(val) {
-        _release_reservation(get, create);
+        _cancel_reservation(get, create);
       }
 
       // maybe I will need to adjust this if it is firing to much
@@ -276,6 +279,9 @@ struct nvme_storage_t {
 
   // assign a tid ot the anonymous tensor
   bool assign_tid(tid_t _anon_id, tid_t _id);
+
+  // set the maximum storage
+  void set_max_storage(size_t val);
 
   // print the nvme_storage
   void print();
@@ -371,6 +377,10 @@ private:
   void _release_reservation(const std::vector<tid_t> &get,
                             const std::vector<std::tuple<tid_t, bool, size_t>> &create);
 
+  // call this to cancel a request that was not reserved
+  void _cancel_reservation(const std::vector<tid_t> &get,
+                           const std::vector<std::tuple<tid_t, bool, size_t>> &create);
+
   // evict some tensors until we have the required 
   void _evict_some(std::unique_lock<std::mutex> &lck, size_t required);
 
@@ -384,25 +394,25 @@ private:
   std::mutex _m;
 
   // currently reserved memory
-  size_t cur_reserved = 0;
+  size_t _cur_reserved = 0;
 
   // maximum reserved we are allowed to allocate
-  size_t max_allocated = 0;
+  size_t _max_allocated = 0;
 
   // currently allocated memory if this goes above the maximum allocated we need to move some tensors to disk
-  size_t cur_allocated = 0;
+  size_t _cur_allocated = 0;
 
   // evicts pages 
   lru_t _lru;
 
   // the file we dump stuff into
-  int32_t fp;
+  int32_t _fp;
 
   // last offset
-  int64_t file_offset = 0;
+  int64_t _file_offset = 0;
 
   // is the storage shutdown
-  bool is_shutdown = false;
+  bool _is_shutdown = false;
 
   // all the scheduled reservations
   std::queue<std::tuple<std::promise<reservation_result_t>, reservation_nfo_t>> _scheduled_reservations;

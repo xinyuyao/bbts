@@ -56,6 +56,10 @@ void bbts::coordinator_t::accept() {
         _set_verbose(static_cast<bool>(op._val));
         break;
       }
+      case coordinator_op_types_t::MAX_STORAGE : {
+        _set_max_storage(op._val);
+        break;
+      }
       case coordinator_op_types_t::PRINT_STORAGE : {
         _print_storage();
         break;
@@ -190,6 +194,30 @@ std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
   return {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::set_num_threads(std::uint32_t set_num_threads) {
+  
+  // TODO - need some work
+  return {false, "Not supported for now!"};
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::set_max_storage(size_t val) {
+  
+  // send the command
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::MAX_STORAGE, 
+                                             ._val = val})) {
+
+    return {false, "Failed to set the maximum storage flag!\n"};
+  }
+
+  // run everything
+  _set_max_storage(val);
+
+  // sync everything
+  _comm->barrier();
+
+  return {true, "Set the max storage to " + std::to_string(val) + " bytes\n"};
+}
+
 std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
 
   if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_STORAGE, ._val = 0})) {
@@ -267,6 +295,9 @@ void bbts::coordinator_t::_shutdown() {
   // shutdown the reservation station
   _rs->shutdown();
 
+  // shutdown the storage
+  _storage->shutdown();
+
   // shutdown the tensor notifier
   _tensor_notifier->shutdown();
 
@@ -276,6 +307,10 @@ void bbts::coordinator_t::_shutdown() {
 
 void bbts::coordinator_t::_set_verbose(bool val) {
   _logger->set_enabled(val);
+}
+
+void bbts::coordinator_t::_set_max_storage(size_t val) {
+  _storage->set_max_storage(val);
 }
 
 void bbts::coordinator_t::_print_storage() {

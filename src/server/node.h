@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include <sys/sysinfo.h>
@@ -67,8 +69,14 @@ public:
   // run all the scheduled commands
   std::tuple<bool, std::string> run_commands();
 
-  //
+  // set the verbose
   std::tuple<bool, std::string> set_verbose(bool val);
+
+  // set the number of threads
+  std::tuple<bool, std::string> set_num_threads(std::uint32_t set_num_threads);
+
+  // set the storage
+  std::tuple<bool, std::string> set_max_storage(size_t set_num_threads);
 
   // print the info about the storage
   std::tuple<bool, std::string> print_storage_info();

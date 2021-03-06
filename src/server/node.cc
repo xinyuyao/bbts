@@ -1,5 +1,7 @@
+#include <cstddef>
 #include <memory>
 #include <sstream>
+#include <string>
 #include "node.h"
 #include "../commands/command_compiler.h"
 
@@ -14,8 +16,10 @@ void bbts::node_t::init() {
   // create the tensor stats
   _stats = std::make_shared<tensor_stats_t>();
 
-  // create the storage
-  _storage = std::make_shared<storage_t>(_comm);
+  // create the storage with 90% of the total ram
+  _storage = std::make_shared<storage_t>(_comm, 
+                                         (size_t) (0.9f * (float) _config->total_ram),
+                                         "./tmp.ts" + std::to_string(_comm->get_rank()));
 
   // init the factory
   _factory = std::make_shared<bbts::tensor_factory_t>();
@@ -51,6 +55,14 @@ void bbts::node_t::run() {
   command_processing_threads.reserve(_comm->get_num_nodes());
   for (node_id_t t = 0; t < _config->num_threads; ++t) {
     command_processing_threads.push_back(std::move(create_command_processing_thread()));
+  }
+
+  // create all the request threads
+  std::vector<std::thread> storage_req_threads; storage_req_threads.reserve(_config->num_threads);
+  for (node_id_t t = 0; t < _config->num_threads; ++t) {
+    storage_req_threads.push_back(std::thread([&]() {
+      _storage->request_thread();
+    }));
   }
 
   // this will get all the notifications about tensors
@@ -105,6 +117,11 @@ void bbts::node_t::run() {
   // we only have a coordinator thread if we are not the root node
   if(get_rank() != 0) {
     coord_thread.join();
+  }
+
+  // wait for all the request threads to finish
+  for(auto &srt : storage_req_threads) {
+    srt.join();
   }
 }
 
@@ -163,6 +180,14 @@ std::tuple<bool, std::string> bbts::node_t::run_commands() {
 
 std::tuple<bool, std::string> bbts::node_t::set_verbose(bool val) {
   return _coordinator->set_verbose(val);
+}
+
+std::tuple<bool, std::string> bbts::node_t::set_num_threads(std::uint32_t set_num_threads){
+  return _coordinator->set_num_threads(set_num_threads);
+}
+
+std::tuple<bool, std::string> bbts::node_t::set_max_storage(size_t set_num_threads){
+  return _coordinator->set_max_storage(set_num_threads);
 }
 
 std::tuple<bool, std::string> bbts::node_t::print_storage_info() {

@@ -13,6 +13,7 @@
 #include <driver_types.h>
 #include <iostream>
 #include <future>
+#include <stdexcept>
 #include <unistd.h>
 
 
@@ -36,10 +37,10 @@ void nvme_storage_t::request_thread() {
     std::unique_lock<std::mutex> lck (_m);
 
     // wait until we have something
-    _res_processing_cv.wait(lck, [&]{return !_scheduled_reservations.empty() || is_shutdown;});
+    _res_processing_cv.wait(lck, [&]{return !_scheduled_reservations.empty() || _is_shutdown;});
 
     // break out from here if we are done
-    if(is_shutdown) {
+    if(_is_shutdown) {
       break;
     }
 
@@ -121,7 +122,7 @@ void nvme_storage_t::request_thread() {
     }
 
     // evict some tensors if necessary
-    if(cur_allocated + required >= max_allocated) {
+    if(_cur_allocated + required >= _max_allocated) {
       _evict_some(lck, required);
     }
 
@@ -138,7 +139,7 @@ void nvme_storage_t::request_thread() {
                                         .tensor = _allocate_tensor(num_bytes, is_gpu)});
 
       // we just allocated
-      cur_allocated += num_bytes;
+      _cur_allocated += num_bytes;
     }
 
     // load all the tensors
@@ -151,7 +152,7 @@ void nvme_storage_t::request_thread() {
       t = _allocate_tensor(nfo->num_bytes, nfo->is_gpu);
 
       // we just allocated
-      cur_allocated += nfo->num_bytes;
+      _cur_allocated += nfo->num_bytes;
     }
 
     for(auto &l : to_load) {
@@ -164,7 +165,7 @@ void nvme_storage_t::request_thread() {
 
       // read the tensor
       lck.unlock();
-      pread(fp, t, num_bytes, offset);
+      pread(_fp, t, num_bytes, offset);
       lck.lock();
 
       // allocate the tensor
@@ -210,7 +211,7 @@ bool nvme_storage_t::remove_by_tid(tid_t _id) {
   _lru.remove(_id);
 
   // it is no longer allocated 
-  cur_allocated -= it->second.num_bytes;
+  _cur_allocated -= it->second.num_bytes;
 
   // free the memory allocated
   free(it->second.data.get().tensor);
@@ -226,6 +227,18 @@ bool nvme_storage_t::assign_tid(tid_t _anon_id, tid_t _id) {
   // TODO
 
   return true;
+}
+
+void nvme_storage_t::set_max_storage(size_t val) {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // check if this is smaller, dump some to disk
+  if(val < _max_allocated) {
+    _max_allocated = val;
+    _evict_some(lck, _max_allocated - val);
+  }
 }
 
 size_t nvme_storage_t::get_num_tensors() {
@@ -262,7 +275,7 @@ void nvme_storage_t::shutdown() {
   std::unique_lock<std::mutex> lck (_m);
 
   // shutdown the storage
-  is_shutdown = true;
+  _is_shutdown = true;
   _res_processing_cv.notify_all();
 }
 
@@ -288,8 +301,13 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
     required += std::get<2>(c);
   }
 
+  // make sure it is acutally possible to process this
+  if(required >= _max_allocated) {
+    throw std::runtime_error("Can not process this.");
+  }
+
   // check if we have enough memory
-  if(cur_reserved + required >= max_allocated) {
+  if(_cur_reserved + required >= _max_allocated) {
 
     // we failed
     return false;
@@ -297,7 +315,6 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
 
   // we need to reverse reference counts
   for(auto &t : get) {
-
     // remove it from the lru if it is there and increment the reference count
     auto it = _tensor_nfo.find(t);
     _lru.remove(it->second.id);
@@ -312,7 +329,7 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
   }
 
   // mark this as reserved
-  cur_reserved += required;
+  _cur_reserved += required;
 
   // tell that we have approved it
   return true;
@@ -350,7 +367,7 @@ void nvme_storage_t::_release_reservation(const std::vector<tid_t> &get,
     if(it->second.num_ref == 0) {
 
       // ok this is not reserved anymore
-      cur_reserved -= it->second.num_bytes;
+      _cur_reserved -= it->second.num_bytes;
 
       // if we already laoded it add it to eviction
       if(it->second.state == tensor_state_t::LOADED) {
@@ -372,11 +389,45 @@ void nvme_storage_t::_release_reservation(const std::vector<tid_t> &get,
     assert(it->second.num_ref == 0);
 
     // remove the reserved
-    cur_reserved -= std::get<2>(c);
+    _cur_reserved -= std::get<2>(c);
 
     // add it to the lru, as it should have zero references
     _lru.add(it->second.id);
   }
+}
+
+void nvme_storage_t::_cancel_reservation(const std::vector<tid_t> &get,
+                                         const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+  
+  // go through all the tensor we wanted to get
+  for(auto &t : get) {
+
+    // find information about the tensor
+    auto it = _tensor_nfo.find(t);
+    it->second.num_ref--;
+
+    // if this tensor is no longer reserved mark that we are 
+    if(it->second.num_ref == 0) {
+
+      // ok this is not reserved anymore
+      _cur_reserved -= it->second.num_bytes;
+
+      // if we already laoded it add it to eviction
+      if(it->second.state == tensor_state_t::LOADED) {
+        
+        // add it to the lru 
+        _lru.add(t);
+      }
+    }
+  }
+
+  // go through all the tensors we wanted to create
+  for(auto &c : create) {
+    
+    // remove the reserved
+    _cur_reserved -= std::get<2>(c);
+  }
+
 }
 
 tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes, bool used_by_gpu) {
@@ -404,7 +455,7 @@ void nvme_storage_t::free_tensor(tensor_t *tensor, bool used_by_gpu) {
 
 void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t required) {
   
-  while (cur_allocated + required >= max_allocated) {
+  while (_cur_allocated + required >= _max_allocated) {
 
     // evict a tensor
     auto id = _lru.evict(lck);
@@ -421,14 +472,14 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
 
     // if it does not have an offset assigned give it one
     if(it->second.file_offset == -1) {
-      it->second.file_offset = file_offset;
-      file_offset += it->second.num_bytes;
+      it->second.file_offset = _file_offset;
+      _file_offset += it->second.num_bytes;
     }
     
     // unlock so we can dump the data to the disk
     lck.unlock();
 
-    pwrite(fp, it->second.data.get().tensor, it->second.num_bytes, it->second.file_offset);
+    pwrite(_fp, it->second.data.get().tensor, it->second.num_bytes, it->second.file_offset);
 
     // lock again so we can update the state
     lck.lock();
@@ -443,7 +494,7 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
       
       // free the memory
       free_tensor(it->second.data.get().tensor, it->second.is_gpu);
-      cur_allocated -= it->second.num_bytes;
+      _cur_allocated -= it->second.num_bytes;
 
       // if the tensor was delted in the mean time just kill it and add the memory
       _tensor_nfo.erase(it);
@@ -451,7 +502,7 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
     else {
 
       // ok the tensor is still there and it is not used
-      cur_allocated -= it->second.num_bytes;
+      _cur_allocated -= it->second.num_bytes;
       it->second.state = tensor_state_t::NOT_LOADED;
 
       // free the memory

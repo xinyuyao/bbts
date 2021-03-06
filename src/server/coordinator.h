@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <thread>
 #include <queue>
 #include <mutex>
@@ -42,6 +43,12 @@ public:
   // set the verbose status
   std::tuple<bool, std::string> set_verbose(bool val);
 
+  // sets the number of threads to use
+  std::tuple<bool, std::string> set_num_threads(std::uint32_t set_num_threads);
+
+  // set the maximum storage
+  std::tuple<bool, std::string> set_max_storage(size_t set_num_threads);
+
   // print the info abo
   std::tuple<bool, std::string> print_storage_info();
 
@@ -72,6 +79,8 @@ private:
   void _shutdown();
 
   void _set_verbose(bool val);
+
+  void _set_max_storage(size_t val);
 
   void _print_storage();
 
