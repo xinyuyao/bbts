@@ -1,5 +1,6 @@
 #include "tensor_factory.h"
 #include "builtin_formats.h"
+#include <sstream>
 
 bbts::tfid_t bbts::tensor_factory_t::register_fmt(const std::string &_fmt_name,
                                                   const bbts::tensor_creation_fs_t &_fmt_funs) {
@@ -39,11 +40,11 @@ size_t bbts::tensor_factory_t::get_tensor_size(const bbts::tensor_meta_t &_meta)
   throw std::runtime_error("Requested get_tensor_size for a format " + std::to_string(_meta.fmt_id) + " not registered with the system.");
 }
 
-void bbts::tensor_factory_t::print_tensor(tensor_t* here) {
+void bbts::tensor_factory_t::print_tensor(tensor_t* here, std::stringstream &ss) {
 
   // find the function to initialize the tensor, run it and set the right fmt_id
   if(here->_meta.fmt_id < _fmt_fs.size()) {
-    _fmt_fs[here->_meta.fmt_id].print(here);
+    _fmt_fs[here->_meta.fmt_id].print(here, ss);
     return;
   }
 

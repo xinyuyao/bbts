@@ -1,5 +1,6 @@
 #include "builtin_formats.h"
 #include <iostream>
+#include <sstream>
 
 namespace bbts {
 
@@ -19,7 +20,7 @@ tensor_creation_fs_t bbts::dense_tensor_t::get_creation_fs() {
     return sizeof(tensor_meta_t) + m.m().num_cols * m.m().num_rows * sizeof(float);
   };
 
-  auto pnt = [](const void *here) {
+  auto pnt = [](const void *here, std::stringstream &ss) {
     
     // get the tensor
     auto &t = *(dense_tensor_t *) here;
@@ -31,11 +32,11 @@ tensor_creation_fs_t bbts::dense_tensor_t::get_creation_fs() {
 
     // print the tensor
     for(int i = 0; i < num_rows; i++) {
-      std::cout << "[";
+      ss << "[";
       for(int j = 0; j < num_cols; j++) {
-        std::cout << data[i * num_cols + j] << ((j == num_cols - 1) ? "" : ",");
+        ss << data[i * num_cols + j] << ((j == num_cols - 1) ? "" : ",");
       }
-      std::cout << "]\n";
+      ss << "]\n";
     }
 
   };

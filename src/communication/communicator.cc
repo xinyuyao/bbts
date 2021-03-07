@@ -26,6 +26,38 @@ mpi_communicator_t::~mpi_communicator_t() {
   MPI_Finalize();
 }
 
+// send a response string
+bool mpi_communicator_t::send_response_string(const std::string &val) {
+
+  // get the number of byte to send and send the request
+  return MPI_Ssend(val.c_str(), val.size(), MPI_CHAR, 0, RESPONSE_STRING_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
+}
+
+// expect a response string
+std::tuple<bool, std::string> mpi_communicator_t::expect_response_string(node_id_t _node) {
+
+  // wait for a request
+  sync_request_t _req;
+  auto mpi_errno = MPI_Mprobe(_node, RESPONSE_STRING_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+
+  // check for errors
+  if (mpi_errno != MPI_SUCCESS) {        
+      return {false, ""};
+  }
+
+  // get the size
+  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
+
+  // allocate the memory and receive the string
+  std::unique_ptr<char[]> p(new char[_req.num_bytes]);
+  if(MPI_Mrecv (p.get(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
+    return {false, ""};
+  }
+
+  // return it
+  return {true, std::string(p.get(), _req.num_bytes)};
+}
+
 bool mpi_communicator_t::recv_sync(void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag) {
 
   // recive the stuff
@@ -252,7 +284,6 @@ bool mpi_communicator_t::send_coord_op(const bbts::coordinator_op_t &op) {
   std::vector<async_request_t> requests; requests.reserve(_num_nodes);
   for(node_id_t node = 1; node < _num_nodes; ++node) {
     async_request_t _req;
-    std::cout << node << '\n';
     _req.success = MPI_Isend(&op, sizeof(op), MPI_CHAR, node, COORDINATOR_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
     requests.push_back(_req);
   }

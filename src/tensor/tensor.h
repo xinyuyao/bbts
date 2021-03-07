@@ -61,6 +61,6 @@ namespace bbts {
     std::function<tensor_t&(void* here, const tensor_meta_t&)> init_tensor;
 
     // prints the content of a tensor
-    std::function<void(const void* here)> print;
+    std::function<void(const void* here, std::stringstream &ss)> print;
   };
 }

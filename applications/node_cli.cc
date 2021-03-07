@@ -5,37 +5,38 @@
 #include "../src/tensor/tensor.h"
 #include "../src/tensor/tensor_factory.h"
 #include "../src/server/node.h"
+#include "../src/utils/terminal_color.h"
 
 #include "../third_party/cli/include/cli/cli.h"
 #include "../third_party/cli/include/cli/clifilesession.h"
 
 using namespace cli;
 
-std::thread loading_message(const std::string &s, std::atomic_bool &b) {
+std::thread loading_message(std::ostream &out, const std::string &s, std::atomic_bool &b) {
 
-  auto t = std::thread([s, &b]() {
+  auto t = std::thread([s, &out, &b]() {
 
     // as long as we load
     int32_t dot = 0;
     while(!b) {
 
-      std::cout << '\r' << s;
-      for(int32_t i = 0; i < dot; ++i) { std::cout << '.';}
+      out << '\r' << s;
+      for(int32_t i = 0; i < dot; ++i) { out << '.';}
       dot = (dot + 1) % 4;
       usleep(300000);
     }
 
-    std::cout << '\n';
+    out << '\n';
   });
 
   return std::move(t);
 }
 
-void load_binary_command(bbts::node_t &node, const std::string &file_path) {
+void load_binary_command(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Loading the file", b);
+  auto t = loading_message(out, "Loading the file", b);
 
   // try to deserialize
   bbts::parsed_command_list_t cmd_list;
@@ -46,13 +47,13 @@ void load_binary_command(bbts::node_t &node, const std::string &file_path) {
 
   // did we fail
   if(!success) {
-    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+    out << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
     return;
   }
 
   // kick of a loading message
   b = false;
-  t = loading_message("Scheduling the loaded commands", b);
+  t = loading_message(out, "Scheduling the loaded commands", b);
 
   // load the commands we just parsed
   auto [did_load, message] = node.load_commands(cmd_list);
@@ -62,18 +63,18 @@ void load_binary_command(bbts::node_t &node, const std::string &file_path) {
 
   // did we fail
   if(!did_load) {
-    std::cout << bbts::red << "Failed to schedule the loaded commands : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Failed to schedule the loaded commands : \"" << message << "\"\n" << bbts::reset;
   }
   else {
-    std::cout << bbts::green << message << bbts::reset;
+    out << bbts::green << message << bbts::reset;
   }
 }
 
-void run_commands(bbts::node_t &node) {
+void run_commands(std::ostream &out, bbts::node_t &node) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Running the commands", b);
+  auto t = loading_message(out, "Running the commands", b);
 
   // run all the commands
   auto [did_load, message] = node.run_commands();
@@ -83,18 +84,18 @@ void run_commands(bbts::node_t &node) {
 
   // did we fail
   if(!did_load) {
-    std::cout << bbts::red << "Failed to run commands : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Failed to run commands : \"" << message << "\"\n" << bbts::reset;
   }
   else {
-    std::cout << bbts::green << message << bbts::reset;
+    out << bbts::green << message << bbts::reset;
   }
 }
 
-void print(bbts::node_t &node, const std::string &file_path) {
+void print(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Loading the file", b);
+  auto t = loading_message(out, "Loading the file", b);
 
   // try to deserialize
   bbts::parsed_command_list_t cmd_list;
@@ -105,18 +106,18 @@ void print(bbts::node_t &node, const std::string &file_path) {
 
   // did we fail
   if(!success) {
-    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+    out << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
   }
 
   // print out the commands
-  cmd_list.print(std::cout);
+  cmd_list.print(out);
 }
 
-void clear(bbts::node_t &node) {
+void clear(std::ostream &out, bbts::node_t &node) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Clearing", b);
+  auto t = loading_message(out, "Clearing", b);
 
   // run all the commands
   auto [did_load, message] = node.clear();
@@ -126,25 +127,25 @@ void clear(bbts::node_t &node) {
 
   // did we fail
   if(!did_load) {
-    std::cout << bbts::red << "Failed to clear : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Failed to clear : \"" << message << "\"\n" << bbts::reset;
   }
   else {
-    std::cout << bbts::green << message << bbts::reset;
+    out << bbts::green << message << bbts::reset;
   }
 }
 
-void set(bbts::node_t &node, const std::string &what, const std::string &value) {
+void set(std::ostream &out, bbts::node_t &node, const std::string &what, const std::string &value) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Setting", b);
+  auto t = loading_message(out, "Setting", b);
 
   // parse the number of threads
   if(what == "no_threads") {
     
     // check the value
     if(value.empty()) {
-      std::cout << "You must provide a number of threads.\n";
+      out << "You must provide a number of threads.\n";
     }
 
     // get the value
@@ -156,17 +157,17 @@ void set(bbts::node_t &node, const std::string &what, const std::string &value) 
 
     // did we fail
     if(!did_load) {
-      std::cout << bbts::red << "Failed to set : \"" << message << "\"\n" << bbts::reset;
+      out << bbts::red << "Failed to set : \"" << message << "\"\n" << bbts::reset;
     }
     else {
-      std::cout << bbts::green << message << bbts::reset;
+      out << bbts::green << message << bbts::reset;
     }
   }
   else if(what == "max_mem") {
 
     // check the value
     if(value.empty()) {
-      std::cout << "You must provide a number of threads.\n";
+      out << "You must provide a number of threads.\n";
       return;
     }
 
@@ -176,7 +177,7 @@ void set(bbts::node_t &node, const std::string &what, const std::string &value) 
 
     // check the unit
     if(!(unit == 'K' || unit == 'M' || unit == 'G') || num.empty()) {
-      std::cout << "The value must be a positive number followed by [K|M|G].\n";
+      out << "The value must be a positive number followed by [K|M|G].\n";
       return;
     }
 
@@ -199,10 +200,10 @@ void set(bbts::node_t &node, const std::string &what, const std::string &value) 
 
     // did we fail
     if(!did_load) {
-      std::cout << bbts::red << "Failed to set : \"" << message << "\"\n" << bbts::reset;
+      out << bbts::red << "Failed to set : \"" << message << "\"\n" << bbts::reset;
     }
     else {
-      std::cout << bbts::green << message << bbts::reset;
+      out << bbts::green << message << bbts::reset;
     }
   }
   else {
@@ -210,17 +211,17 @@ void set(bbts::node_t &node, const std::string &what, const std::string &value) 
     // finish the loading message
     b = true; t.join();
 
-    std::cout << bbts::red << "You can only set :\n" << bbts::reset;
-    std::cout << bbts::red << "no_threads - the number of threads\n" << bbts::reset;
-    std::cout << bbts::red << "max_mem - the maximum memory\n" << bbts::reset;
+    out << bbts::red << "You can only set :\n" << bbts::reset;
+    out << bbts::red << "no_threads - the number of threads\n" << bbts::reset;
+    out << bbts::red << "max_mem - the maximum memory\n" << bbts::reset;
   }
 }
 
-void verbose(bbts::node_t &node, bool val) {
+void verbose(std::ostream &out, bbts::node_t &node, bool val) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Set verbose", b);
+  auto t = loading_message(out, "Set verbose", b);
 
   // run all the commands
   auto [did_load, message] = node.set_verbose(val);
@@ -230,18 +231,18 @@ void verbose(bbts::node_t &node, bool val) {
 
   // did we fail
   if(!did_load) {
-    std::cout << bbts::red << "Set to fail verbose : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Set to fail verbose : \"" << message << "\"\n" << bbts::reset;
   }
   else {
-    std::cout << bbts::green << message << bbts::reset;
+    out << bbts::green << message << bbts::reset;
   }
 }
 
-void shutdown(bbts::node_t &node) {
+void shutdown(std::ostream &out, bbts::node_t &node) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message("Shutting down", b);
+  auto t = loading_message(out, "Shutting down", b);
 
   // run all the commands
   auto [did_load, message] = node.shutdown_cluster();
@@ -251,10 +252,10 @@ void shutdown(bbts::node_t &node) {
 
   // did we fail
   if(!did_load) {
-    std::cout << bbts::red << "Failed to shutdown : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Failed to shutdown : \"" << message << "\"\n" << bbts::reset;
   }
   else {
-    std::cout << bbts::green << message << bbts::reset;
+    out << bbts::green << message << bbts::reset;
   }
 }
 
@@ -281,7 +282,12 @@ void prompt(bbts::node_t &node) {
       node.print_cluster_info(out);
     }
     else if(what == "storage") {
-      node.print_storage_info();
+      
+      auto [success, message] = node.print_storage_info();
+      if(!success) {
+        out << bbts::red << "[ERROR]\n";
+      }
+      out << message << '\n';
     }
     
   },"Returns information about the cluster. Usage : info [cluster, storage, tensor] \n ");
@@ -289,45 +295,49 @@ void prompt(bbts::node_t &node) {
   rootMenu->Insert("info",[&](std::ostream &out, const std::string &what, int32_t id) {
 
     if(what == "tensor") {
-      node.print_tensor_info(static_cast<bbts::tid_t>(id));
+      auto [success, message] = node.print_tensor_info(static_cast<bbts::tid_t>(id));
+      if(!success) {
+        out << bbts::red << "[ERROR]\n";
+      }
+      out << message << '\n';
     }
 
   },"Returns information about the cluster. Usage : info [cluster, storage, tensor] [tid] \n ");
 
   rootMenu->Insert("load",[&](std::ostream &out, const std::string &file) {
 
-    load_binary_command(node, file);
+    load_binary_command(out, node, file);
 
   },"Load commands form a binary file. Usage : load <file>\n");
 
 
   rootMenu->Insert("run",[&](std::ostream &out) {
 
-    run_commands(node);
+    run_commands(out, node);
 
   },"Run scheduled commands.\n");
 
   rootMenu->Insert("verbose",[&](std::ostream &out, bool val) {
 
-    verbose(node, val);
+    verbose(out, node, val);
 
   },"Enables or disables debug messages. verbose [true|false]\n");
 
   rootMenu->Insert("print",[&](std::ostream &out, const std::string &file) {
 
-    print(node, file);
+    print(out, node, file);
 
   },"Prints command stored in a file. Usage : print <file>\n");
 
   rootMenu->Insert("clear",[&](std::ostream &out) {
 
-    clear(node);
+    clear(out, node);
 
   },"Clears the tensor operating system.\n");
 
   rootMenu->Insert("set",[&](std::ostream &out, const std::string &what, const std::string &val) {
 
-    set(node, what, val);
+    set(out, node, what, val);
 
   },"Sets a value in the system. Usage : set <no_threads, max_mem> <value>.\n");
 
@@ -336,7 +346,7 @@ void prompt(bbts::node_t &node) {
   Cli cli(std::move(rootMenu));
 
   // global exit action
-  cli.ExitAction([&](auto &out) { shutdown(node); });
+  cli.ExitAction([&](auto &out) { shutdown(out, node); });
 
   // start the cli session
   CliFileSession input(cli);

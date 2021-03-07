@@ -25,7 +25,7 @@ public:
   size_t get_tensor_size(const tensor_meta_t& _meta);
 
   // the tensor to print
-  void print_tensor(tensor_t* here);
+  void print_tensor(tensor_t* here, std::stringstream &ss);
 
   // initializes the tensor
   tensor_t& init_tensor(tensor_t* here, const tensor_meta_t& _meta);

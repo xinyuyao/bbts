@@ -30,10 +30,11 @@ const com_tags SHUTDOWN_TAG = 2;
 const com_tags COORDINATOR_TAG = 3;
 const com_tags COORDINATOR_BCAST_CMD_TAG = 4;
 const com_tags NOTIFY_TENSOR_TAG = 5;
+const com_tags RESPONSE_STRING_TAG = 6;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 6;
+const com_tags FREE_TAG = 7;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -70,6 +71,12 @@ public:
     // the success 
     bool success = true;
   };
+
+  // send a response string
+  bool send_response_string(const std::string &val);
+
+  // expect a response string
+  std::tuple<bool, std::string> expect_response_string(node_id_t _node);
 
   // recives a blob with the matching tag from a given node, method blocks
   bool recv_sync(void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);

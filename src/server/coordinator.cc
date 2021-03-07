@@ -1,4 +1,5 @@
 #include <chrono>
+#include <sstream>
 #include <utility>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
@@ -30,6 +31,7 @@ void bbts::coordinator_t::accept() {
     // the operation
     auto op = _comm->expect_coord_op();
 
+    std::stringstream ss;
     switch (op._type) {
 
       case coordinator_op_types_t::FAIL : {
@@ -61,17 +63,17 @@ void bbts::coordinator_t::accept() {
         break;
       }
       case coordinator_op_types_t::PRINT_STORAGE : {
-        _print_storage();
+        _print_storage(ss);
         break;
       }
       case coordinator_op_types_t::PRINT_TENSOR : {
-        _print_tensor((tid_t)(op._val));
+        _print_tensor((tid_t)(op._val), ss);
         break;
       }
     }
 
     // sync all nodes
-    _comm->barrier();
+    _comm->send_response_string(ss.str());
   }
 }
 
@@ -90,17 +92,20 @@ std::tuple<bool, std::string> bbts::coordinator_t::schedule_commands(const std::
   // load all the commands
   _load_cmds(cmds);
 
-  // sync all nodes
-  _comm->barrier();
+  // collect the respnses from all the nodes
+  std::tuple<bool, std::string> out = {true, "Scheduled " + std::to_string(cmds.size()) + " commands\n"};
+  _collect(out);
 
   // we succeeded
-  return {true, "Scheduled " + std::to_string(cmds.size()) + " commands\n"};
+  return out;
 }
 
 std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
 
+  // measure start
   auto start = high_resolution_clock::now();
 
+  // send the commands
   if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::RUN, ._val = 0})) {
     return {false, "Could not run the commands!\n"};
   }
@@ -108,20 +113,127 @@ std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
   // run everything
   _run();
 
-  // sync everything
-  _comm->barrier();
+  // collect the responses from all the nodes
+  std::tuple<bool, std::string> out = {true, ""};
+  _collect(out);
 
+  // measure end
   auto end = high_resolution_clock::now();
-  auto duration =
-      (double) duration_cast<microseconds>(end - start).count() / (double) duration_cast<microseconds>(1s).count();
+  auto duration = (double) duration_cast<microseconds>(end - start).count() / (double) duration_cast<microseconds>(1s).count();
 
   return {true, "Finished running commands in " + std::to_string(duration) + "s \n"};
 }
 
-void bbts::coordinator_t::shutdown() {
+std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
 
-  // mark the we are done
-  _is_down = true;
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::VERBOSE,
+      ._val = static_cast<size_t>(val)})) {
+    return {false, "Failed to set the verbose flag!\n"};
+  }
+
+  // run everything
+  _set_verbose(val);
+
+  // collect the responses from all the nodes
+  std::tuple<bool, std::string> out = {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
+  _collect(out);
+
+  return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::set_num_threads(std::uint32_t set_num_threads) {
+  
+  // TODO - need some work
+  return {false, "Not supported for now!"};
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::set_max_storage(size_t val) {
+  
+  // send the command
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::MAX_STORAGE, 
+                                             ._val = val})) {
+
+    return {false, "Failed to set the maximum storage flag!\n"};
+  }
+
+  // run everything
+  _set_max_storage(val);
+
+  // collect the responses from all the nodes
+  std::tuple<bool, std::string> out = {true, "Set the max storage to " + std::to_string(val) + " bytes\n"};
+  _collect(out);
+
+  return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_STORAGE, ._val = 0})) {
+    return {false, "Failed to print storage!\n"};
+  }
+
+  // print the storage
+  std::stringstream ss;
+  _print_storage(ss);
+
+  // collect the responses from all the nodes
+  std::tuple<bool, std::string> out = {true, ss.str()};
+  _collect(out);
+
+  // we succeded
+  return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::print_tensor_info(bbts::tid_t id) {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_TENSOR, ._val = (size_t)(id) } )) {
+    return {false, "Failed to print tensor!\n"};
+  }
+
+  // print the storage
+  std::stringstream ss;
+  _print_tensor(id, ss);
+
+  // sync everything
+  std::tuple<bool, std::string> out = {true, ss.str()};
+  _collect(out);
+
+  // we succeded
+  return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::clear() {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::CLEAR, ._val = 0})) {
+    return {false, "Failed to clear the cluster!\n"};
+  }
+
+  // claer the storage
+  _clear();
+
+  // sync everything
+  std::tuple<bool, std::string> out = {true, "Cleared the cluster!\n"};
+  _collect(out);
+
+  // we succeded
+  return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::shutdown_cluster() {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::SHUTDOWN, ._val = 0})) {
+    return {false, "Failed to shutdown the cluster!\n"};
+  }
+
+  // print the storage
+  _shutdown();
+
+  // sync everything
+  std::tuple<bool, std::string> out = {true, "Cluster shutdown!\n"};
+  _collect(out);
+
+  // we succeded
+  return out;
 }
 
 void bbts::coordinator_t::_fail() {
@@ -140,6 +252,18 @@ void bbts::coordinator_t::_schedule(coordinator_op_t op) {
 
   // load all the commands
   _load_cmds(cmds);
+}
+
+void bbts::coordinator_t::_collect(std::tuple<bool, std::string> &out) {
+
+  // collect all the responses
+  for(bbts::tid_t node = 1; node < _comm->get_num_nodes(); ++node) {
+    auto rec = _comm->expect_response_string(node);
+
+    // combine the result
+    std::get<0>(out) = std::get<0>(out) &&  std::get<0>(rec);
+    std::get<1>(out) = std::get<1>(out)  +  std::get<1>(rec);
+  }
 }
 
 void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds) {
@@ -178,107 +302,6 @@ void bbts::coordinator_t::_run() {
   _rs->stop_executing();
 }
 
-std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
-
-  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::VERBOSE,
-      ._val = static_cast<size_t>(val)})) {
-    return {false, "Failed to set the verbose flag!\n"};
-  }
-
-  // run everything
-  _set_verbose(val);
-
-  // sync everything
-  _comm->barrier();
-
-  return {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
-}
-
-std::tuple<bool, std::string> bbts::coordinator_t::set_num_threads(std::uint32_t set_num_threads) {
-  
-  // TODO - need some work
-  return {false, "Not supported for now!"};
-}
-
-std::tuple<bool, std::string> bbts::coordinator_t::set_max_storage(size_t val) {
-  
-  // send the command
-  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::MAX_STORAGE, 
-                                             ._val = val})) {
-
-    return {false, "Failed to set the maximum storage flag!\n"};
-  }
-
-  // run everything
-  _set_max_storage(val);
-
-  // sync everything
-  _comm->barrier();
-
-  return {true, "Set the max storage to " + std::to_string(val) + " bytes\n"};
-}
-
-std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
-
-  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_STORAGE, ._val = 0})) {
-    return {false, "Failed to print storage!\n"};
-  }
-
-  // print the storage
-  _print_storage();
-
-  // we succeded
-  return {true, ""};
-}
-
-std::tuple<bool, std::string> bbts::coordinator_t::print_tensor_info(bbts::tid_t id) {
-
-  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_TENSOR, ._val = (size_t)(id) } )) {
-    return {false, "Failed to print tensor!\n"};
-  }
-
-  // print the storage
-  _print_tensor(id);
-
-  // sync everything
-  _comm->barrier();
-
-  // we succeded
-  return {true, ""};
-}
-
-std::tuple<bool, std::string> bbts::coordinator_t::clear() {
-
-  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::CLEAR, ._val = 0})) {
-    return {false, "Failed to clear the cluster!\n"};
-  }
-
-  // claer the storage
-  _clear();
-
-  // sync everything
-  _comm->barrier();
-
-  // we succeded
-  return {true, "Cleared the cluster!\n"};
-}
-
-std::tuple<bool, std::string> bbts::coordinator_t::shutdown_cluster() {
-
-  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::SHUTDOWN, ._val = 0})) {
-    return {false, "Failed to shutdown the cluster!\n"};
-  }
-
-  // print the storage
-  _shutdown();
-
-  // sync everything
-  _comm->barrier();
-
-  // we succeded
-  return {true, "Cluster shutdown!\n"};
-}
-
 void bbts::coordinator_t::_clear() {
 
   // clear everything
@@ -291,55 +314,29 @@ void bbts::coordinator_t::_set_verbose(bool val) {
   _logger->set_enabled(val);
 }
 
-void bbts::coordinator_t::_print_storage() {
+void bbts::coordinator_t::_print_storage(std::stringstream &ss) {
 
-  // each node gets a turn
-  for (node_id_t node = 0; node < _comm->get_num_nodes(); ++node) {
-
-    // check the rank of the node
-    if (node == _comm->get_rank()) {
-      std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
-      _storage->print();
-    }
-
-    _comm->barrier();
-  }
-
-  // final sync just in case
-  _comm->barrier();
+  ss << "<<< For Node " << _comm->get_rank() << ">>>\n";
+  _storage->print(ss);
 }
 
-void bbts::coordinator_t::_print_tensor(tid_t id) {
+void bbts::coordinator_t::_print_tensor(tid_t id, std::stringstream &ss) {
 
-  // each node gets a turn
-  auto rnk = _comm->get_rank();
-  for (node_id_t node = 0; node < _comm->get_num_nodes(); ++node) {
-
-    // check the rank of the node
-    if (node == _comm->get_rank()) {
-
-      // check if it exists
-      if(!_storage->has_tensor(id)) {
-        continue;
-      }
-
-      // run the transaction
-      _storage->local_transaction({id}, {}, [&](const storage_t::reservation_result_t &res) {
-
-        // the get the tensor
-        auto ts = res.get[0].get().tensor;
-        if(ts != nullptr) {
-          
-          // print the tensor since we found it
-          std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
-          _tf->print_tensor(ts);
-          std::cout << std::flush;
-        }
-      });
-
-    }
-
-    _comm->barrier();
+  // check if it exists
+  if(!_storage->has_tensor(id)) {
+    return;;
   }
 
+  // run the transaction
+  _storage->local_transaction({id}, {}, [&](const storage_t::reservation_result_t &res) {
+
+    // the get the tensor
+    auto ts = res.get[0].get().tensor;
+    if(ts != nullptr) {
+      
+      // print the tensor since we found it
+      ss << bbts::green << "<<< On Node " << _comm->get_rank() << ">>>\n" << bbts::reset;
+      _tf->print_tensor(ts, ss);
+    }
+  });
 }

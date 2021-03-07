@@ -63,14 +63,13 @@ public:
   // shutdown the cluster
   std::tuple<bool, std::string> shutdown_cluster();
 
-  // shutdown the coordinator
-  void shutdown();
-
 private:
 
   void _fail();
 
   void _schedule(coordinator_op_t ops);
+
+  void _collect(std::tuple<bool, std::string> &out);
 
   void _load_cmds(const std::vector<command_ptr_t> &cmds);
 
@@ -111,9 +110,9 @@ private:
     }
   } 
 
-  void _print_storage();
+  void _print_storage(std::stringstream &ss);
 
-  void _print_tensor(tid_t);
+  void _print_tensor(tid_t id, std::stringstream &ss);
 
   // the communicator
   bbts::communicator_ptr_t _comm;

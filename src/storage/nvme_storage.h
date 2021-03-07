@@ -298,7 +298,7 @@ struct nvme_storage_t {
   bool has_tensor(tid_t _id);
 
   // print the nvme_storage
-  void print();
+  void print(std::stringstream &ss);
 
   // clear the nvme_storage
   void clear();

@@ -13,6 +13,7 @@
 #include <driver_types.h>
 #include <iostream>
 #include <future>
+#include <sstream>
 #include <stdexcept>
 #include <unistd.h>
 
@@ -304,20 +305,20 @@ size_t nvme_storage_t::get_tensor_size(tid_t id) {
   return it->second.num_bytes;
 }
 
-void nvme_storage_t::print() {
+void nvme_storage_t::print(std::stringstream &ss) {
 
   // lock this thing
   std::unique_lock<std::mutex> lck (_m);
 
   // print all the allocated tensors
-  std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  ss << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
 
     // get the address
     void *address = t.second.state == tensor_state_t::LOADED ? t.second.data.get().tensor : nullptr;
 
     // print it out
-    std::cout << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) address << '\n';
+    ss << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) address << '\n';
   }
 }
 
