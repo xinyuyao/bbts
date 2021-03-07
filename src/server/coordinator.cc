@@ -1,5 +1,6 @@
 #include <chrono>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
@@ -47,7 +48,7 @@ void bbts::coordinator_t::accept() {
         break;
       }
       case coordinator_op_types_t::SCHEDULE : {
-        _schedule(op);
+        _schedule(op, ss);
         break;
       }
       case coordinator_op_types_t::SHUTDOWN : {
@@ -90,14 +91,20 @@ std::tuple<bool, std::string> bbts::coordinator_t::schedule_commands(const std::
   }
 
   // load all the commands
-  _load_cmds(cmds);
+  std::stringstream ss;
+  _load_cmds(cmds, ss);
 
   // collect the respnses from all the nodes
-  std::tuple<bool, std::string> out = {true, "Scheduled " + std::to_string(cmds.size()) + " commands\n"};
+  std::tuple<bool, std::string> out = {true, ""};
   _collect(out);
 
-  // we succeeded
-  return out;
+  // check if we succeded
+  if(!std::get<0>(out) || !std::get<1>(out).empty()) {
+    return {false, std::get<1>(out).empty() ? "Unknown error\n" : std::get<1>(out)};
+  }
+  
+  // we succeded
+  return {true, "Scheduled " + std::to_string(cmds.size()) + " commands\n"};
 }
 
 std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
@@ -241,7 +248,7 @@ void bbts::coordinator_t::_fail() {
   exit(-1);
 }
 
-void bbts::coordinator_t::_schedule(coordinator_op_t op) {
+void bbts::coordinator_t::_schedule(coordinator_op_t op, std::stringstream &ss) {
 
   // expect all the commands
   std::vector<command_ptr_t> cmds;
@@ -251,7 +258,7 @@ void bbts::coordinator_t::_schedule(coordinator_op_t op) {
   }
 
   // load all the commands
-  _load_cmds(cmds);
+  _load_cmds(cmds, ss);
 }
 
 void bbts::coordinator_t::_collect(std::tuple<bool, std::string> &out) {
@@ -266,14 +273,21 @@ void bbts::coordinator_t::_collect(std::tuple<bool, std::string> &out) {
   }
 }
 
-void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds) {
+void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds,
+                                     std::stringstream &ss) {
 
   // extract the stats from the commands
   for (auto &_cmd : cmds) {
 
-    // if it uses the node
-    if (_cmd->uses_node(_comm->get_rank())) {
-      _stats->add_command(*_cmd);
+    try {
+
+      // if it uses the node
+      if (_cmd->uses_node(_comm->get_rank())) {
+        _stats->add_command(*_cmd);
+      }
+    }
+    catch(std::runtime_error &error) {
+      ss << error.what();
     }
   }
 

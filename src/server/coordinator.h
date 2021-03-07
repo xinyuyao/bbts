@@ -67,11 +67,12 @@ private:
 
   void _fail();
 
-  void _schedule(coordinator_op_t ops);
+  void _schedule(coordinator_op_t ops, std::stringstream &ss);
 
   void _collect(std::tuple<bool, std::string> &out);
 
-  void _load_cmds(const std::vector<command_ptr_t> &cmds);
+  void _load_cmds(const std::vector<command_ptr_t> &cmds,
+                  std::stringstream &ss);
 
   void _run();
 

@@ -311,7 +311,7 @@ void nvme_storage_t::print(std::stringstream &ss) {
   std::unique_lock<std::mutex> lck (_m);
 
   // print all the allocated tensors
-  ss << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  ss << bbts::green << "TID\tGPU\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
 
     // get the address

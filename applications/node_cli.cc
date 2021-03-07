@@ -167,7 +167,11 @@ void set(std::ostream &out, bbts::node_t &node, const std::string &what, const s
 
     // check the value
     if(value.empty()) {
+
+      // finish the loading message
+      b = true; t.join();
       out << "You must provide a number of threads.\n";
+
       return;
     }
 
@@ -177,7 +181,11 @@ void set(std::ostream &out, bbts::node_t &node, const std::string &what, const s
 
     // check the unit
     if(!(unit == 'K' || unit == 'M' || unit == 'G') || num.empty()) {
-      out << "The value must be a positive number followed by [K|M|G].\n";
+
+      // finish the loading message
+      b = true; t.join();
+      out << bbts::red  << "The value must be a positive number followed by [K|M|G].\n" << bbts::reset;
+      
       return;
     }
 

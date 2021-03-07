@@ -199,7 +199,7 @@ void memory_storage_t::print() {
   std::unique_lock<std::mutex> lck (_m);
 
   // print all the allocated tensors
-  std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  std::cout << bbts::green << "TID\tGPU\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
     std::cout << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
   }
