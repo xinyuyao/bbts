@@ -43,6 +43,17 @@ struct lru_t {
     cv.notify_all();
   }
 
+  void reassign(tid_t _anon_id, tid_t _id) {
+
+    // set the value
+    auto it = index.find(_anon_id);
+    *it->second = _id;
+
+    // remove and replace
+    index[_id] = it->second;
+    index.erase(it);
+  }
+
   // remove it from the lru
   void remove(tid_t id) {
 
@@ -283,6 +294,9 @@ struct nvme_storage_t {
   // set the maximum storage
   void set_max_storage(size_t val);
 
+  // does the tensor exist in the storage
+  bool has_tensor(tid_t _id);
+
   // print the nvme_storage
   void print();
 
@@ -319,6 +333,7 @@ private:
     LOADING,
     UNLOADING,
     DELETED,
+    REASSIGNED
   };
 
   // information about the stored tensor
@@ -361,9 +376,6 @@ private:
 
   // maps to the information
   std::unordered_map<tid_t, sto_tensor_nfo_t> _tensor_nfo;
-
-  // start transaction
-  transaction_id _start_transaction();
 
   // this reserves space for the tensors in get to be loaded and tensors in create to created
   bool _try_reserve(const std::vector<tid_t> &get,

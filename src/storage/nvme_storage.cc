@@ -67,6 +67,7 @@ void nvme_storage_t::request_thread() {
       
       // make sure the tensor is not deleted
       assert(it->second.state != tensor_state_t::DELETED);
+      assert(it->second.state != tensor_state_t::UNLOADING);
 
       // if the tensor is not loaded we need prep, if it is unloading 
       // we will take care of it later but just not freeing the memory
@@ -224,7 +225,45 @@ bool nvme_storage_t::remove_by_tid(tid_t _id) {
 
 bool nvme_storage_t::assign_tid(tid_t _anon_id, tid_t _id) {
 
-  // TODO
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // try to find it
+  auto it =_tensor_nfo.find(_anon_id);
+  if(it == _tensor_nfo.end()) {
+    return false;
+  }
+
+  // make sure that nobody is referencing this tensor
+  assert(it->second.num_ref == 0);
+
+  // reassign
+  auto &nfo = _tensor_nfo[_id];
+  nfo.data = it->second.data;
+  nfo.file_offset = it->second.file_offset;
+  nfo.id = it->second.id;
+  nfo.is_gpu = it->second.is_gpu;
+  nfo.num_bytes = it->second.num_bytes;
+  nfo.num_ref = it->second.num_ref;
+  nfo.state = it->second.state;
+  nfo.promise = std::move(it->second.promise);
+  nfo.data = it->second.data;
+
+  // check for special cases
+  if(it->second.state == tensor_state_t::UNLOADING) {
+
+    // if the tensor is unloading now just mark it as deleted and return
+    it->second.state = tensor_state_t::REASSIGNED;
+    it->second.id = _id;
+  }
+  else {
+
+    // remove it from the lru
+    _lru.reassign(_anon_id, _id);
+
+    // remove it
+    _tensor_nfo.erase(it);
+  }
 
   return true;
 }
@@ -265,7 +304,22 @@ size_t nvme_storage_t::get_tensor_size(tid_t id) {
   return it->second.num_bytes;
 }
 
-void nvme_storage_t::print() {}
+void nvme_storage_t::print() {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // print all the allocated tensors
+  std::cout << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  for(auto &t : _tensor_nfo) {
+
+    // get the address
+    void *address = t.second.state == tensor_state_t::LOADED ? t.second.data.get().tensor : nullptr;
+
+    // print it out
+    std::cout << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) address << '\n';
+  }
+}
 
 void nvme_storage_t::clear() {}
 
@@ -333,6 +387,18 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
 
   // tell that we have approved it
   return true;
+}
+
+bool nvme_storage_t::has_tensor(tid_t _id) {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // find information about the tensor
+  auto it = _tensor_nfo.find(_id);
+
+  // check if we found it
+  return it != _tensor_nfo.end();
 }
 
 std::future<nvme_storage_t::reservation_result_t> nvme_storage_t::_create_reserved(const std::vector<tid_t> &get,
@@ -511,6 +577,11 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
 
     // lock again so we can update the state
     lck.lock();
+
+    // check if the tensor was resassigned
+    if(it->second.state == tensor_state_t::REASSIGNED) {
+      it = _tensor_nfo.find(it->second.id);
+    }
 
     // check if somebody has used it in the mean time
     if(it->second.num_ref != 0) {

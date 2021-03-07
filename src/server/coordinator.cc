@@ -240,6 +240,9 @@ std::tuple<bool, std::string> bbts::coordinator_t::print_tensor_info(bbts::tid_t
   // print the storage
   _print_tensor(id);
 
+  // sync everything
+  _comm->barrier();
+
   // we succeded
   return {true, ""};
 }
@@ -309,11 +312,18 @@ void bbts::coordinator_t::_print_storage() {
 void bbts::coordinator_t::_print_tensor(tid_t id) {
 
   // each node gets a turn
+  auto rnk = _comm->get_rank();
   for (node_id_t node = 0; node < _comm->get_num_nodes(); ++node) {
 
     // check the rank of the node
     if (node == _comm->get_rank()) {
 
+      // check if it exists
+      if(!_storage->has_tensor(id)) {
+        continue;
+      }
+
+      // run the transaction
       _storage->local_transaction({id}, {}, [&](const storage_t::reservation_result_t &res) {
 
         // the get the tensor
@@ -323,6 +333,7 @@ void bbts::coordinator_t::_print_tensor(tid_t id) {
           // print the tensor since we found it
           std::cout << "<<< For Node " << _comm->get_rank() << ">>>\n";
           _tf->print_tensor(ts);
+          std::cout << std::flush;
         }
       });
 
@@ -331,6 +342,4 @@ void bbts::coordinator_t::_print_tensor(tid_t id) {
     _comm->barrier();
   }
 
-  // final sync just in case
-  _comm->barrier();
 }

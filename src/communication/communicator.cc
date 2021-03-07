@@ -252,6 +252,7 @@ bool mpi_communicator_t::send_coord_op(const bbts::coordinator_op_t &op) {
   std::vector<async_request_t> requests; requests.reserve(_num_nodes);
   for(node_id_t node = 1; node < _num_nodes; ++node) {
     async_request_t _req;
+    std::cout << node << '\n';
     _req.success = MPI_Isend(&op, sizeof(op), MPI_CHAR, node, COORDINATOR_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
     requests.push_back(_req);
   }
