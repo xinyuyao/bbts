@@ -60,39 +60,16 @@ struct memory_storage_t {
   void local_transaction(const std::vector<tid_t> &get, 
                          const std::vector<std::tuple<tid_t, bool, size_t>> &create,
                          const fn &fun) {
-  
-    for(;;) {
 
-      // lock this thing
-      std::unique_lock<std::mutex> lck (_m);
+    // lock this thing
+    std::unique_lock<std::mutex> lck (_m);
 
-      // try to aquire a reservation
-      bool val = _try_reserve(get, create);
+    // craete the reserved
+    auto c = _create_reserved(get, create);
 
-      if(!val) {
-
-        // maybe I will need to adjust this if it is firing to much
-        lck.unlock();
-        std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
-
-        // try again
-        continue;
-      }
-
-      // craete the reserved
-      auto c = _create_reserved(get, create);
-
-      // run the function
-      lck.unlock();
-      fun(c);
-      lck.lock();
-      
-      // release the reserved
-      _release_reservation(get, create);
-
-      // we are done here
-      break;
-    }
+    // run the function
+    lck.unlock();
+    fun(c);
   }
 
   // if there is a 
@@ -103,45 +80,15 @@ struct memory_storage_t {
                           const std::vector<std::tuple<tid_t, bool, size_t>> &create,
                           const fn &fun) {
     
-    for(;;) {
+    // lock this thing
+    std::unique_lock<std::mutex> lck (_m);
 
-      // lock this thing
-      std::unique_lock<std::mutex> lck (_m);
+    // craete the reserved
+    auto c = _create_reserved(get, create);
 
-      // try to aquire a reservation
-      bool val = _try_reserve(get, create);
-
-      // sync all the nodes so that they know if the reservation was aquired or not
-      lck.unlock();
-      bool res = _com->sync_resource_aquisition(cmd, nodes, val);
-      lck.lock();
-
-      // did all the nodes aquire a result if so we can proceed
-      if(res) {
-
-        // craete the reserved
-        auto c = _create_reserved(get, create);
-
-        // run the function
-        lck.unlock();
-        fun(c);
-        lck.lock();
-
-        // release the reserved
-        _release_reservation(get, create);
-
-        return;
-      }
-
-      // release the reservation and try to reaqire again
-      if(val) {
-        _release_reservation(get, create);
-      }
-
-      // maybe I will need to adjust this if it is firing to much
-      lck.unlock();
-      std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
-    }
+    // run the function
+    lck.unlock();
+    fun(c);
   }
 
     // if there is a 
@@ -152,45 +99,15 @@ struct memory_storage_t {
                               const std::vector<std::tuple<tid_t, bool, size_t>> &create,
                               const fn &fun) {
     
-    for(;;) {
+    // lock this thing
+    std::unique_lock<std::mutex> lck (_m);
 
-      // lock this thing
-      std::unique_lock<std::mutex> lck (_m);
+    // craete the reserved
+    auto c = _create_reserved(get, create);
 
-      // try to aquire a reservation
-      bool val = _try_reserve(get, create);
- 
-      // sync all the nodes so that they know if the reservation was aquired or not
-      lck.unlock();
-      bool res = _com->sync_resource_aquisition_p2p(cmd, other, val);
-      lck.lock();
-
-      // did all the nodes aquire a result if so we can proceed
-      if(res) {
-
-        // craete the reserved
-        auto c = _create_reserved(get, create);
-
-        // run the function
-        lck.unlock();
-        fun(c);
-        lck.lock();
-
-        // release the reserved
-        _release_reservation(get, create);
-
-        return;
-      }
-
-      // release the reservation and try to reaqire again
-      if(val) {
-        _release_reservation(get, create);
-      }
-
-      // maybe I will need to adjust this if it is firing to much
-      lck.unlock();
-      std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
-    }
+    // run the function
+    lck.unlock();
+    fun(c);
   }
 
   // allocate the tensor
@@ -199,6 +116,9 @@ struct memory_storage_t {
   // free the allocated tensor
   void free_tensor(tensor_t *tensor, bool used_by_gpu);
   
+  // check if there is a tensor in the storage
+  bool has_tensor(tid_t _id);
+
   // remove by tid
   bool remove_by_tid(tid_t _id);
 
@@ -206,7 +126,7 @@ struct memory_storage_t {
   bool assign_tid(tid_t _anon_id, tid_t _id);
 
   // print the memory_storage
-  void print();
+  void print(std::stringstream &ss);
 
   // clear the memory_storage
   void clear();
@@ -249,17 +169,9 @@ private:
   // an existing tensor by tid
   tensor_ref_t _get_by_tid(tid_t _id);
 
-  // this reserves space for the tensors in get to be loaded and tensors in create to created
-  bool _try_reserve(const std::vector<tid_t> &get,
-                   const std::vector<std::tuple<tid_t, bool, size_t>> &create);
-
   // craete all the tensors we just reserved
   reservation_result_t _create_reserved(const std::vector<tid_t> &get, 
                                        const std::vector<std::tuple<tid_t, bool, size_t>> &create);
-
-  // release the reserved tensors
-  void _release_reservation(const std::vector<tid_t> &get,
-                            const std::vector<std::tuple<tid_t, bool, size_t>> &create);
 
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;

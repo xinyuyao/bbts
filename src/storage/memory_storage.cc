@@ -8,6 +8,7 @@
 #include "../utils/terminal_color.h"
 #include <driver_types.h>
 #include <iostream>
+#include <sstream>
 
 
 namespace bbts {
@@ -31,13 +32,7 @@ memory_storage_t::tensor_ref_t memory_storage_t::_get_by_tid(tid_t _id) {
 memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu) {
 
   // malloc the tensor
-  tensor_t *ts;
-  if(used_by_gpu) {
-    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
-  }
-  else {
-    ts = (tensor_t*) malloc(num_bytes); 
-  }
+  tensor_t *ts = _allocate_tensor(num_bytes, used_by_gpu);
 
   // store the info
   _tensor_nfo[_id] = sto_tensor_nfo_t{.address = ts, .num_bytes = num_bytes, .is_gpu = used_by_gpu};
@@ -54,13 +49,7 @@ memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(tid_t _id, size_
 memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(size_t num_bytes, bool used_by_gpu) {
 
   // malloc the tensor
-  tensor_t *ts;
-  if(used_by_gpu) {
-    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
-  }
-  else {
-    ts = (tensor_t*) malloc(num_bytes); 
-  }
+  tensor_t *ts = _allocate_tensor(num_bytes, used_by_gpu);
 
   // get a new tid for this
   auto tid = _current_anon--;
@@ -128,6 +117,15 @@ void memory_storage_t::free_tensor(tensor_t *tensor, bool used_by_gpu) {
   }
 }
 
+bool memory_storage_t::has_tensor(tid_t _id) {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // check if found
+  return _tensor_nfo.find(_id) != _tensor_nfo.end();
+}
+
 bool memory_storage_t::remove_by_tid(tid_t _id) {
 
   // remove the tensor
@@ -137,12 +135,7 @@ bool memory_storage_t::remove_by_tid(tid_t _id) {
   }
 
   // free the tensor
-  if(it->second.is_gpu) {
-    cudaFree(it->second.address);
-  }
-  else {
-    free(it->second.address);
-  }
+  free_tensor(it->second.address, it->second.is_gpu);
 
   // remove the tensor
   _tensor_nfo.erase(it);
@@ -193,15 +186,15 @@ size_t memory_storage_t::get_tensor_size(tid_t _id){
   return it == _tensor_nfo.end() ? 0 : it->second.num_bytes;
 }
 
-void memory_storage_t::print() {
+void memory_storage_t::print(std::stringstream &ss) {
 
   // lock this thing
   std::unique_lock<std::mutex> lck (_m);
 
   // print all the allocated tensors
-  std::cout << bbts::green << "TID\tGPU\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  ss << bbts::green << "TID\tGPU\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
-    std::cout << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
+    ss << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
   }
 }
 
@@ -214,21 +207,9 @@ void memory_storage_t::clear() {
   for(auto &it : _tensor_nfo) {
     
     // is it gpu
-    if(it.second.is_gpu) {
-      cudaFree(it.second.address);
-    }
-    else {
-      free(it.second.address);
-    }
+    free_tensor(it.second.address, it.second.is_gpu);
   }
   _tensor_nfo.clear();
-}
-
-bool memory_storage_t::_try_reserve(const std::vector<tid_t> &get,
-                             const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
-
-  // TODO for now we always do this
-  return true;
 }
 
 memory_storage_t::reservation_result_t memory_storage_t::_create_reserved(const std::vector<tid_t> &get,
@@ -257,12 +238,6 @@ memory_storage_t::reservation_result_t memory_storage_t::_create_reserved(const 
 
   // return the result
   return {.get = out_get, .create = out_create};
-}
-
-// release the reserved tensors
-void memory_storage_t::_release_reservation(const std::vector<tid_t> &get,
-                                        const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
-  return;
 }
 
 }
