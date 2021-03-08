@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
-project(tra_sub_sys_barbatos LANGUAGES CXX CUDA)
+project(tra_sub_sys_barbatos LANGUAGES CXX)
 
 # set the c++ and cuda version
-set(CMAKE_CUDA_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
 
 # set the output directory
@@ -32,17 +31,31 @@ elseif(CMAKE_BUILD_TYPE MATCHES Release)
 
 endif()
 
-# set the cuda flags
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread -arch=sm_60")
+# forward the definitions ENABLE_GPU=ON/OFF
+if(${ENABLE_GPU})
+
+    # enable the cuda language
+    enable_language(CUDA)
+
+    # set the cuda standard
+    set(CMAKE_CUDA_STANDARD 11)
+
+    # set the cuda flags
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread -arch=sm_60")
+
+    # try to find cuda
+    find_package(CUDA REQUIRED)
+
+    # add the definition
+    add_compile_definitions(ENABLE_GPU)
+    
+    # auto cuda paths
+    file(GLOB UD_SOURCE_CUDA "src/ud_functions/impls/*.cu")
+endif()
 
 # forward the definitions ENABLE_HOOKS=ON/OFF
 if(${ENABLE_HOOKS})
     add_compile_definitions(ENABLE_HOOKS)
-endif()
-
-# forward the definitions ENABLE_GPU=ON/OFF
-if(${ENABLE_GPU})
-    add_compile_definitions(ENABLE_GPU)
 endif()
 
 # forward the definitions ENABLE_STORAGE=ON/OFF
@@ -53,9 +66,6 @@ endif()
 # try to find mkl
 set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
-
-# try to find cuda
-find_package(CUDA REQUIRED)
 
 # try to find the mpi library
 find_package(MPI REQUIRED)
@@ -91,8 +101,8 @@ file(GLOB COMMUNICATION_SOURCE "src/communication/*.cc")
 add_library(communication OBJECT ${COMMUNICATION_SOURCE})
 
 # the ud functions
-file(GLOB UD_SOURCE "src/ud_functions/*.cc" "src/ud_functions/impls/*.cc" "src/ud_functions/impls/*.cu")
-add_library(ud_functions OBJECT ${UD_SOURCE})
+file(GLOB UD_SOURCE "src/ud_functions/*.cc" "src/ud_functions/impls/*.cc")
+add_library(ud_functions OBJECT ${UD_SOURCE} ${UD_SOURCE_CUDA})
 
 # link all modules up
 add_library(bbts-common $<TARGET_OBJECTS:tensor>

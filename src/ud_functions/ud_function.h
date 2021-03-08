@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include <memory>
 #include "../tensor/tensor.h"
+#include "../server/static_config.h"
 #include "../commands/command_utils.h"
 
 #include "../../third_party/cuda/gpu.h"
@@ -157,15 +158,23 @@ struct ud_impl_t {
                const tensor_args_t &_in,
                tensor_args_t &_out) const {
     
-    // check if this is a gpu based function
-    if(is_gpu) {
+    if constexpr(static_config::enable_gpu) {
 
-      // call the function
-      fn(_params, _in, _out);
+      // check if this is a gpu based function
+      if(is_gpu) {
 
-      // sync the device
-      auto error = cudaDeviceSynchronize();
-      checkCudaErrors(error);
+        // call the function
+        fn(_params, _in, _out);
+
+        // sync the device
+        auto error = cudaDeviceSynchronize();
+        checkCudaErrors(error);
+      }
+      else {
+
+        // jut call the function
+        fn(_params, _in, _out);
+      }
     }
     else {
 

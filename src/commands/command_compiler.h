@@ -112,7 +112,10 @@ class command_compiler_t {
 
         // get the ud object
         auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, cmd.def.is_gpu);
-
+        if(ud == nullptr) {
+          throw std::runtime_error("No matching implementation for the function " + cmd.def.ud_name + ".");
+        }
+        
         std::vector<command_t::tid_node_id_t> inputs;
         for(auto &in : cmd.inputs) {
           inputs.push_back(command_t::tid_node_id_t{.tid = std::get<0>(in),
@@ -148,6 +151,9 @@ class command_compiler_t {
 
         // get the ud object
         auto ud = matcher->findMatch(cmd.def.input_types, cmd.def.output_types, cmd.def.is_gpu);
+        if(ud == nullptr) {
+          throw std::runtime_error("No matching implementation for the function " + cmd.def.ud_name + ".");
+        }
 
         // make the inputs
         std::vector<command_t::tid_node_id_t> inputs;
