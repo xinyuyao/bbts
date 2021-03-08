@@ -156,32 +156,7 @@ struct ud_impl_t {
   // ud function is using the GPU or not
   void call_ud(const bbts::ud_impl_t::tensor_params_t &_params,
                const tensor_args_t &_in,
-               tensor_args_t &_out) const {
-    
-    if constexpr(static_config::enable_gpu) {
-
-      // check if this is a gpu based function
-      if(is_gpu) {
-
-        // call the function
-        fn(_params, _in, _out);
-
-        // sync the device
-        auto error = cudaDeviceSynchronize();
-        checkCudaErrors(error);
-      }
-      else {
-
-        // jut call the function
-        fn(_params, _in, _out);
-      }
-    }
-    else {
-
-      // jut call the function
-      fn(_params, _in, _out);
-    }
-  }
+               tensor_args_t &_out) const;
 
   // this is a function pointer to the function that needs to be applied
   // we don't use virtual function on purpose applied function can be a free standing function

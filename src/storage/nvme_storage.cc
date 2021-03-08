@@ -68,7 +68,6 @@ void nvme_storage_t::request_thread() {
       
       // make sure the tensor is not deleted
       assert(it->second.state != tensor_state_t::DELETED);
-      assert(it->second.state != tensor_state_t::UNLOADING);
 
       // if the tensor is not loaded we need prep, if it is unloading 
       // we will take care of it later but just not freeing the memory

@@ -15,9 +15,9 @@ struct static_config {
 
 // are we using gpu
 #ifdef ENABLE_GPU
-  static const bool enable_gpu = true;
+  static constexpr bool enable_gpu = true;
 #else 
-  static const bool enable_gpu = false;
+  static constexpr bool enable_gpu = false;
 #endif
 
 // are we using a buffer manager that relies on storage
