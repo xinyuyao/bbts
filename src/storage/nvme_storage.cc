@@ -166,7 +166,7 @@ void nvme_storage_t::request_thread() {
 
       // read the tensor
       lck.unlock();
-      pread(_fp, t, num_bytes, offset);
+      pread(_fd, t, num_bytes, offset);
       lck.lock();
 
       // allocate the tensor
@@ -321,7 +321,29 @@ void nvme_storage_t::print(std::stringstream &ss) {
   }
 }
 
-void nvme_storage_t::clear() {}
+void nvme_storage_t::clear() {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // free all the tensors
+  for(auto &nfo : _tensor_nfo) {
+    if(nfo.second.state == tensor_state_t::LOADED) {
+      free_tensor(nfo.second.data.get().tensor, nfo.second.is_gpu);
+    }
+  }
+
+  // clear the nfo
+  _tensor_nfo.clear();
+
+  // set all the offsets to zero
+  _file_offset = 0;
+  _cur_reserved = 0;
+  _cur_allocated = 0;
+  _current_anon = TID_NONE - 1;
+  _lru.clear();
+  ftruncate(_fd, 0);
+}
 
 void nvme_storage_t::shutdown() {
 
@@ -573,7 +595,7 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
     // unlock so we can dump the data to the disk
     lck.unlock();
 
-    pwrite(_fp, it->second.data.get().tensor, it->second.num_bytes, it->second.file_offset);
+    pwrite(_fd, it->second.data.get().tensor, it->second.num_bytes, it->second.file_offset);
 
     // lock again so we can update the state
     lck.lock();

@@ -65,6 +65,12 @@ struct lru_t {
     }
   }
 
+  // clear the lru
+  void clear() {
+    index.clear();
+    queue.clear();
+  }
+
   // evict one tensor
   tid_t evict(std::unique_lock<std::mutex> &lck) {
 
@@ -103,7 +109,7 @@ struct nvme_storage_t {
     _tensor_delete_hook = [](tid_t _) {};
     
     // open the file for reading and writing
-    _fp = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
+    _fd = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
   }
 
   nvme_storage_t(communicator_ptr_t com, 
@@ -116,7 +122,7 @@ struct nvme_storage_t {
     _tensor_delete_hook = [](tid_t _) {};
 
     // open the file for reading and writing
-    _fp = open(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
+    _fd = open(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
   }
 
   // destructor
@@ -418,7 +424,7 @@ private:
   lru_t _lru;
 
   // the file we dump stuff into
-  int32_t _fp;
+  int32_t _fd;
 
   // last offset
   int64_t _file_offset = 0;
