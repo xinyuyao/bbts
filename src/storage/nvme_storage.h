@@ -110,6 +110,13 @@ struct nvme_storage_t {
     
     // open the file for reading and writing
     _fd = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
+
+    // bootstrap the managed memory
+    if constexpr(static_config::enable_gpu) {
+      void *ts;
+      checkCudaErrors(cudaMallocManaged(&ts, 1024));
+      cudaFree(ts);
+    }
   }
 
   nvme_storage_t(communicator_ptr_t com, 
@@ -123,6 +130,13 @@ struct nvme_storage_t {
 
     // open the file for reading and writing
     _fd = open(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
+
+    // bootstrap the managed memory
+    if constexpr(static_config::enable_gpu) {
+      void *ts;
+      checkCudaErrors(cudaMallocManaged(&ts, 1024));
+      cudaFree(ts);
+    }
   }
 
   // destructor

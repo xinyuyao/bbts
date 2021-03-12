@@ -25,6 +25,15 @@ struct memory_storage_t {
     // just empty hooks
     _tensor_create_hook = [](tid_t _) {};
     _tensor_delete_hook = [](tid_t _) {};
+
+    // bootstrap cuda
+    if constexpr(static_config::enable_gpu) {
+
+      // bootstrap managed memory
+      void *ts;
+      checkCudaErrors(cudaMallocManaged(&ts, 1024));
+      cudaFree(ts);
+    }
   }
 
   // destructor
