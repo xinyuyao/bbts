@@ -4,6 +4,7 @@
 #include "impls/dense_matrix_add.h"
 #include "impls/dense_matrix_gpu_add.h"
 #include "impls/dense_matrix_mult.h"
+#include "impls/dense_matrix_gpu_mult.h"
 #include "impls/dense_uniform.h"
 
 namespace bbts {

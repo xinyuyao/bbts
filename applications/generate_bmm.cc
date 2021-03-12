@@ -154,7 +154,7 @@ to_agg_index_t create_multiply(fun fn,
         _cmds.add_apply("matrix_mult",
                         {"dense", "dense"},
                         {"dense"},
-                        false,
+                        gpu_mult,
                         {{a_tid, target_node}, {b_tid, target_node}},
                         {{tid_offset, target_node}}, {});
 

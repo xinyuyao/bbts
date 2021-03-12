@@ -122,7 +122,8 @@ void create_shuffle(size_t num_nodes,
   }
 }
 
-to_agg_index_t create_multiply(size_t split,
+to_agg_index_t create_multiply(bool gpu_mult,
+                               size_t split,
                                size_t num_nodes,
                                index_t a_mat,
                                index_t b_mat,
@@ -149,7 +150,7 @@ to_agg_index_t create_multiply(size_t split,
         _cmds.add_apply("matrix_mult",
                         {"dense", "dense"},
                         {"dense"},
-                        false,
+                        gpu_mult,
                         {{a_tid, target_node}, {b_tid, target_node}},
                         {{tid_offset, target_node}}, {});
 
@@ -168,7 +169,8 @@ to_agg_index_t create_multiply(size_t split,
   return std::move(multiplies);
 }
 
-void generate_aggregation(size_t split,
+void generate_aggregation(bool gpu_add,
+                          size_t split,
                           size_t num_nodes,
                           int32_t &tid_offset,
                           to_agg_index_t &multiplies,
@@ -195,7 +197,7 @@ void generate_aggregation(size_t split,
       _cmds.add_reduce("matrix_add",
                        {"dense", "dense"},
                        {"dense"},
-                       false,
+                       gpu_add,
                        inputs,
                        {tid_offset, target_node}, {});
 
@@ -223,7 +225,9 @@ void create_delete(size_t num_nodes,
   }
 }
 
-bbts::parsed_command_list_t generate_commands(size_t split,
+bbts::parsed_command_list_t generate_commands(bool gpu_add, 
+                                              bool gpu_mult, 
+                                              size_t split,
                                               size_t num_nodes,
                                               size_t matrix_size) {
 
@@ -256,11 +260,11 @@ bbts::parsed_command_list_t generate_commands(size_t split,
 
 
   // create the multiply commands
-  auto multiplies = create_multiply(split, num_nodes, a_idx, b_idx, 
+  auto multiplies = create_multiply(gpu_mult, split, num_nodes, a_idx, b_idx, 
                                     tid_offset, _cmds, to_del);
 
   // generate the aggregation
-  generate_aggregation(split, num_nodes, tid_offset, multiplies, _cmds);
+  generate_aggregation(gpu_add, split, num_nodes, tid_offset, multiplies, _cmds);
 
   // create the delete
   create_delete(num_nodes, to_del, _cmds);
@@ -271,21 +275,25 @@ bbts::parsed_command_list_t generate_commands(size_t split,
 
 int main(int argc, char **argv) {
 
-  if (argc != 5) {
+  if (argc != 7) {
     std::cout << "Incorrect usage\n";
-    std::cout << "Usage ./generate_bmm <split> <num_nodes> <matrix_size> <file>.bbts\n";
+    std::cout << "Usage ./generate_cpmm <gpu_add> <gpu_mult> <split> <num_nodes> <matrix_size> <file>.bbts\n";
     return 0;
   }
 
   // get the parameters
+  bool gpu_add = std::string(argv[1]) == "true" ? true : false;
+  bool gpu_mult = std::string(argv[2]) == "true" ? true : false;
+
+  // 
   char *end;
-  auto split = std::strtol(argv[1], &end, 10);
-  auto num_nodes = std::strtol(argv[2], &end, 10);
-  auto matrix_size = std::strtol(argv[3], &end, 10);
+  auto split = std::strtol(argv[3], &end, 10);
+  auto num_nodes = std::strtol(argv[4], &end, 10);
+  auto matrix_size = std::strtol(argv[5], &end, 10);
 
   // store them
-  auto t = generate_commands(split, num_nodes, matrix_size);
-  t.serialize(argv[4]);
+  auto t = generate_commands(gpu_add, gpu_mult, split, num_nodes, matrix_size);
+  t.serialize(argv[6]);
 
   return 0;
 }

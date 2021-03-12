@@ -51,6 +51,7 @@ if(${ENABLE_GPU})
     
     # auto cuda paths
     file(GLOB UD_SOURCE_CUDA "src/ud_functions/impls/*.cu")
+
 endif()
 
 # forward the definitions ENABLE_HOOKS=ON/OFF
@@ -113,8 +114,13 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
                         $<TARGET_OBJECTS:server>
                         $<TARGET_OBJECTS:ud_functions>)
 
-# link the mkl library
-target_link_libraries(bbts-common ${BLAS_LIBRARIES})
+
+cuda_add_cublas_to_target(bbts-common)
+
+# link the cublas library
+if(${ENABLE_GPU})
+    target_link_libraries(bbts-common ${BLAS_LIBRARIES})
+endif()
 
 # add the tests
 include(tests/Tests.cmake)
