@@ -41,10 +41,13 @@ if(${ENABLE_GPU})
     set(CMAKE_CUDA_STANDARD 11)
 
     # set the cuda flags
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread -arch=sm_60")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread")
 
     # try to find cuda
     find_package(CUDA REQUIRED)
+
+    # add the include directory
+    include_directories("${CUDA_INCLUDE_DIRS}")
 
     # add the definition
     add_compile_definitions(ENABLE_GPU)

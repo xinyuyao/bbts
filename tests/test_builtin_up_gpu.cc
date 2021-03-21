@@ -84,7 +84,7 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
         // sync the device
         auto error = cudaDeviceSynchronize();
         checkCudaErrors(error);
-
+        
         // check that the values are correct
         for(auto row = 0; row < am.num_rows; ++row) {
           for (auto col = 0; col < am.num_cols; ++col) {

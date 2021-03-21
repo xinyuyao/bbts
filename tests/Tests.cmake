@@ -9,7 +9,18 @@ find_package(GTest REQUIRED)
 get_filename_component(unit-test-path ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
 
 # compile all the objects
+if(${ENABLE_GPU})
+
+# also add the .cu files
+file(GLOB files "${unit-test-path}/*.cc" "${unit-test-path}/*.cu")
+
+else()
+
+# just use the .cc files
 file(GLOB files "${unit-test-path}/*.cc")
+
+endif()
+
 
 # sorts files alphabetically because some tests require
 # files created in previous tests

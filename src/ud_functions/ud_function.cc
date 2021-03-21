@@ -15,7 +15,7 @@ void bbts::ud_impl_t::call_ud(const bbts::ud_impl_t::tensor_params_t &_params,
             fn(_params, _in, _out);
 
             // sync the device
-            auto error = cudaDeviceSynchronize();
+            auto error = cudaStreamSynchronize(cudaStreamPerThread);
             checkCudaErrors(error);
         }
         else {

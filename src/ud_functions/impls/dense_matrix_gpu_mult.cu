@@ -75,18 +75,19 @@ void bbts::dense_matrix_gpu_mult_t::mult(const bbts::ud_impl_t::tensor_params_t 
   float *in1Data = a.data();
   float *in2Data = b.data();
 
+  // get the current stream and create the handle
+  cudaStream_t stream = cudaStreamPerThread;
+  cublasHandle_t handle; cublasCreate(&handle);
 
-  std::cout << "CUDA\n";
-  // create the handle
-  cublasHandle_t handle;
-  cublasCreate(&handle);
+  // associate the stream with the handle
+  cublasSetStream(handle, stream);
 
-  // do the multiply
-  const float alpha = 1;
-  const float beta = 0;
+  // run the matrix multiply
+  float alpha=1.0f;                                             
+  float beta=0.0f;                                              
   cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, I, J, K, &alpha, in1Data, K, in2Data, J, &beta, outData, J);
 
-  // destroy the handle
+  // destroy the handloe
   cublasDestroy(handle);
 
   // set the new meta data
