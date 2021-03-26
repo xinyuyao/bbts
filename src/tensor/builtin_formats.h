@@ -36,7 +36,7 @@ struct dense_tensor_t : public tensor_t {
   }
 
   // returns the payload of the tensor
-  float *data() {
+  float *data() const {
     return (float*) _blob;
   }
 

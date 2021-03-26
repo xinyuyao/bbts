@@ -1,12 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cublas_v2.h>
 #include <memory>
 #include "../tensor/tensor.h"
 #include "../server/static_config.h"
 #include "../commands/command_utils.h"
-
 #include "../../third_party/cuda/gpu.h"
 
 namespace bbts {
@@ -49,6 +50,11 @@ struct ud_impl_t {
     // just with empty arguments
     ud_impl_args_t(size_t num_args) : arguments(num_args) {}
 
+    // the number of parameters
+    size_t num_args() const {
+      return arguments.size();
+    }
+
     // this is for the output arguments
     template<size_t n>
     T &get() { return *arguments[n]; }
@@ -58,7 +64,7 @@ struct ud_impl_t {
     const T &get() const { return *arguments[n]; }
 
     // this gets the arguments at runtime
-    const T &get_by_idx(size_t idx) { return *arguments[idx]; }
+    const T &get_by_idx(size_t idx) const { return *arguments[idx]; }
 
     // sets the argument
     template<size_t n>
@@ -117,6 +123,12 @@ struct ud_impl_t {
 
     // the parameters
     bbts::command_param_list_t _params;
+
+    // the stream to use by the ud function
+    cudaStream_t stream;
+
+    // the handle to cublas
+    cublasHandle_t cublas_handle;
   };
 
   // each apply is a call to these

@@ -78,7 +78,7 @@ void bbts::dense_matrix_gpu_add_t::add(const bbts::ud_impl_t::tensor_params_t &p
     uint32_t grid_size = (int) ceil ((float) n / block_size);
  
     // Execute the kernel
-    dense_add_kernel<<<grid_size, block_size>>>(a.data(), b.data(), out.data(), n);
+    dense_add_kernel<<<grid_size, block_size, 0, params.stream>>>(a.data(), b.data(), out.data(), n);
 
     // set the new meta data
     m_out.m() = {I, J};

@@ -50,7 +50,7 @@ void bbts::dense_matrix_gpu_mult_t::get_out_meta(const bbts::ud_impl_t::tensor_p
 
 void bbts::dense_matrix_gpu_mult_t::mult(const bbts::ud_impl_t::tensor_params_t &params,
                                          const bbts::ud_impl_t::tensor_args_t &_in,
-                                        bbts::ud_impl_t::tensor_args_t &_out) {
+                                         bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
   auto &a = _in.get<0>().as<dense_tensor_t>();
@@ -75,20 +75,10 @@ void bbts::dense_matrix_gpu_mult_t::mult(const bbts::ud_impl_t::tensor_params_t 
   float *in1Data = a.data();
   float *in2Data = b.data();
 
-  // get the current stream and create the handle
-  cudaStream_t stream = cudaStreamPerThread;
-  cublasHandle_t handle; cublasCreate(&handle);
-
-  // associate the stream with the handle
-  cublasSetStream(handle, stream);
-
   // run the matrix multiply
   float alpha=1.0f;                                             
   float beta=0.0f;                                              
-  cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, I, J, K, &alpha, in1Data, K, in2Data, J, &beta, outData, J);
-
-  // destroy the handloe
-  cublasDestroy(handle);
+  cublasSgemm(params.cublas_handle, CUBLAS_OP_N, CUBLAS_OP_N, I, J, K, &alpha, in1Data, K, in2Data, J, &beta, outData, J);
 
   // set the new meta data
   m_out = {m_a.num_rows, m_b.num_cols};
