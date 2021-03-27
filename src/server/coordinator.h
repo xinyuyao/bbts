@@ -15,6 +15,7 @@
 #include "../commands/reservation_station.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
+#include "../ud_functions/gpu_scheduler.h"
 #include "coordinator.h"
 #include "static_config.h"
 
@@ -25,6 +26,7 @@ public:
 
   // init the scheduler
   coordinator_t(bbts::communicator_ptr_t _comm,
+                bbts::gpu_scheduler_ptr_t _gpu_scheduler,
                 bbts::reservation_station_ptr_t _rs,
                 bbts::logger_ptr_t _logger,
                 storage_ptr_t _storage,
@@ -84,6 +86,9 @@ private:
     // sync
     _comm->barrier();
 
+    // shutdown the gpu scheduler
+    _gpu_scheduler->shutdown();
+
     // shutdown the command runner
     _command_runner->shutdown();
 
@@ -114,6 +119,9 @@ private:
   void _print_storage(std::stringstream &ss);
 
   void _print_tensor(tid_t id, std::stringstream &ss);
+
+  // the gpu scheduler
+  gpu_scheduler_ptr_t _gpu_scheduler;
 
   // the communicator
   bbts::communicator_ptr_t _comm;

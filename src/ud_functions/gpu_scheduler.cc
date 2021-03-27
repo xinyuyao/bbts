@@ -50,8 +50,12 @@ void gpu_scheduler_t::run() {
     // run the kernel first, since this is more imporant
     if(_has_something[MID]) {
 
+      // set the stream and cublas handle
+      _specs[MID].params.stream = _streams[MID]; 
+      _specs[MID].params.cublas_handle = _handles[MID];
+
       // call the kernel
-      _specs[MID].fun->call_ud({ ._params = *_specs[MID].params, .stream = _streams[MID], .cublas_handle=_handles[MID] }, *_specs[MID].inputs, *_specs[MID].outputs);
+      _specs[MID].fun->call_gpu_ud( _specs[MID].params, *_specs[MID].inputs, *_specs[MID].outputs);
       cudaEventRecord(_events[MID], _streams[MID]);
     }
 
@@ -84,7 +88,7 @@ void gpu_scheduler_t::run() {
 
         // get the tensor and the number of bytes
         auto &ts = _specs[BACK].outputs->get_by_idx(i)._blob;
-        auto num_bytes = _factory->get_tensor_size(_specs[FRONT].inputs->get_by_idx(i)._meta) - sizeof(bbts::tensor_meta_t);
+        auto num_bytes = _factory->get_tensor_size(_specs[BACK].outputs->get_by_idx(i)._meta) - sizeof(bbts::tensor_meta_t);
 
         // load out on back
         cudaMemPrefetchAsync(&ts, num_bytes, cudaCpuDeviceId, _streams[BACK]); 
@@ -105,7 +109,7 @@ void gpu_scheduler_t::run() {
 }
 
 std::future<bool> gpu_scheduler_t::execute_kernel(bbts::ud_impl_t* fun,
-                                                  const bbts::command_param_list_t* params,
+                                                  const bbts::ud_impl_t::tensor_params_t * params,
                                                   const bbts::ud_impl_t::tensor_args_t* inputs,
                                                   bbts::ud_impl_t::tensor_args_t* outputs) {
 
@@ -118,7 +122,7 @@ std::future<bool> gpu_scheduler_t::execute_kernel(bbts::ud_impl_t* fun,
     std::unique_lock<std::mutex> lk(_m);
     
     // schedule
-    _q.push(kernel_spec_t{.fun = fun, .params = params, .inputs = inputs, .outputs = outputs, .success = std::move(success)});
+    _q.push(kernel_spec_t{.fun = fun, .params = *params, .inputs = inputs, .outputs = outputs, .success = std::move(success)});
     _cv.notify_one();
   }
 

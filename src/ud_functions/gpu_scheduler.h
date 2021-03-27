@@ -1,3 +1,5 @@
+#pragma once
+
 #include <future>
 #include <condition_variable>
 #include <mutex>
@@ -10,7 +12,7 @@
 #include <cublasLt.h>
 #include "../tensor/builtin_formats.h"
 #include "../ud_functions/builtin_functions.h"
-#include "../ud_functions/udf_manager.h"
+#include "../tensor/tensor_factory.h"
 #include "../../third_party/cuda/gpu.h"
 
 namespace bbts {
@@ -28,7 +30,7 @@ struct gpu_scheduler_t {
 
   // runs the kernel
   std::future<bool> execute_kernel(bbts::ud_impl_t* fun,
-                                   const bbts::command_param_list_t* params,
+                                   const bbts::ud_impl_t::tensor_params_t* params,
                                    const bbts::ud_impl_t::tensor_args_t* inputs,
                                    bbts::ud_impl_t::tensor_args_t* outputs);
 
@@ -47,7 +49,7 @@ private:
     bbts::ud_impl_t* fun;
 
     // the input parameters
-    const bbts::command_param_list_t* params;
+    bbts::ud_impl_t::tensor_params_t params;
 
     // the inputs
     const bbts::ud_impl_t::tensor_args_t* inputs;
@@ -93,5 +95,7 @@ private:
   size_t MID = 1;
   size_t BACK = 2;
 };
+
+using gpu_scheduler_ptr_t = std::shared_ptr<gpu_scheduler_t>;
 
 }

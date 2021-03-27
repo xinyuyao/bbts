@@ -8,6 +8,7 @@
 using namespace std::chrono;
 
 bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
+                                   bbts::gpu_scheduler_ptr_t _gpu_scheduler,
                                    bbts::reservation_station_ptr_t _rs,
                                    bbts::logger_ptr_t _logger,
                                    storage_ptr_t _storage,
@@ -17,6 +18,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    tensor_stats_ptr_t _stats)
 
     : _comm(std::move(_comm)),
+      _gpu_scheduler(std::move(_gpu_scheduler)),
       _rs(std::move(_rs)),
       _logger(std::move(_logger)),
       _storage(std::move(_storage)),

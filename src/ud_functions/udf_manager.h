@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_scheduler.h"
 #include "../tensor/tensor_factory.h"
 #include "../ud_functions/builtin_functions.h"
 #include "../server/static_config.h"
@@ -32,7 +33,8 @@ class udf_manager_t {
 public:
 
   // initializes the UD manager
-  udf_manager_t(tensor_factory_ptr_t _tensor_factory);
+  udf_manager_t(tensor_factory_ptr_t _tensor_factory, 
+                gpu_scheduler_ptr_t _gpu_scheduler);
 
   // registers a udf with the system
   ud_id_t register_udf(ud_func_ptr_t _fun);
@@ -49,6 +51,9 @@ public:
   ud_impl_t* get_fn_impl(ud_impl_id_t _id);
 
 private:
+
+  // the GPU scheduler
+  gpu_scheduler_ptr_t _gpu_scheduler;
 
   // we use this to grab types from strings
   tensor_factory_ptr_t _tensor_factory;

@@ -14,6 +14,8 @@
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
 #include "../commands/parsed_command.h"
+#include "../ud_functions/gpu_scheduler.h"
+
 
 namespace bbts {
 
@@ -164,7 +166,8 @@ public:
   // the notifier
   tensor_notifier_ptr_t _tensor_notifier;
 
-
+  // the gpu scheduler
+  gpu_scheduler_ptr_t _gpu_scheduler;
 };
 
 

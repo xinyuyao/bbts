@@ -37,7 +37,9 @@ ud_impl_t* udf_matcher::findMatch(const std::vector<std::string> &inputs,
 }
 
 // initializes the UD manager
-udf_manager_t::udf_manager_t(tensor_factory_ptr_t _tensor_factory) : _tensor_factory(_tensor_factory) {
+udf_manager_t::udf_manager_t(tensor_factory_ptr_t _tensor_factory, 
+                             gpu_scheduler_ptr_t _gpu_scheduler) : _tensor_factory(std::move(_tensor_factory)),
+                                                                   _gpu_scheduler(std::move(_gpu_scheduler)) {
 
   /// 1. matrix summation
   register_udf(get_matrix_add_udf());
@@ -91,6 +93,19 @@ ud_id_t udf_manager_t::register_udf(ud_func_ptr_t _fun) {
 
 // registers the implementation for a udf with the system
 ud_impl_id_t udf_manager_t::register_udf_impl(ud_impl_ptr_t _impl) {
+
+  // if this is a gpu function we need to wrap it so that it runs it on the scheduler
+  if(_impl->is_gpu) {
+    
+    _impl->gpu_fn = _impl->fn;
+    _impl->fn = [&, me = _impl.get()](const bbts::ud_impl_t::tensor_params_t &params,
+                                      const bbts::ud_impl_t::tensor_args_t &_in,
+                                      bbts::ud_impl_t::tensor_args_t &_out) {
+
+      auto ret = _gpu_scheduler->execute_kernel(me, &params, &_in, &_out);
+      ret.get();
+    };
+  }
 
   // check if udf is registered.
   auto it = _udfs_name_to_id.find(_impl->ud_name);

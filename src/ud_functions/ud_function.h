@@ -170,9 +170,17 @@ struct ud_impl_t {
                const tensor_args_t &_in,
                tensor_args_t &_out) const;
 
+  // call the gpu kernel if this is a gpu function
+  void call_gpu_ud(const bbts::ud_impl_t::tensor_params_t &_params,
+                   const tensor_args_t &_in,
+                   tensor_args_t &_out) const;
+
   // this is a function pointer to the function that needs to be applied
   // we don't use virtual function on purpose applied function can be a free standing function
   ud_impl_callable fn;
+
+  // the gpu function to call
+  ud_impl_callable gpu_fn;
 
   // returns the complexity hint of the ud function
   virtual size_t get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,

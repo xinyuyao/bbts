@@ -2,6 +2,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <thread>
 #include "node.h"
 #include "../commands/command_compiler.h"
 
@@ -33,8 +34,11 @@ void bbts::node_t::init() {
   // init the factory
   _factory = std::make_shared<bbts::tensor_factory_t>();
 
+  // the gpu scheduler
+  _gpu_scheduler = std::make_shared<gpu_scheduler_t>(_factory);
+
   // init the udf manager
-  _udf_manager = std::make_shared<bbts::udf_manager_t>(_factory);
+  _udf_manager = std::make_shared<bbts::udf_manager_t>(_factory, _gpu_scheduler);
 
   // init the reservation station
   _res_station = std::make_shared<bbts::reservation_station_t>(_comm->get_rank(),
@@ -48,8 +52,10 @@ void bbts::node_t::init() {
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
-  _coordinator = std::make_shared<coordinator_t>(_comm, _res_station, _logger,
+  _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger,
                                                  _storage, _command_runner, _tensor_notifier, _factory,  _stats);
+
+
 }
 
 
@@ -83,6 +89,11 @@ void bbts::node_t::run() {
     // this will accept requests from the coordinator
     coord_thread = create_coordinator_thread();
   }
+
+  // run the scheduler for the gpu kernels
+  std::thread gpu_scheduler_thread = std::thread ([&]() {
+    _gpu_scheduler->run();
+  });
 
   // notification sender
   std::vector<std::thread> remote_notification_sender;
@@ -123,6 +134,9 @@ void bbts::node_t::run() {
   if(get_rank() != 0) {
     coord_thread.join();
   }
+
+  // wait for the scheduler
+  gpu_scheduler_thread.join();
 
   // wait for all the request threads to finish
   for(auto &srt : storage_req_threads) {

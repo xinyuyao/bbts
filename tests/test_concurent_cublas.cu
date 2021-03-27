@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <future>
+#include <memory>
 #include <ostream>
 #include <thread>
 #include <iostream>
@@ -11,18 +12,25 @@
 #include <algorithm>
 #include <mutex>
 
+#include "../src/ud_functions/udf_manager.h"
 #include "../src/ud_functions/gpu_scheduler.h"
 
 int main() {
 
-  const int N = 10000;
+  const int N = 20000;
   const int split = 4;
 
   // create the tensor factory
   auto factory = std::make_shared<bbts::tensor_factory_t>();
 
+  // kick off the scheduler
+  bbts::gpu_scheduler_ptr_t scheduler = std::make_shared<bbts::gpu_scheduler_t>(factory);
+  std::thread sch = std::thread([&](){
+    scheduler->run();
+  });
+
   // crate the udf manager
-  bbts::udf_manager_t manager(factory);
+  bbts::udf_manager_t manager(factory, scheduler);
 
   // return me that matcher for matrix addition
   auto matcher = manager.get_matcher_for("matrix_mult");
@@ -78,12 +86,6 @@ int main() {
 
   std::random_shuffle ( muls.begin(), muls.end() );
 
-  // kick off the scheduler
-  bbts::gpu_scheduler_t scheduler(factory);
-  std::thread sch = std::thread([&](){
-    scheduler.run();
-  });
-
   // run the multiplies
   std::vector<std::thread> threads; threads.reserve(muls.size());
   // kick off the thread
@@ -91,7 +93,7 @@ int main() {
     
     std::vector<bbts::ud_impl_t::tensor_args_t> ins; ins.reserve(muls.size());
     std::vector<bbts::ud_impl_t::tensor_args_t> outs; outs.reserve(muls.size());
-    std::vector<bbts::command_param_list_t> params; params.reserve(muls.size());
+    std::vector<bbts::ud_impl_t::tensor_params_t> params; params.reserve(muls.size());
     std::vector<std::future<bool>> futs; futs.reserve(muls.size());
 
     for(auto mul : muls) {
@@ -114,7 +116,7 @@ int main() {
         params.push_back({});
 
         // run the kernel
-        futs.push_back(scheduler.execute_kernel(ud, &params.back(), &ins.back(), &outs.back()));
+        futs.push_back(scheduler->execute_kernel(ud, &params.back(), &ins.back(), &outs.back()));
     }
 
     // sync
@@ -130,7 +132,7 @@ int main() {
   }
 
   // shutdown the scheduler
-  scheduler.shutdown();
+  scheduler->shutdown();
 
   // wait
   sch.join();
