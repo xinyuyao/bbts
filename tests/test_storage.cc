@@ -10,7 +10,13 @@ namespace bbts {
 TEST(TestStorage, TestTwoTransactionSingleThreaded) {
 
   // 
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+  storage_ptr_t storage;
+  if constexpr(static_config::enable_storage) {
+   storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
+  }
+  else {
+    storage = std::make_shared<storage_t>(nullptr);
+  }
 
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
 
@@ -72,7 +78,13 @@ TEST(TestStorage, TestNoEvictionMultiThreaded) {
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024 * 800);
+  storage_ptr_t storage;
+  if constexpr(static_config::enable_storage) {
+    storage = std::make_shared<storage_t>(nullptr, 100 * 1024 * 1024, "tmp.sto");
+  }
+  else {
+    storage = std::make_shared<storage_t>(nullptr);
+  }
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
@@ -159,7 +171,13 @@ TEST(TestStorage, TestEvictionMultiThreaded) {
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+  storage_ptr_t storage;
+  if constexpr(static_config::enable_storage) {
+   storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
+  }
+  else {
+    storage = std::make_shared<storage_t>(nullptr);
+  }
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
@@ -247,7 +265,13 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads1) {
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+  storage_ptr_t storage;
+  if constexpr(static_config::enable_storage) {
+   storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
+  }
+  else {
+    storage = std::make_shared<storage_t>(nullptr);
+  }
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
@@ -340,7 +364,13 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads2) {
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+  storage_ptr_t storage;
+  if constexpr(static_config::enable_storage) {
+   storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
+  }
+  else {
+    storage = std::make_shared<storage_t>(nullptr);
+  }
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
@@ -457,7 +487,13 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRead) {
   std::vector<std::thread> threads;
 
   // create the storage
-  storage_ptr_t storage = std::make_shared<storage_t>(nullptr, 1024 * 1024);
+  storage_ptr_t storage;
+  if constexpr(static_config::enable_storage) {
+   storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
+  }
+  else {
+    storage = std::make_shared<storage_t>(nullptr);
+  }
 
   // make a tensor factory
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();

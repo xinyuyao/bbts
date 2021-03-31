@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   auto id = factory->get_tensor_ftm("dense");
 
   // crate the udf manager
-  bbts::udf_manager_t manager(factory);
+  bbts::udf_manager_t manager(factory, nullptr);
 
   // return me that matcher for matrix addition
   auto matcher = manager.get_matcher_for("matrix_add");
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
   storage.local_transaction({}, {{input_tid, false, size}}, [&](const bbts::storage_t::reservation_result_t &res) {
 
     // get the craeted tensor
-    auto &t = res.create[0].tensor;
+    auto &t = res.create[0].get().tensor;
 
     // init the tensor
     auto &a = factory->init_tensor(t, m).as<bbts::dense_tensor_t>();
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
 
       storage.local_transaction({0}, {}, [&](const bbts::storage_t::reservation_result_t &res) {
         
-        auto b = res.get[0].tensor;
+        auto b = res.get[0].get().tensor;
 
         auto &bb = b->as<bbts::dense_tensor_t>();
 

@@ -154,6 +154,12 @@ struct memory_storage_t {
   template<class fn>
   void add_deleted_hook(fn fun){ _tensor_delete_hook = fun; }
 
+  // just an empty request thread
+  void request_thread() {};
+
+  // shutdown
+  void shutdown() {};
+
 private:
 
   // information about the stored tensor
@@ -199,6 +205,7 @@ private:
 
   // communicator used for remote transactions
   bbts::communicator_ptr_t _com;
+
 };
 
 }

@@ -11,7 +11,7 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
   auto factory = std::make_shared<tensor_factory_t>();
 
   // crate the udf manager
-  udf_manager_t manager(factory);
+  udf_manager_t manager(factory, nullptr);
 
   // return me that matcher for matrix addition
   auto matcher = manager.get_matcher_for("matrix_add");

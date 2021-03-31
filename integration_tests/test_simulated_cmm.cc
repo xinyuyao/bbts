@@ -46,15 +46,19 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
         // get the size of the tensor we need to crate
         auto tensor_size = node._factory->get_tensor_size(dm);
 
-        // crate the tensor
-        auto t = node._storage->create_tensor(cur_tid, tensor_size, false);
 
-        // init the tensor
-        auto &dt = node._factory->init_tensor(t, dm).as<dense_tensor_t>();
+        node._storage->local_transaction({}, {{cur_tid, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
-        // set the index
-        index[{row_id, col_id}] = {target_node, cur_tid};
-        node._res_station->register_tensor(cur_tid);
+          // get the craeted tensor
+          auto &t = res.create[0].get().tensor;
+
+          // init the tensor
+          auto &dt = node._factory->init_tensor(t, dm).as<dense_tensor_t>();
+
+          // set the index
+          index[{row_id, col_id}] = {target_node, cur_tid};
+          node._res_station->register_tensor(cur_tid);
+        });
 
         std::cout << "CREATE(matrix=" << matrix << ", tensor=(" << row_id << ", " << col_id << "), tid=" << cur_tid
                   << " , node=" << my_rank

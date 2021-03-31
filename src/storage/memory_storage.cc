@@ -127,6 +127,9 @@ bool memory_storage_t::has_tensor(tid_t _id) {
 }
 
 bool memory_storage_t::remove_by_tid(tid_t _id) {
+  
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
 
   // remove the tensor
   auto it = _tensor_nfo.find(_id);

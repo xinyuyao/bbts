@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
   storage.local_transaction({}, {{12, false, size}}, [&](const bbts::storage_t::reservation_result_t &res) {
 
     // get the craeted tensor
-    auto &t = res.create[0].tensor;
+    auto &t = res.create[0].get().tensor;
 
     // init the tensor
     auto &a = factory->init_tensor(t, m).as<bbts::dense_tensor_t>();
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     storage.local_transaction({12}, {}, [&](const bbts::storage_t::reservation_result_t &res) {
 
       // get the dense tensor
-      auto t = res.get[0].tensor;
+      auto t = res.get[0].get().tensor;
       auto &bcs = t->as<bbts::dense_tensor_t>();
 
       // check all the values
