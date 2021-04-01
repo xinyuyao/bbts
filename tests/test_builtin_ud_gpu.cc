@@ -18,8 +18,14 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
   // create the tensor factory
   auto factory = std::make_shared<tensor_factory_t>();
 
+  // kick off the scheduler
+  bbts::gpu_scheduler_ptr_t scheduler = std::make_shared<bbts::gpu_scheduler_t>(factory);
+  std::thread sch = std::thread([&](){
+    scheduler->run();
+  });
+
   // crate the udf manager
-  udf_manager_t manager(factory, nullptr);
+  udf_manager_t manager(factory, scheduler);
 
   // return me that matcher for matrix addition
   auto matcher = manager.get_matcher_for("matrix_add");
@@ -108,6 +114,11 @@ TEST(TestBuiltinMatrix, TestDenseMatrixAdditonInplace) {
   for(auto &t : threads) {
     t.join();
   }
+
+  // shutdown the scheduler
+  scheduler->shutdown();
+
+  sch.join();
 
   cudaProfilerStop();
 }
