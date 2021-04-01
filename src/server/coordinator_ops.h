@@ -14,7 +14,8 @@ enum class coordinator_op_types_t : int32_t {
   VERBOSE, // turn on or off the debug messages
   MAX_STORAGE, // maximum storage
   PRINT_STORAGE, // prints the storage of the node
-  PRINT_TENSOR // prints tensor
+  PRINT_TENSOR, // prints tensor
+  REGISTER // register a library
 };
 
 struct coordinator_op_t {

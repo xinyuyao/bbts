@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 # set the output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  "${PROJECT_SOURCE_DIR}/bin")
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/libraries")
+
 # set the location for cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
@@ -16,7 +18,8 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         set(CMAKE_CXX_FLAGS "-D_GLIBCXX_DEBUG")
     endif()
-    set(CMAKE_CXX_FLAGS "-g3")
+    set(CMAKE_CXX_FLAGS "-g3 -fPIC")
+    set(CMAKE_C_FLAGS "-g3 -fPIC")
 
     # set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
     # set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
@@ -41,8 +44,8 @@ if(${ENABLE_GPU})
     set(CMAKE_CUDA_STANDARD 11)
 
     # set the cuda flags
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread")
-
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --default-stream per-thread -Xcompiler -fPIC")
+    
     # try to find cuda
     find_package(CUDA REQUIRED)
 
@@ -117,7 +120,6 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
                         $<TARGET_OBJECTS:server>
                         $<TARGET_OBJECTS:ud_functions>)
 
-
 cuda_add_cublas_to_target(bbts-common)
 
 # link the cublas library
@@ -129,3 +131,4 @@ endif()
 include(tests/Tests.cmake)
 include(integration_tests/Integration.cmake)
 include(applications/Applications.cmake)
+include(libraries/Libraries.cmake)

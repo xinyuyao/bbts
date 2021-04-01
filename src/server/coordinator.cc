@@ -1,7 +1,10 @@
 #include <chrono>
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <unistd.h>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
 
@@ -73,6 +76,11 @@ void bbts::coordinator_t::accept() {
         _print_tensor((tid_t)(op._val), ss);
         break;
       }
+      case coordinator_op_types_t::REGISTER : {
+        _register(op, ss);
+        break;
+      }
+
     }
 
     // sync all nodes
@@ -250,6 +258,35 @@ void bbts::coordinator_t::_fail() {
   exit(-1);
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::load_shared_library(char* file_bytes, size_t file_size) {
+
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::REGISTER, ._val = file_size})) {
+    return {false, "Failed to register library!\n"};
+  }
+
+  // send the data
+  if (!_comm->send_bytes(file_bytes, file_size)) {
+    return {false, "Could not send file to register!\n"};
+  }
+  
+  // do the actual registering, on this node
+  std::stringstream ss;
+  bool val = _register_from_bytes(file_bytes, file_size, ss);
+
+  // sync everything
+  std::tuple<bool, std::string> out;
+  if(val) {
+    out = {val, ss.str()};
+  }
+  else {
+    out = {val, "Loaded successfully!\n"};
+  }
+  _collect(out);
+
+  // return the output
+  return out;
+}
+
 void bbts::coordinator_t::_schedule(coordinator_op_t op, std::stringstream &ss) {
 
   // expect all the commands
@@ -356,3 +393,75 @@ void bbts::coordinator_t::_print_tensor(tid_t id, std::stringstream &ss) {
     }
   });
 }
+
+bool bbts::coordinator_t::_register(coordinator_op_t op, std::stringstream &ss) {
+
+  std::vector<char> file_bytes;
+  file_bytes.reserve(op._val);
+
+  if(!_comm->expect_bytes(op._val, file_bytes)) {
+    ss << bbts::red << "Could not recieve the library file!\n" << bbts::reset;
+    return false;
+  }
+
+  return _register_from_bytes(file_bytes.data(), op._val, ss);
+}
+
+bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_size, std::stringstream &ss) {
+
+  // make the temporary file name
+  int rank = _comm->get_rank();
+  std::string filename = std::string("/tmp/bbts_lib_") + std::to_string(shared_library_item_t::last_so) + ".so";
+
+  // this will modify filename
+  int filedes = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
+
+  // check if we could actually open this
+  if(filedes == -1) {
+    ss << bbts::red << "Could not set temporary filename!\n" << bbts::reset;
+    return false;
+  }
+  if(-1 == write(filedes, file_bytes, file_size)) {
+    ss << bbts::red << "Could not write shared library object!\n" << bbts::reset;
+    return false;
+  }
+
+  // open the newly created temporary file
+  void* so_handle = dlopen(filename.c_str(), RTLD_LOCAL | RTLD_NOW);
+  if(!so_handle) {
+    ss << bbts::red << "Could not open temporary shared library object!\n" << bbts::reset;
+    return false;
+  }
+
+  // The .so should have atleast one of the two (unmangled) functions, register_tensors, register_udfs. 
+  bool had_something = false;
+  void* register_tensors_ = dlsym(so_handle, "register_tensors");
+  if(register_tensors_) {
+    had_something = true;
+    typedef void *register_tensors_f(tensor_factory_ptr_t);
+    auto *register_tensors = (register_tensors_f *) register_tensors_;
+    register_tensors(_tf);
+  }
+
+  // check for the register_udfs
+  void* register_udfs_ = dlsym(so_handle, "register_udfs");
+  if(register_udfs_) {
+    had_something = true;
+    typedef void *register_udfs_f(udf_manager_ptr);
+    auto *register_udfs = (register_udfs_f *) register_udfs_;
+    register_udfs(_udf_manager);
+  }
+
+  // check if we have actually loaded something
+  if(!had_something) {
+    ss << bbts::red << "Shared library object did not have a valid \"register_tensors\" or \"register_udfs\"!\n" << std::endl;
+  }  
+
+  // keep track of the stuff here so the system can clean it up later
+  shared_libs.emplace_back(filename, so_handle);
+
+  return had_something;
+}
+
+// we start counting so libararies naturally from zero
+int64_t bbts::coordinator_t::shared_library_item_t::last_so = 1;

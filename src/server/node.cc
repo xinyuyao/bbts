@@ -54,8 +54,6 @@ void bbts::node_t::init() {
   // the scheduler
   _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger,
                                                  _storage, _command_runner, _tensor_notifier, _factory,  _stats);
-
-
 }
 
 
@@ -189,6 +187,10 @@ std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_com
   catch (const std::runtime_error& ex) {
     return {false, ex.what()};
   }
+}
+
+std::tuple<bool, std::string> bbts::node_t::load_shared_library(char* file_bytes, size_t file_size) {
+  return _coordinator->load_shared_library(file_bytes, file_size);
 }
 
 std::tuple<bool, std::string> bbts::node_t::run_commands() {

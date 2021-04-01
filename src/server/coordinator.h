@@ -1,21 +1,25 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <thread>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <unistd.h>
+#include <dlfcn.h>
 #include "../server/coordinator_ops.h"
 #include "../server/logger.h"
 #include "../commands/command.h"
 #include "../commands/tensor_stats.h"
-#include "../communication/communicator.h"
 #include "../commands/reservation_station.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
 #include "../ud_functions/gpu_scheduler.h"
+#include "../tensor/tensor_factory.h"
+#include "../ud_functions/udf_manager.h"
 #include "coordinator.h"
 #include "static_config.h"
 
@@ -64,6 +68,12 @@ public:
 
   // shutdown the cluster
   std::tuple<bool, std::string> shutdown_cluster();
+
+  // load the shared library contained in file_bytes
+  std::tuple<bool, std::string> load_shared_library(char* file_bytes, size_t file_size);
+
+  // shutdown the coordinator
+  void shutdown();
 
 private:
 
@@ -123,6 +133,12 @@ private:
   // the gpu scheduler
   gpu_scheduler_ptr_t _gpu_scheduler;
 
+  // recieves the bytes of the .so library from another node
+  bool _register(coordinator_op_t ops, std::stringstream &ss);
+
+  // register from loaded bytes
+  bool _register_from_bytes(char* file_bytes, size_t file_size, std::stringstream &ss);
+
   // the communicator
   bbts::communicator_ptr_t _comm;
 
@@ -149,6 +165,39 @@ private:
 
   // tensor factory
   bbts::tensor_factory_ptr_t _tf;
+
+  // the udf manager
+  bbts::udf_manager_ptr _udf_manager;
+
+  // This struct will handle removing temporary files opened by 
+  // load_shared_library and hold onto the so_handle. 
+  // It isn't strictly necessary because the os will delete files 
+  // in /tmp/ periodically. 
+  // When barb exits, the shared library will be closed regardless 
+  // of calling dlclose.
+  struct shared_library_item_t {
+
+    shared_library_item_t(std::string const& filename, 
+                          void* so_handle) : filename(filename), 
+                                             so_handle(so_handle) {}
+    
+    ~shared_library_item_t() {
+
+      // we no longer need the temporary file
+      unlink(filename.c_str());
+    }
+
+    // the file of the loaded library
+    std::string filename;
+
+    // the .so file handle
+    void* so_handle;
+
+    // the id of the last so library, we use this during the name generation
+    static int64_t last_so;
+  };
+
+  std::vector<shared_library_item_t> shared_libs;
 };
 
 // the pointer

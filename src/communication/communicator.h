@@ -31,10 +31,11 @@ const com_tags COORDINATOR_TAG = 3;
 const com_tags COORDINATOR_BCAST_CMD_TAG = 4;
 const com_tags NOTIFY_TENSOR_TAG = 5;
 const com_tags RESPONSE_STRING_TAG = 6;
+const com_tags COORDINATOR_BCAST_BYTES = 7;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 7;
+const com_tags FREE_TAG = 8;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -123,6 +124,9 @@ public:
   // send the cmds to all nodes
   bool send_coord_cmds(const std::vector<command_ptr_t> &cmds);
 
+  // send a bunch of bytes to all nodes
+  bool send_bytes(char* file, size_t file_size);
+
   // expect the a coord op
   bool expect_coord_cmds(size_t num_cmds, std::vector<command_ptr_t> &out);
 
@@ -158,6 +162,7 @@ public:
   bool send_tensor_size(node_id_t node, com_tags tag, uint64_t val) {
     return MPI_Ssend(&val, 1, MPI_UINT64_T, node, tag + FREE_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;  
   }
+  bool expect_bytes(size_t num_bytes, std::vector<char> &out);
 
   // waits for all the nodes to hit this, should only be used for initialization
   void barrier();

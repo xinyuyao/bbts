@@ -34,7 +34,7 @@ std::thread loading_message(std::ostream &out, const std::string &s, std::atomic
 
 void load_binary_command(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
 
-  // kick of a loading message
+  // kick off a loading message
   std::atomic_bool b; b = false;
   auto t = loading_message(out, "Loading the file", b);
 
@@ -51,7 +51,7 @@ void load_binary_command(std::ostream &out, bbts::node_t &node, const std::strin
     return;
   }
 
-  // kick of a loading message
+  // kick off a loading message
   b = false;
   t = loading_message(out, "Scheduling the loaded commands", b);
 
@@ -66,6 +66,49 @@ void load_binary_command(std::ostream &out, bbts::node_t &node, const std::strin
     out << bbts::red << "Failed to schedule the loaded commands : \"" << message << "\"\n" << bbts::reset;
   }
   else {
+    out << bbts::green << message << bbts::reset;
+  }
+}
+
+void load_shared_library(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
+
+  // kick off a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message(out, "Loading the library file", b);
+
+  // try to open the file
+  std::ifstream in(file_path, std::ifstream::ate | std::ifstream::binary);
+
+  if(in.fail()) {
+    // finish the loading message
+    b = true; t.join();
+
+    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+    return;
+  }
+
+  auto file_len = (size_t) in.tellg();
+  in.seekg (0, std::ifstream::beg);
+
+  auto file_bytes = new char[file_len];
+  in.readsome(file_bytes, file_len);
+
+  // finish the loading message  
+  b = true; t.join();
+
+  // kick off a registering message
+  b = false;
+  t = loading_message(out, "Registering the library", b);
+
+  auto [did_load, message] = node.load_shared_library(file_bytes, file_len);
+  delete[] file_bytes;
+
+  // finish the registering message
+  b = true; t.join();
+
+  if(!did_load) {
+    out << bbts::red << "Failed to register the library : \"" << message << "\"\n" << bbts::reset;
+  } else {
     out << bbts::green << message << bbts::reset;
   }
 }
@@ -283,6 +326,23 @@ void prompt(bbts::node_t &node) {
 
   auto rootMenu = std::make_unique<Menu>("cli");
 
+  // set up load commands and load library
+  auto loadSubMenu = std::make_unique<Menu>("load");
+
+  loadSubMenu->Insert("commands",[&](std::ostream &out, const std::string &file) {
+  
+    load_binary_command(out, node, file);
+  
+  },"Load commands form a binary file. Usage : load commands <file>\n");
+  
+  loadSubMenu->Insert("library", [&](std::ostream &out, const std::string &file) {
+
+    load_shared_library(out, node, file);  
+  
+   },"Load a shared object file. Usage : load library <file>\n");
+  
+  rootMenu->Insert(std::move(loadSubMenu));
+
   // setup the info command
   rootMenu->Insert("info",[&](std::ostream &out, const std::string &what) {
 
@@ -311,13 +371,6 @@ void prompt(bbts::node_t &node) {
     }
 
   },"Returns information about the cluster. Usage : info [cluster, storage, tensor] [tid] \n ");
-
-  rootMenu->Insert("load",[&](std::ostream &out, const std::string &file) {
-
-    load_binary_command(out, node, file);
-
-  },"Load commands form a binary file. Usage : load <file>\n");
-
 
   rootMenu->Insert("run",[&](std::ostream &out) {
 
