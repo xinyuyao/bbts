@@ -34,6 +34,9 @@ struct ud_impl_t {
   template<class T>
   struct ud_impl_args_t {
 
+    // just an empty argument list
+    ud_impl_args_t() = default;
+
     // the input arguments
     ud_impl_args_t(std::vector<T*> in_arg) : arguments(std::move(in_arg)) {}
 
@@ -77,6 +80,11 @@ struct ud_impl_t {
       arguments[n] = &_in;
     }
 
+    // resize the arguments
+    void resize(size_t n) {
+      arguments.resize(n);
+    }
+
    private:
 
     // holds the input arguments
@@ -117,7 +125,11 @@ struct ud_impl_t {
       if(n < _params.size()) { return _params[n].u; }
       else { return val; }
     }
-    
+
+    command_param_t get_raw(size_t n) const { 
+      return _params[n]; 
+    }
+
     // returns the number of parameters
     size_t num_parameters() const { return _params.size(); }
 
