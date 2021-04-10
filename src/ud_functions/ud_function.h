@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
@@ -79,10 +80,14 @@ struct ud_impl_t {
     void set(size_t n, T &_in) {
       arguments[n] = &_in;
     }
+    
+    void reinit(std::vector<T> &in_arg) {
 
-    // resize the arguments
-    void resize(size_t n) {
-      arguments.resize(n);
+      // fill up the arguments
+      arguments.resize(in_arg.size());
+      for(int32_t idx = 0; idx < in_arg.size(); ++idx) {
+        arguments[idx] = &in_arg[idx];
+      }
     }
 
    private:
