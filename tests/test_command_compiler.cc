@@ -19,7 +19,8 @@ namespace bbts {
 
 enum class abstract_command_type_t {
   APPLY,
-  REDUCE
+  REDUCE,
+  DELETE
 };
 
 using abstract_ud_spec_id_t = int32_t;
@@ -383,7 +384,7 @@ command_compiler_t(cost_model_ptr_t cost_model, size_t num_nodes) : cost_model(c
                                                         max_compute_cost,
                                                         max_transfer_cost)));
       }
-      else {
+      else if(c.type == abstract_command_type_t::REDUCE) {
 
         // store the command
         out_commands.push_back(std::move(generate_reduce(cur_cmd,
@@ -394,12 +395,60 @@ command_compiler_t(cost_model_ptr_t cost_model, size_t num_nodes) : cost_model(c
                                                          max_compute_cost,
                                                          max_transfer_cost)));
       }
+      else {
+        
+        // generate the delete commands
+        auto cmds = generate_deletes(cur_cmd,
+                                     out_commands,
+                                     c, 
+                                     costs,
+                                     tensor_locations,
+                                     max_compute_cost,
+                                     max_transfer_cost);
+        // store the command
+        for(auto &c : cmds) {
+          out_commands.push_back(std::move(c));
+        }
+      }
     }
 
     return std::move(out_commands);
   }
 
 private:
+
+  std::vector<command_ptr_t> generate_deletes(command_id_t &cur_cmd,
+                                              std::vector<bbts::command_ptr_t> &out_commands,
+                                              const abstract_command_t &c, 
+                                              std::vector<node_cost_t> &costs,
+                                              std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                                              float &max_compute_cost,
+                                              float &max_transfer_cost) {
+    
+    std::vector<command_ptr_t> out;
+    for(node_id_t node = 0; node < num_nodes; ++node) {
+
+      // check if there is something
+      std::vector<command_t::tid_node_id_t> inputs;
+      for(auto &in : c.input_tids) {
+
+        // create the command and remove
+        auto it = tensor_locations[node].find(in);
+        if(it != tensor_locations[node].end()) {
+          inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
+          tensor_locations[node].erase(it);
+        }
+      }
+
+      // make the apply
+      auto cmd = command_t::create_delete(cur_cmd++, inputs);
+
+      // store the command
+      out.push_back(std::move(cmd));
+    }
+
+    return std::move(out);
+  }
 
   command_ptr_t generate_reduce(command_id_t &cur_cmd,
                                 std::vector<bbts::command_ptr_t> &out_commands,
@@ -861,11 +910,23 @@ TEST(TestCommandCompiler, Test1) {
                        .input_tids = {8, 9}, // A(0, 0) B(0, 1)
                        .output_tids = {16}, // C(0, 1)
                        .params = {}},
+
+    abstract_command_t{.ud_id = -1,
+                       .type = abstract_command_type_t::DELETE,
+                       .input_tids = {8, 9}, // A(1, 1), B(1, 1)
+                       .output_tids = {},
+                       .params = {}},
                        
     abstract_command_t{.ud_id = 0,
                        .type = abstract_command_type_t::REDUCE,
                        .input_tids = {10, 11}, // A(0, 1) B(1, 1)
                        .output_tids = {17}, // C(0, 1)
+                       .params = {}},
+
+    abstract_command_t{.ud_id = -1,
+                       .type = abstract_command_type_t::DELETE,
+                       .input_tids = {10, 11}, // A(0, 1) B(1, 1)
+                       .output_tids = {},
                        .params = {}},
 
     abstract_command_t{.ud_id = 0,
@@ -874,12 +935,24 @@ TEST(TestCommandCompiler, Test1) {
                        .output_tids = {18}, // C(1, 1)
                        .params = {}},
 
+    abstract_command_t{.ud_id = -1,
+                       .type = abstract_command_type_t::DELETE,
+                       .input_tids = {12, 13}, // A(1, 0) B(0, 1)
+                       .output_tids = {},
+                       .params = {}},
+
     abstract_command_t{.ud_id = 0,
                        .type = abstract_command_type_t::REDUCE,
                        .input_tids = {14, 15}, // A(1, 1) B(1, 1)
                        .output_tids = {19}, // C(1, 1)
-                       .params = {}}
+                       .params = {}},
       
+    abstract_command_t{.ud_id = -1,
+                       .type = abstract_command_type_t::DELETE,
+                       .input_tids = {14, 15}, // A(1, 1) B(1, 1)
+                       .output_tids = {},
+                       .params = {}}
+
   };
 
   cmds = compiler->compile(commands, tensor_locations);
