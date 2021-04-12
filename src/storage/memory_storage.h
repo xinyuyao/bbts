@@ -160,6 +160,9 @@ struct memory_storage_t {
   // shutdown
   void shutdown() {};
 
+  // extract the meta
+  std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> extract_meta();
+
 private:
 
   // information about the stored tensor

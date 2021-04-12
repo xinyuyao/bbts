@@ -127,6 +127,12 @@ public:
   // send a bunch of bytes to all nodes
   bool send_bytes(char* file, size_t file_size);
 
+  // send a bunch of bytes to all nodes
+  bool send_tensor_meta(const std::vector<std::tuple<tid_t, tensor_meta_t>> &meta);
+
+  // get the meta from a node
+  std::vector<std::tuple<tid_t, tensor_meta_t>> recv_meta(node_id_t node); 
+
   // expect the a coord op
   bool expect_coord_cmds(size_t num_cmds, std::vector<command_ptr_t> &out);
 

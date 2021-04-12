@@ -69,6 +69,9 @@ public:
   // load all the parsed commands
   std::tuple<bool, std::string> load_commands(const bbts::parsed_command_list_t &cmds);
 
+  // compile the commands
+  std::tuple<bool, std::string> compile_commands(const std::string &file_path);
+
   // load a shared library
   std::tuple<bool, std::string> load_shared_library(char* file_bytes, size_t file_size);
 

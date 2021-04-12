@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
+#include "node_config.h"
 
 using namespace std::chrono;
 
@@ -80,7 +81,10 @@ void bbts::coordinator_t::accept() {
         _register(op, ss);
         break;
       }
-
+      case coordinator_op_types_t::FETCH_META : {
+        _handle_fetch_meta(ss);
+        break;
+      }
     }
 
     // sync all nodes
@@ -115,6 +119,42 @@ std::tuple<bool, std::string> bbts::coordinator_t::schedule_commands(const std::
   
   // we succeded
   return {true, "Scheduled " + std::to_string(cmds.size()) + " commands\n"};
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_transfer_cost_per_byte,
+                                                                    float send_cost_per_byte,
+                                                                    const std::vector<abstract_command_t> &cmds,
+                                                                    const std::vector<abstract_ud_spec_t> &funs) {
+
+  std::unordered_map<bbts::tid_t, bbts::tensor_meta_t> meta;
+  std::vector<std::unordered_set<bbts::tid_t>> locations;
+
+
+  // fetch the info about the tensors  
+  _fetch_tensor_info(meta, locations);
+
+  // make the cost
+  cost_model_ptr_t cost = std::make_shared<cost_model_t>(meta,
+                                                         funs,
+                                                         _tf, 
+                                                         _udf_manager, 
+                                                         gpu_transfer_cost_per_byte, 
+                                                         send_cost_per_byte);
+
+  // init the compiler
+  command_compiler_t compiler(cost, _comm->get_num_nodes());
+
+  try {
+
+    // the compiled commands
+    auto compiled_cmds = compiler.compile(cmds, locations);
+
+    // schedule the compiled commands
+    return schedule_commands(compiled_cmds);
+  }
+  catch (const std::runtime_error& ex) {
+    return {false, ex.what()};
+  }
 }
 
 std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
@@ -251,6 +291,27 @@ std::tuple<bool, std::string> bbts::coordinator_t::shutdown_cluster() {
 
   // we succeded
   return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::_fetch_tensor_info(std::unordered_map<bbts::tid_t, bbts::tensor_meta_t> &meta, 
+                                                                      std::vector<std::unordered_set<bbts::tid_t>> &locations) {
+  
+  // send the request to get all the meta
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::FETCH_META, ._val = 0})) {
+    return {false, "Failed to shutdown the cluster!\n"};
+  }
+
+  // init the locations
+  locations.clear(); locations.resize(_comm->get_num_nodes());
+
+  auto m = _storage->extract_meta();
+
+  for(node_id_t node = 1; node < _comm->get_num_nodes(); ++node) {
+
+
+  }
+
+  return {false, "Failed to shutdown the cluster!\n"};
 }
 
 void bbts::coordinator_t::_fail() {
@@ -405,6 +466,12 @@ bool bbts::coordinator_t::_register(coordinator_op_t op, std::stringstream &ss) 
   }
 
   return _register_from_bytes(file_bytes.data(), op._val, ss);
+}
+
+void bbts::coordinator_t::_handle_fetch_meta(std::stringstream &ss) {
+
+  auto m = _storage->extract_meta();
+  _comm->send_tensor_meta(m);
 }
 
 bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_size, std::stringstream &ss) {

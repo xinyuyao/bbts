@@ -70,6 +70,25 @@ void load_binary_command(std::ostream &out, bbts::node_t &node, const std::strin
   }
 }
 
+void compile_commands(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
+
+    // kick off a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message(out, "Compiling commands", b);
+
+  // compile the commands and load them
+  auto [did_compile, message] = node.compile_commands(file_path);
+
+  // finish the loading message  
+  b = true; t.join();
+
+  if(!did_compile) {
+    out << bbts::red << "Failed to register the library : \"" << message << "\"\n" << bbts::reset;
+  } else {
+    out << bbts::green << message << bbts::reset;
+  }
+}
+
 void load_shared_library(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
 
   // kick off a loading message

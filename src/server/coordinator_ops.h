@@ -15,7 +15,8 @@ enum class coordinator_op_types_t : int32_t {
   MAX_STORAGE, // maximum storage
   PRINT_STORAGE, // prints the storage of the node
   PRINT_TENSOR, // prints tensor
-  REGISTER // register a library
+  REGISTER, // register a library
+  FETCH_META // fetches meta data from each node
 };
 
 struct coordinator_op_t {

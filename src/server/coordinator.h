@@ -20,6 +20,7 @@
 #include "../ud_functions/gpu_scheduler.h"
 #include "../tensor/tensor_factory.h"
 #include "../ud_functions/udf_manager.h"
+#include "../commands/command_compiler.h"
 #include "coordinator.h"
 #include "static_config.h"
 
@@ -44,6 +45,12 @@ public:
 
   // schedules all the provided commands
   std::tuple<bool, std::string> schedule_commands(const std::vector<command_ptr_t>& cmds);
+
+  // compile the commands
+  std::tuple<bool, std::string> compile_commands(float gpu_transfer_cost_per_byte,
+                                                 float send_cost_per_byte,
+                                                 const std::vector<abstract_command_t>& cmds,
+                                                 const std::vector<abstract_ud_spec_t> &funs);
 
   // run the commands
   std::tuple<bool, std::string> run_commands();
@@ -76,6 +83,11 @@ public:
   void shutdown();
 
 private:
+
+
+  
+  std::tuple<bool, std::string> _fetch_tensor_info(std::unordered_map<bbts::tid_t, bbts::tensor_meta_t> &meta, 
+                                                   std::vector<std::unordered_set<bbts::tid_t>> &locations);
 
   void _fail();
 
@@ -138,6 +150,9 @@ private:
 
   // register from loaded bytes
   bool _register_from_bytes(char* file_bytes, size_t file_size, std::stringstream &ss);
+
+  // handles a request to fetch the meta data
+  void _handle_fetch_meta(std::stringstream &ss);
 
   // the communicator
   bbts::communicator_ptr_t _comm;

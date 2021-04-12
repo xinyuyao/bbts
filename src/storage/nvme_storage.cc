@@ -632,5 +632,9 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
   }
 }
 
+std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> nvme_storage_t::extract_meta() {
+
+}
+
 }
 

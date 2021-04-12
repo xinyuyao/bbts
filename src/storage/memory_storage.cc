@@ -243,4 +243,9 @@ memory_storage_t::reservation_result_t memory_storage_t::_create_reserved(const 
   return {.get = out_get, .create = out_create};
 }
 
+std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> memory_storage_t::extract_meta() {
+
+}
+
+
 }

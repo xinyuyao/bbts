@@ -4,7 +4,7 @@
 #include <string>
 #include <thread>
 #include "node.h"
-#include "../commands/command_compiler.h"
+#include "../commands/command_loader.h"
 
 void bbts::node_t::init() {
 
@@ -173,7 +173,7 @@ std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_com
   _logger->message(ss.str());
 
   // init the compiler
-  command_compiler_t compiler(*_factory, *_udf_manager);
+  command_loader_t compiler(*_factory, *_udf_manager);
 
   // compile the commands
   try {
@@ -183,6 +183,26 @@ std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_com
 
     // schedule all commands
     return _coordinator->schedule_commands(compiled_cmds);
+  }
+  catch (const std::runtime_error& ex) {
+    return {false, ex.what()};
+  }
+}
+
+std::tuple<bool, std::string> bbts::node_t::compile_commands(const std::string &file_path) {
+  
+  // the commands we loaded from a file //TODO load them from the file
+  std::vector<abstract_command_t> commands;
+  std::vector<abstract_ud_spec_t> funs;
+
+  // compile the commands
+  try {
+
+    // schedule all commands
+    return _coordinator->compile_commands(_config->gpu_transfer_cost_per_byte,
+                                          _config->send_cost_per_byte,
+                                          commands, 
+                                          funs);
   }
   catch (const std::runtime_error& ex) {
     return {false, ex.what()};

@@ -25,6 +25,13 @@ struct node_config_t {
 
   // should we print out everything?
   bool verbose = false;
+
+  // the cost to transfter bytes to/from the GPU per byte
+  float gpu_transfer_cost_per_byte = 1.0f;
+
+  // the cost to send bytes per byte
+  float send_cost_per_byte = 1.0f;
+  
 };
 
 // a nice way to reference the configuration ptr

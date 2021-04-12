@@ -340,6 +340,9 @@ struct nvme_storage_t {
   template<class fn>
   void add_deleted_hook(fn fun){ _tensor_delete_hook = fun; }
 
+  // extract the meta
+  std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> extract_meta();
+
 private:
 
   // we use this to identify the transasction
