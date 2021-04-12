@@ -376,39 +376,36 @@ command_compiler_t(cost_model_ptr_t cost_model, size_t num_nodes) : cost_model(c
       if(c.type == abstract_command_type_t::APPLY) {
 
         // store the command
-        out_commands.push_back(std::move(generate_apply(cur_cmd,
-                                                        out_commands,
-                                                        c, 
-                                                        costs,
-                                                        tensor_locations,
-                                                        max_compute_cost,
-                                                        max_transfer_cost)));
+        generate_apply(cur_cmd,
+                       out_commands,
+                       c, 
+                       costs,
+                       tensor_locations,
+                       max_compute_cost,
+                       max_transfer_cost);
       }
       else if(c.type == abstract_command_type_t::REDUCE) {
 
         // store the command
-        out_commands.push_back(std::move(generate_reduce(cur_cmd,
-                                                         out_commands,
-                                                         c, 
-                                                         costs,
-                                                         tensor_locations,
-                                                         max_compute_cost,
-                                                         max_transfer_cost)));
+        generate_reduce(cur_cmd,
+                        out_commands,
+                        c, 
+                        costs,
+                        tensor_locations,
+                        max_compute_cost,
+                        max_transfer_cost);
       }
       else {
         
         // generate the delete commands
-        auto cmds = generate_deletes(cur_cmd,
-                                     out_commands,
-                                     c, 
-                                     costs,
-                                     tensor_locations,
-                                     max_compute_cost,
-                                     max_transfer_cost);
-        // store the command
-        for(auto &c : cmds) {
-          out_commands.push_back(std::move(c));
-        }
+        generate_deletes(cur_cmd,
+                         out_commands,
+                         c, 
+                         costs,
+                         tensor_locations,
+                         max_compute_cost,
+                         max_transfer_cost);
+
       }
     }
 
@@ -417,15 +414,14 @@ command_compiler_t(cost_model_ptr_t cost_model, size_t num_nodes) : cost_model(c
 
 private:
 
-  std::vector<command_ptr_t> generate_deletes(command_id_t &cur_cmd,
-                                              std::vector<bbts::command_ptr_t> &out_commands,
-                                              const abstract_command_t &c, 
-                                              std::vector<node_cost_t> &costs,
-                                              std::vector<std::unordered_set<tid_t>> &tensor_locations,
-                                              float &max_compute_cost,
-                                              float &max_transfer_cost) {
+  void generate_deletes(command_id_t &cur_cmd,
+                        std::vector<bbts::command_ptr_t> &out_commands,
+                        const abstract_command_t &c, 
+                        std::vector<node_cost_t> &costs,
+                        std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                        float &max_compute_cost,
+                        float &max_transfer_cost) {
     
-    std::vector<command_ptr_t> out;
     for(node_id_t node = 0; node < num_nodes; ++node) {
 
       // check if there is something
@@ -440,17 +436,17 @@ private:
         }
       }
 
-      // make the apply
-      auto cmd = command_t::create_delete(cur_cmd++, inputs);
+      if(!inputs.empty()) {
+        // make the apply
+        auto cmd = command_t::create_delete(cur_cmd++, inputs);
 
-      // store the command
-      out.push_back(std::move(cmd));
+        // store the command
+        out_commands.push_back(std::move(cmd));
+      }
     }
-
-    return std::move(out);
   }
 
-  command_ptr_t generate_reduce(command_id_t &cur_cmd,
+  void generate_reduce(command_id_t &cur_cmd,
                                 std::vector<bbts::command_ptr_t> &out_commands,
                                 const abstract_command_t &c, 
                                 std::vector<node_cost_t> &costs,
@@ -488,9 +484,7 @@ private:
 
       // mark that we are creating a tensor here
       tensor_locations[local_node].insert(c.output_tids[0]);
-
-      // return the command
-      return std::move(cmd);
+      out_commands.push_back(std::move(cmd));
     }
 
     // first find the best node to send the data for each input
@@ -554,17 +548,17 @@ private:
     tensor_locations[best_node].insert(c.output_tids[0]);
 
     // return the command
-    return std::move(cmd);
+    out_commands.push_back(std::move(cmd));
   }
 
 
-  command_ptr_t generate_apply(command_id_t &cur_cmd,
-                               std::vector<bbts::command_ptr_t> &out_commands,
-                               const abstract_command_t &c, 
-                               std::vector<node_cost_t> &costs,
-                               std::vector<std::unordered_set<tid_t>> &tensor_locations,
-                               float &max_compute_cost,
-                               float &max_transfer_cost) {
+  void generate_apply(command_id_t &cur_cmd,
+                      std::vector<bbts::command_ptr_t> &out_commands,
+                      const abstract_command_t &c, 
+                      std::vector<node_cost_t> &costs,
+                      std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                      float &max_compute_cost,
+                      float &max_transfer_cost) {
     
     // unique inputs
     std::vector<std::tuple<tid_t, size_t>> unique_inputs; unique_inputs.resize(10);
@@ -622,6 +616,7 @@ private:
 
           // store the command
           out_commands.push_back(std::move(cmd));
+          tensor_locations[best_node].insert(std::get<0>(u));
         }
     }
 
@@ -667,7 +662,7 @@ private:
                                    c.output_tids);
 
     // move the command
-    return std::move(cmd);
+    out_commands.push_back(std::move(cmd));
   }
 
   node_id_t _find_node_to_fetch(tid_t id,
