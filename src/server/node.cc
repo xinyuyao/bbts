@@ -53,7 +53,7 @@ void bbts::node_t::init() {
 
   // the scheduler
   _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger,
-                                                 _storage, _command_runner, _tensor_notifier, _factory,  _stats);
+                                                 _storage, _command_runner, _tensor_notifier, _udf_manager, _factory,  _stats);
 }
 
 
@@ -191,9 +191,86 @@ std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_com
 
 std::tuple<bool, std::string> bbts::node_t::compile_commands(const std::string &file_path) {
   
+  std::vector<command_param_t> param_data = {command_param_t{.u = 100},
+                                             command_param_t{.u = 100},
+                                             command_param_t{.f = 0.0f},
+                                             command_param_t{.f = 1.0f}};
+  command_param_list_t raw_param = {._data = param_data.data(), ._num_elements = param_data.size()};
+
   // the commands we loaded from a file //TODO load them from the file
-  std::vector<abstract_command_t> commands;
+  // the commands
+  std::vector<abstract_command_t> commands = {
+
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {0}, // A(0, 0)
+                       .params = raw_param},
+                       
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {1}, // A(0, 1)
+                       .params = raw_param},
+
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {2}, // A(1, 0)
+                       .params = raw_param},
+
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {3}, // A(1, 1)
+                       .params = raw_param},
+
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {4}, // B(0, 0)
+                       .params = raw_param},
+                       
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {5}, // B(0, 1)
+                       .params = raw_param},
+
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {6}, // B(1, 0)
+                       .params = raw_param},
+
+    abstract_command_t{.ud_id = 2,
+                       .type = abstract_command_type_t::APPLY,
+                       .input_tids = {}, 
+                       .output_tids = {7}, // B(1, 1)
+                       .params = raw_param}
+  };
+
+  // the functions
   std::vector<abstract_ud_spec_t> funs;
+
+  // matrix addition
+  funs.push_back(abstract_ud_spec_t{.id = 0,
+                                    .ud_name = "matrix_add",
+                                    .input_types = {"dense", "dense"},
+                                    .output_types = {"dense"}});
+
+  // matrix multiplication
+  funs.push_back(abstract_ud_spec_t{.id = 1,
+                                    .ud_name = "matrix_mult",
+                                    .input_types = {"dense", "dense"},
+                                    .output_types = {"dense"}});
+  
+  // the uniform distribution
+  funs.push_back(abstract_ud_spec_t{.id = 2,
+                                    .ud_name = "uniform",
+                                    .input_types = {},
+                                    .output_types = {"dense"}});
+
 
   // compile the commands
   try {

@@ -37,6 +37,7 @@ public:
                 storage_ptr_t _storage,
                 bbts::command_runner_ptr_t _command_runner,
                 bbts::tensor_notifier_ptr_t _tensor_notifier,
+                bbts::udf_manager_ptr _udf_manager,
                 bbts::tensor_factory_ptr_t _tf,
                 tensor_stats_ptr_t _stats);
 

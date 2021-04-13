@@ -1,5 +1,6 @@
 #include "memory_storage.h"
 
+#include <cstddef>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>  
@@ -245,6 +246,16 @@ memory_storage_t::reservation_result_t memory_storage_t::_create_reserved(const 
 
 std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> memory_storage_t::extract_meta() {
 
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+  
+  std::size_t idx = 0;
+  std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> out(_tensor_nfo.size());
+  for(auto nfo : _tensor_nfo) {
+    out[idx++] = {nfo.first, nfo.second.address->_meta};
+  }
+
+  return std::move(out);
 }
 
 

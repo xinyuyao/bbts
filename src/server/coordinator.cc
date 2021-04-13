@@ -18,6 +18,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    storage_ptr_t _storage,
                                    bbts::command_runner_ptr_t _command_runner,
                                    bbts::tensor_notifier_ptr_t _tensor_notifier,
+                                   bbts::udf_manager_ptr _udf_manager,
                                    bbts::tensor_factory_ptr_t _tf,
                                    tensor_stats_ptr_t _stats)
 
@@ -28,6 +29,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
       _storage(std::move(_storage)),
       _command_runner(std::move(_command_runner)),
       _tensor_notifier(std::move(_tensor_notifier)),
+      _udf_manager(std::move(_udf_manager)),
       _tf(std::move(_tf)),
       _stats(std::move(_stats)) { _is_down = false; }
 
@@ -126,11 +128,9 @@ std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_tr
                                                                     const std::vector<abstract_command_t> &cmds,
                                                                     const std::vector<abstract_ud_spec_t> &funs) {
 
+  // fetch the info about the tensors  
   std::unordered_map<bbts::tid_t, bbts::tensor_meta_t> meta;
   std::vector<std::unordered_set<bbts::tid_t>> locations;
-
-
-  // fetch the info about the tensors  
   _fetch_tensor_info(meta, locations);
 
   // make the cost
@@ -304,14 +304,28 @@ std::tuple<bool, std::string> bbts::coordinator_t::_fetch_tensor_info(std::unord
   // init the locations
   locations.clear(); locations.resize(_comm->get_num_nodes());
 
+  // get the meta from my storage
   auto m = _storage->extract_meta();
-
-  for(node_id_t node = 1; node < _comm->get_num_nodes(); ++node) {
-
-
+  for(auto &t : m) {
+    meta[std::get<0>(t)] = std::get<1>(t);
+    locations[0].insert(std::get<0>(t));
   }
 
-  return {false, "Failed to shutdown the cluster!\n"};
+  // recive all the meta from other nodes
+  bool success = true;
+  for(node_id_t node = 1; node < _comm->get_num_nodes(); ++node) {
+    
+    // fetch the meta
+    if(!_comm->recv_meta(node, m)) {
+      success = false;
+    }
+  }
+
+    // sync everything
+  std::tuple<bool, std::string> out = {success, "Fetched meta data \n"};
+  _collect(out);
+
+  return out;
 }
 
 void bbts::coordinator_t::_fail() {
@@ -471,7 +485,9 @@ bool bbts::coordinator_t::_register(coordinator_op_t op, std::stringstream &ss) 
 void bbts::coordinator_t::_handle_fetch_meta(std::stringstream &ss) {
 
   auto m = _storage->extract_meta();
-  _comm->send_tensor_meta(m);
+  if(_comm->send_tensor_meta(m)) {
+    ss << bbts::red << "Failed to send the tensor meta data." << bbts::reset;
+  }
 }
 
 bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_size, std::stringstream &ss) {

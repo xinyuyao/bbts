@@ -409,6 +409,14 @@ void prompt(bbts::node_t &node) {
 
   },"Prints command stored in a file. Usage : print <file>\n");
 
+
+  rootMenu->Insert("compile",[&](std::ostream &out, const std::string &file) {
+
+    compile_commands(out, node, file);
+
+  },"Prints command stored in a file. Usage : print <file>\n");
+
+
   rootMenu->Insert("clear",[&](std::ostream &out) {
 
     clear(out, node);

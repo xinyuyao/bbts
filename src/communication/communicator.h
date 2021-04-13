@@ -32,10 +32,11 @@ const com_tags COORDINATOR_BCAST_CMD_TAG = 4;
 const com_tags NOTIFY_TENSOR_TAG = 5;
 const com_tags RESPONSE_STRING_TAG = 6;
 const com_tags COORDINATOR_BCAST_BYTES = 7;
+const com_tags TENSOR_META_TAG = 8;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 8;
+const com_tags FREE_TAG = 9;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -131,7 +132,7 @@ public:
   bool send_tensor_meta(const std::vector<std::tuple<tid_t, tensor_meta_t>> &meta);
 
   // get the meta from a node
-  std::vector<std::tuple<tid_t, tensor_meta_t>> recv_meta(node_id_t node); 
+  bool recv_meta(node_id_t node, std::vector<std::tuple<tid_t, tensor_meta_t>> &data); 
 
   // expect the a coord op
   bool expect_coord_cmds(size_t num_cmds, std::vector<command_ptr_t> &out);

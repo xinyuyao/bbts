@@ -634,6 +634,24 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
 
 std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> nvme_storage_t::extract_meta() {
 
+  std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> out;
+  for(auto &t : _tensor_nfo) {
+
+    // if the tensor was deleted or reassined 
+    if(t.second.state == tensor_state_t::DELETED || t.second.state == tensor_state_t::REASSIGNED) {
+      continue;
+    }
+
+    // run the transaction
+    local_transaction({t.first}, {}, [&](const nvme_storage_t::reservation_result_t &res) {
+
+      // the get the tensor
+      auto ts = res.get[0].get().tensor;
+      out.push_back({t.first, ts->_meta});
+    });
+  }
+
+  return std::move(out);
 }
 
 }

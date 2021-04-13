@@ -373,11 +373,35 @@ bool mpi_communicator_t::send_bytes(char* file, size_t file_size) {
 // send a bunch of bytes to all nodes
 bool mpi_communicator_t::send_tensor_meta(const std::vector<std::tuple<tid_t, tensor_meta_t>> &meta) {
 
+  // get the number of byte to send and send the request
+  return MPI_Ssend(meta.data(), meta.size(), MPI_CHAR, 0, TENSOR_META_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
 }
 
 // get the meta from a node
-std::vector<std::tuple<tid_t, tensor_meta_t>> mpi_communicator_t::recv_meta(node_id_t node) {
+bool mpi_communicator_t::recv_meta(node_id_t node, std::vector<std::tuple<tid_t, tensor_meta_t>> &data) {
 
+  // wait for a request
+  sync_request_t _req;
+  auto mpi_errno = MPI_Mprobe(node, TENSOR_META_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+
+  // check for errors
+  if(mpi_errno != MPI_SUCCESS) {
+    return false;
+  }
+
+  // get the size  and set the tag for the request
+  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
+  _req.message_tag = (com_tags) _req.status.MPI_TAG;
+
+  // resize the data
+  data.resize(_req.num_bytes / sizeof(std::tuple<tid_t, tensor_meta_t>));
+
+  // receive the command
+  if(MPI_Mrecv (data.data(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
+    return false;
+  }
+
+  return true;
 }
 
 // expect the a coord op
