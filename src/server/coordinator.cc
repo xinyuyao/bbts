@@ -319,6 +319,14 @@ std::tuple<bool, std::string> bbts::coordinator_t::_fetch_tensor_info(std::unord
     if(!_comm->recv_meta(node, m)) {
       success = false;
     }
+    else {
+
+      // store the meta
+      for(auto &t : m) {
+        meta[std::get<0>(t)] = std::get<1>(t);
+        locations[0].insert(std::get<0>(t));
+      }
+    }
   }
 
     // sync everything

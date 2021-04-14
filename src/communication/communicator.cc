@@ -374,7 +374,7 @@ bool mpi_communicator_t::send_bytes(char* file, size_t file_size) {
 bool mpi_communicator_t::send_tensor_meta(const std::vector<std::tuple<tid_t, tensor_meta_t>> &meta) {
 
   // get the number of byte to send and send the request
-  return MPI_Ssend(meta.data(), meta.size(), MPI_CHAR, 0, TENSOR_META_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
+  return MPI_Ssend(meta.data(), meta.size() * sizeof(std::tuple<tid_t, tensor_meta_t>), MPI_CHAR, 0, TENSOR_META_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
 }
 
 // get the meta from a node

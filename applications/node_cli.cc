@@ -83,7 +83,7 @@ void compile_commands(std::ostream &out, bbts::node_t &node, const std::string &
   b = true; t.join();
 
   if(!did_compile) {
-    out << bbts::red << "Failed to register the library : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Failed to compile the : \"" << message << "\"\n" << bbts::reset;
   } else {
     out << bbts::green << message << bbts::reset;
   }

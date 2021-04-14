@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <limits>
 #include <memory>
@@ -65,7 +66,6 @@ TEST(TestCommandCompiler, Test1) {
                                              command_param_t{.u = 100},
                                              command_param_t{.f = 0.0f},
                                              command_param_t{.f = 1.0f}};
-  command_param_list_t raw_param = {._data = param_data.data(), ._num_elements = param_data.size()};
 
   // the commands
   std::vector<abstract_command_t> commands = {
@@ -74,49 +74,49 @@ TEST(TestCommandCompiler, Test1) {
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {0}, // A(0, 0)
-                       .params = raw_param},
+                       .params = param_data},
                        
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {1}, // A(0, 1)
-                       .params = raw_param},
+                       .params = param_data},
 
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {2}, // A(1, 0)
-                       .params = raw_param},
+                       .params = param_data},
 
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {3}, // A(1, 1)
-                       .params = raw_param},
+                       .params = param_data},
 
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {4}, // B(0, 0)
-                       .params = raw_param},
+                       .params = param_data},
                        
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {5}, // B(0, 1)
-                       .params = raw_param},
+                       .params = param_data},
 
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {6}, // B(1, 0)
-                       .params = raw_param},
+                       .params = param_data},
 
     abstract_command_t{.ud_id = 2,
                        .type = abstract_command_type_t::APPLY,
                        .input_tids = {}, 
                        .output_tids = {7}, // B(1, 1)
-                       .params = raw_param}
+                       .params = param_data}
   };
 
   // compile them

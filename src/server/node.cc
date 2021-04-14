@@ -191,86 +191,23 @@ std::tuple<bool, std::string> bbts::node_t::load_commands(const bbts::parsed_com
 
 std::tuple<bool, std::string> bbts::node_t::compile_commands(const std::string &file_path) {
   
-  std::vector<command_param_t> param_data = {command_param_t{.u = 100},
-                                             command_param_t{.u = 100},
-                                             command_param_t{.f = 0.0f},
-                                             command_param_t{.f = 1.0f}};
-  command_param_list_t raw_param = {._data = param_data.data(), ._num_elements = param_data.size()};
+  // load the file with commands
+  compile_source_file_t sf;
+  try {
 
-  // the commands we loaded from a file //TODO load them from the file
-  // the commands
-  std::vector<abstract_command_t> commands = {
+    // open the file
+    std::ifstream iff;
+    iff.open(file_path);
 
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {0}, // A(0, 0)
-                       .params = raw_param},
-                       
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {1}, // A(0, 1)
-                       .params = raw_param},
+    // read the source
+    sf.read_from_file(iff);
 
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {2}, // A(1, 0)
-                       .params = raw_param},
-
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {3}, // A(1, 1)
-                       .params = raw_param},
-
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {4}, // B(0, 0)
-                       .params = raw_param},
-                       
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {5}, // B(0, 1)
-                       .params = raw_param},
-
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {6}, // B(1, 0)
-                       .params = raw_param},
-
-    abstract_command_t{.ud_id = 2,
-                       .type = abstract_command_type_t::APPLY,
-                       .input_tids = {}, 
-                       .output_tids = {7}, // B(1, 1)
-                       .params = raw_param}
-  };
-
-  // the functions
-  std::vector<abstract_ud_spec_t> funs;
-
-  // matrix addition
-  funs.push_back(abstract_ud_spec_t{.id = 0,
-                                    .ud_name = "matrix_add",
-                                    .input_types = {"dense", "dense"},
-                                    .output_types = {"dense"}});
-
-  // matrix multiplication
-  funs.push_back(abstract_ud_spec_t{.id = 1,
-                                    .ud_name = "matrix_mult",
-                                    .input_types = {"dense", "dense"},
-                                    .output_types = {"dense"}});
-  
-  // the uniform distribution
-  funs.push_back(abstract_ud_spec_t{.id = 2,
-                                    .ud_name = "uniform",
-                                    .input_types = {},
-                                    .output_types = {"dense"}});
-
+    // close the file
+    iff.close();
+  }
+  catch (const std::runtime_error& ex) {
+    return {false, ex.what()};
+  }
 
   // compile the commands
   try {
@@ -278,8 +215,8 @@ std::tuple<bool, std::string> bbts::node_t::compile_commands(const std::string &
     // schedule all commands
     return _coordinator->compile_commands(_config->gpu_transfer_cost_per_byte,
                                           _config->send_cost_per_byte,
-                                          commands, 
-                                          funs);
+                                          sf.commands, 
+                                          sf.function_specs);
   }
   catch (const std::runtime_error& ex) {
     return {false, ex.what()};

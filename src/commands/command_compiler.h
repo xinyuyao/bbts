@@ -1,3 +1,5 @@
+#include <cstddef>
+#include <fstream>
 #include <stdexcept>
 #include <unordered_set>
 #include "../commands/command.h"
@@ -9,7 +11,7 @@
 
 namespace bbts {
 
-enum class abstract_command_type_t {
+enum class abstract_command_type_t : int {
   APPLY,
   REDUCE,
   DELETE
@@ -34,6 +36,45 @@ struct abstract_ud_spec_t {
  
   // the output types
   std::vector<std::string> output_types; 
+
+  // write the function to the file
+  void write_to_file(std::ofstream &file) {
+    
+    // write the stuff
+    file << id << " " << ud_name << " " << input_types.size() << " ";
+    for(auto &s : input_types) {
+      file << s << " ";
+    }
+    file << output_types.size() << " ";
+    for(auto &s : output_types) {
+      file << s << " ";
+    }
+    file << '\n';
+  }
+
+  void read_from_file(std::ifstream &file) {
+
+    // write the stuff
+    std::size_t num_inputs;
+    file >> id >> ud_name >> num_inputs;
+
+    // read all the input types
+    input_types.resize(num_inputs);
+    for(auto &s : input_types) {
+      file >> s;
+    }
+
+    // read the number of outputs
+    std::size_t num_outputs;
+    file >> num_outputs;
+
+    // read all the outputs
+    output_types.resize(num_outputs);
+    for(auto &s : output_types) {
+      file >> s;
+    }
+  }
+
 };
 
 class cost_model_t {
@@ -326,7 +367,7 @@ struct abstract_command_t {
   // the type 
   abstract_ud_spec_id_t ud_id;
 
-  // the type of the command (APPY or REDUCE)
+  // the type of the command (APPLY or REDUCE)
   abstract_command_type_t type;
 
   // the input tids
@@ -336,7 +377,97 @@ struct abstract_command_t {
   std::vector<tid_t> output_tids;
 
   // parameters
-  bbts::ud_impl_t::tensor_params_t params;
+  std::vector<command_param_t> params;
+
+  // write the command to file
+  void write_to_file(std::ofstream &file) {
+    
+    // figure out the sting label
+    std::string type_string;
+    switch (type) {
+      case abstract_command_type_t::APPLY  : type_string = "APPLY"; break;
+      case abstract_command_type_t::REDUCE : type_string = "REDUCE"; break;
+      case abstract_command_type_t::DELETE : type_string = "DELETE"; break;
+    }
+
+    // write the stuff
+    file << ud_id << " " << type_string << " " << input_tids.size() << " ";
+    for(auto &s : input_tids) {
+      file << s << " ";
+    }
+
+    file << output_tids.size() << " ";
+    for(auto &s : output_tids) {
+      file << s << " ";
+    }
+
+    file << params.size() << " ";
+    for(auto idx = 0; idx < params.size(); ++idx) {
+      file << "int ";
+      file << params[idx].i << " ";
+    }
+    file << '\n';
+  }
+
+  void read_from_file(std::ifstream &file) {
+
+    std::size_t num_input_tids;
+    std::size_t num_output_tids;
+    std::size_t num_params;
+    std::string type_string;
+
+    file >> ud_id >> type_string >> num_input_tids;
+
+    if(type_string == "APPLY") {
+      type = abstract_command_type_t::APPLY;
+    }
+    else if(type_string == "REDUCE") {
+      type = abstract_command_type_t::REDUCE;
+    }
+    else if(type_string == "DELETE") {
+      type = abstract_command_type_t::DELETE;
+    }
+    else {
+      throw std::runtime_error("Unknown type!");
+    }
+
+    input_tids.resize(num_input_tids);
+    for(auto &tid : input_tids) {
+      file >> tid;
+    }
+
+    file >> num_output_tids;
+    output_tids.resize(num_output_tids);
+    for(auto &tid : output_tids) {
+      file >> tid;
+    }
+
+    file >> num_params;
+    std::string type;
+    for(auto idx = 0; idx < num_params; ++idx) {
+
+      // the parameter
+      command_param_t param;
+
+      // find the type
+      file >> type;
+      if(type == "int") {
+        file >> param.i;
+      }
+      else if(type == "float") {
+        file >> param.f;
+      }
+      else if(type == "uint") {
+        file >> param.u;
+      }
+      else {
+        throw std::runtime_error("Unknown param type!");
+      }
+
+      // store the parameter
+      params.push_back(param);
+    }
+  }
 };
 
 class command_compiler_t {
@@ -451,7 +582,10 @@ private:
                                 float &max_transfer_cost) {
 
     // get the compute cost of running this
-    auto ud_info = cost_model->get_reduce_cost(c.ud_id, c.params, c.input_tids);
+    command_param_list_t raw_param = {._data = c.params.data(), ._num_elements = c.params.size()};
+    auto ud_info = cost_model->get_reduce_cost(c.ud_id, 
+                                               bbts::ud_impl_t::tensor_params_t{._params = raw_param}, 
+                                               c.input_tids);
 
     // check if the reduce can be local
     node_id_t local_node = _get_can_be_local(c, tensor_locations);
@@ -464,9 +598,9 @@ private:
       }
 
       // init the parameters
-      std::vector<command_param_t> params(c.params.num_parameters());
-      for(int32_t idx = 0; idx < c.params.num_parameters(); ++idx) {
-        params[idx] = c.params.get_raw(idx);
+      std::vector<command_param_t> params(c.params.size());
+      for(int32_t idx = 0; idx < c.params.size(); ++idx) {
+        params[idx] = c.params[idx];
       }
 
       // make the apply
@@ -525,9 +659,9 @@ private:
     }
 
     // init the parameters
-    std::vector<command_param_t> params(c.params.num_parameters());
-    for(int32_t idx = 0; idx < c.params.num_parameters(); ++idx) {
-      params[idx] = c.params.get_raw(idx);
+    std::vector<command_param_t> params(c.params.size());
+    for(int32_t idx = 0; idx < c.params.size(); ++idx) {
+      params[idx] = c.params[idx];
     }
 
     // make the reduce
@@ -560,7 +694,10 @@ private:
     std::vector<std::tuple<tid_t, size_t>> unique_inputs; unique_inputs.resize(10);
 
     // get the compute cost of running this
-    auto ud_info = cost_model->get_ud_cost(c.ud_id, c.params, c.input_tids);
+    command_param_list_t raw_param = {._data = c.params.data(), ._num_elements = c.params.size()};
+    auto ud_info = cost_model->get_ud_cost(c.ud_id, 
+                                           bbts::ud_impl_t::tensor_params_t{._params = raw_param}, 
+                                           c.input_tids);
     
     // find all the unique inputs
     _find_unique_inputs(c.input_tids, unique_inputs);
@@ -634,9 +771,9 @@ private:
     }
 
     // init the parameters
-    std::vector<command_param_t> params(c.params.num_parameters());
-    for(int32_t idx = 0; idx < c.params.num_parameters(); ++idx) {
-      params[idx] = c.params.get_raw(idx);
+    std::vector<command_param_t> params(c.params.size());
+    for(int32_t idx = 0; idx < c.params.size(); ++idx) {
+      params[idx] = c.params[idx];
     }
 
     // make the apply
@@ -651,9 +788,10 @@ private:
     costs[best_node].compute_cost += ud_info.cost;
 
     // update the meta for the ud function
+    raw_param = {._data = c.params.data(), ._num_elements = c.params.size()};
     cost_model->update_meta_for_ud(c.ud_id, 
                                    ud_info.is_gpu, 
-                                   c.params, 
+                                   bbts::ud_impl_t::tensor_params_t{._params = raw_param}, 
                                    c.input_tids, 
                                    c.output_tids);
 
@@ -731,5 +869,58 @@ private:
   size_t num_nodes;
 
 };
+
+struct compile_source_file_t {
+
+  // specifies all the functions used
+  std::vector<abstract_ud_spec_t> function_specs;
+
+  // specifies all the commands used
+  std::vector<abstract_command_t> commands;
+
+  void write_to_file(std::ofstream &file) {
+
+    // write number of functions
+    file << function_specs.size() << "\n";
+
+    // write the function specs
+    for(auto &fn : function_specs) {
+      fn.write_to_file(file);
+    }
+
+    // write the command numbers
+    file << commands.size() << '\n';
+
+    // write the commands
+    for(auto &cmd : commands) {
+      cmd.write_to_file(file);
+    }
+  }
+
+  void read_from_file(std::ifstream &file) {
+
+    // get the number of functions
+    std::size_t num_funs;
+    file >> num_funs;
+
+    // read all the functions
+    function_specs.resize(num_funs);
+    for(auto &fn : function_specs) {
+      fn.read_from_file(file);
+    }
+
+    // read the number of commands
+    std::size_t num_cmds;
+    file >> num_cmds;
+
+    // read all the commands
+    commands.resize(num_cmds);
+    for(auto &cmd : commands) {
+      cmd.read_from_file(file);
+    }
+  }
+
+};
+
 
 }
