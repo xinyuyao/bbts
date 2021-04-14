@@ -1,8 +1,8 @@
-#include "gpu_scheduler.h"
+#include "gpu_scheduler_impl.h"
 
 namespace bbts {
 
-gpu_scheduler_t::gpu_scheduler_t(const bbts::tensor_factory_ptr_t &fact) : _factory(fact) {
+gpu_scheduler_impl_t::gpu_scheduler_impl_t(const bbts::tensor_factory_ptr_t &fact) : _factory(fact) {
 
     // create the front stream (at the current step fetch the tensor)
     cudaStreamCreate(&_streams[FRONT]);
@@ -21,7 +21,7 @@ gpu_scheduler_t::gpu_scheduler_t(const bbts::tensor_factory_ptr_t &fact) : _fact
 }
 
 
-gpu_scheduler_t::~gpu_scheduler_t() {
+gpu_scheduler_impl_t::~gpu_scheduler_impl_t() {
 
     // destroy the handle
     cublasDestroy(_handles[FRONT]);
@@ -29,7 +29,7 @@ gpu_scheduler_t::~gpu_scheduler_t() {
     cublasDestroy(_handles[BACK]);
 }
 
-void gpu_scheduler_t::run() {
+void gpu_scheduler_impl_t::run() {
 
   while (true) {
   
@@ -108,7 +108,7 @@ void gpu_scheduler_t::run() {
   }
 }
 
-std::future<bool> gpu_scheduler_t::execute_kernel(bbts::ud_impl_t* fun,
+std::future<bool> gpu_scheduler_impl_t::execute_kernel(bbts::ud_impl_t* fun,
                                                   const bbts::ud_impl_t::tensor_params_t * params,
                                                   const bbts::ud_impl_t::tensor_args_t* inputs,
                                                   bbts::ud_impl_t::tensor_args_t* outputs) {
@@ -129,7 +129,7 @@ std::future<bool> gpu_scheduler_t::execute_kernel(bbts::ud_impl_t* fun,
   return wait;
 }
 
-void gpu_scheduler_t::shutdown() {
+void gpu_scheduler_impl_t::shutdown() {
 
   std::unique_lock<std::mutex> lk(_m);
 
@@ -138,7 +138,7 @@ void gpu_scheduler_t::shutdown() {
   _cv.notify_one();
 }
 
-void gpu_scheduler_t::_rotate() {
+void gpu_scheduler_impl_t::_rotate() {
 
   auto tmp = BACK;
   BACK  = MID;

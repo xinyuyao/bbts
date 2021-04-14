@@ -60,8 +60,12 @@ udf_manager_t::udf_manager_t(tensor_factory_ptr_t _tensor_factory,
   /// 2.1 add the dense implementation
   register_udf_impl(std::make_unique<dense_matrix_mult_t>());
 
-  /// 2.2 register the gpu dense implementation
-  register_udf_impl(std::make_unique<dense_matrix_gpu_mult_t>());
+  // check if the gpu is enabled
+  if constexpr(static_config::enable_gpu) {
+    
+    /// 2.2 register the gpu dense implementation
+    register_udf_impl(std::make_unique<dense_matrix_gpu_mult_t>());
+  }
 
   /// 3. matrix multiplication
   register_udf(get_matrix_uniform_udf());

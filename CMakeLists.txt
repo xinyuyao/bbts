@@ -57,7 +57,7 @@ if(${ENABLE_GPU})
     
     # auto cuda paths
     file(GLOB UD_SOURCE_CUDA "src/ud_functions/impls/*.cu")
-
+    set (UD_SOURCE_CUDA ${UD_SOURCE_CUDA} "src/ud_functions/gpu_scheduler_impl.cc")
 endif()
 
 # forward the definitions ENABLE_HOOKS=ON/OFF
@@ -109,6 +109,7 @@ add_library(communication OBJECT ${COMMUNICATION_SOURCE})
 
 # the ud functions
 file(GLOB UD_SOURCE "src/ud_functions/*.cc" "src/ud_functions/impls/*.cc")
+list(REMOVE_ITEM UD_SOURCE "src/ud_functions/gpu_scheduler_impl.cc")
 add_library(ud_functions OBJECT ${UD_SOURCE} ${UD_SOURCE_CUDA})
 
 # link all modules up
@@ -120,11 +121,15 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
                         $<TARGET_OBJECTS:server>
                         $<TARGET_OBJECTS:ud_functions>)
 
-cuda_add_cublas_to_target(bbts-common)
+# to open .so files and stuff
+target_link_libraries(bbts-common ${CMAKE_DL_LIBS})
+
+# the blas implementation
+target_link_libraries(bbts-common ${BLAS_LIBRARIES})
 
 # link the cublas library
 if(${ENABLE_GPU})
-    target_link_libraries(bbts-common ${BLAS_LIBRARIES})
+    cuda_add_cublas_to_target(bbts-common)
 endif()
 
 # add the tests

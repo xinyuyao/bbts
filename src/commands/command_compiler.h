@@ -615,6 +615,7 @@ private:
       // mark that we are creating a tensor here
       tensor_locations[local_node].insert(c.output_tids[0]);
       out_commands.push_back(std::move(cmd));
+      return;
     }
 
     // first find the best node to send the data for each input

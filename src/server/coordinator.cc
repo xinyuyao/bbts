@@ -324,7 +324,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::_fetch_tensor_info(std::unord
       // store the meta
       for(auto &t : m) {
         meta[std::get<0>(t)] = std::get<1>(t);
-        locations[0].insert(std::get<0>(t));
+        locations[node].insert(std::get<0>(t));
       }
     }
   }
