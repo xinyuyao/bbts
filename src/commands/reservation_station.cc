@@ -310,7 +310,7 @@ void bbts::reservation_station_t::stop_executing() {
   // update the flag
   std::unique_lock<std::mutex> lk(_m);
   _is_executing = false;
-  _last_cmd = 0;
+  _last_cmd = -1;
 }
 
 bool bbts::reservation_station_t::_queue_remote(bbts::command_ptr_t _command) {

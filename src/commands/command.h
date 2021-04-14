@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <sstream>
 #include <vector>
 #include <assert.h>
 #include <cstring>
@@ -158,6 +160,32 @@ struct command_t {
     }
 
     return false;
+  }
+
+  void print(std::stringstream &ss) {
+
+    ss << "{.id : " << id << " ";
+    ss << ".type : ";
+
+    switch (type) {
+      case MOVE : ss << "MOVE "; break;
+      case APPLY : ss << "APPLY "; break;
+      case DELETE : ss << "DELETE "; break;
+      case REDUCE : ss << "REDUCE "; break;
+      case SHUTDOWN :ss << "SHUTDOWN ";  break;
+    }
+
+    ss << " .inputs : [";
+    for(int32_t idx = 0; idx < _num_inputs; idx++) {
+      ss << "( " << get_input(idx).tid << ", " << get_input(idx).node << "),";
+    }
+    ss << "]";
+
+    ss << " .outputs : [";
+    for(int32_t idx = 0; idx < _num_outputs; idx++) {
+      ss << "( " << get_output(idx).tid << ", " << get_output(idx).node << "),";
+    }
+    ss << "]\n";
   }
 
   // the root node is always first

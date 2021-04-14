@@ -651,12 +651,12 @@ private:
       // if the tensor is local no need to fetch
       auto it = tensor_locations[best_node].find(c.input_tids[idx]);
       if(it == tensor_locations[best_node].end()) {
-        inputs[idx] = (command_t::tid_node_id_t{.tid = c.input_tids[idx], .node = best_node});
+        inputs[idx] = (command_t::tid_node_id_t{.tid = c.input_tids[idx], .node = assigned_nodes[idx]});
         continue;
       }
 
       // we are fetching it
-      inputs[idx] = (command_t::tid_node_id_t{.tid = c.input_tids[idx], .node = assigned_nodes[idx]});
+      inputs[idx] = (command_t::tid_node_id_t{.tid = c.input_tids[idx], .node = best_node});
     }
 
     // init the parameters
