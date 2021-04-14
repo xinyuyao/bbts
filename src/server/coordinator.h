@@ -13,7 +13,6 @@
 #include "../server/coordinator_ops.h"
 #include "../server/logger.h"
 #include "../commands/command.h"
-#include "../commands/tensor_stats.h"
 #include "../commands/reservation_station.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
@@ -38,8 +37,7 @@ public:
                 bbts::command_runner_ptr_t _command_runner,
                 bbts::tensor_notifier_ptr_t _tensor_notifier,
                 bbts::udf_manager_ptr _udf_manager,
-                bbts::tensor_factory_ptr_t _tf,
-                tensor_stats_ptr_t _stats);
+                bbts::tensor_factory_ptr_t _tf);
 
   // accept a request
   void accept();
@@ -163,9 +161,6 @@ private:
 
   // the reservation station
   bbts::reservation_station_ptr_t _rs;
-
-  // the statistics about the tensors for the current 
-  bbts::tensor_stats_ptr_t _stats;
 
   // the logger
   bbts::logger_ptr_t _logger;

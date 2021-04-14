@@ -19,8 +19,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    bbts::command_runner_ptr_t _command_runner,
                                    bbts::tensor_notifier_ptr_t _tensor_notifier,
                                    bbts::udf_manager_ptr _udf_manager,
-                                   bbts::tensor_factory_ptr_t _tf,
-                                   tensor_stats_ptr_t _stats)
+                                   bbts::tensor_factory_ptr_t _tf)
 
     : _comm(std::move(_comm)),
       _gpu_scheduler(std::move(_gpu_scheduler)),
@@ -30,8 +29,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
       _command_runner(std::move(_command_runner)),
       _tensor_notifier(std::move(_tensor_notifier)),
       _udf_manager(std::move(_udf_manager)),
-      _tf(std::move(_tf)),
-      _stats(std::move(_stats)) { _is_down = false; }
+      _tf(std::move(_tf)) { _is_down = false; }
 
 void bbts::coordinator_t::accept() {
 
@@ -398,21 +396,6 @@ void bbts::coordinator_t::_collect(std::tuple<bool, std::string> &out) {
 void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds,
                                      std::stringstream &ss) {
 
-  // extract the stats from the commands
-  for (auto &_cmd : cmds) {
-
-    try {
-
-      // if it uses the node
-      if (_cmd->uses_node(_comm->get_rank())) {
-        _stats->add_command(*_cmd);
-      }
-    }
-    catch(std::runtime_error &error) {
-      ss << error.what();
-    }
-  }
-
   // schedule them all at once
   for (auto &_cmd : cmds) {
 
@@ -431,9 +414,6 @@ void bbts::coordinator_t::_run() {
   // wait for all the commands to be run
   _rs->wait_until_finished();
 
-  // reset all the stats as we are done executing
-  _stats->reset();
-
   // stop executing all the commands
   _rs->stop_executing();
 }
@@ -441,7 +421,6 @@ void bbts::coordinator_t::_run() {
 void bbts::coordinator_t::_clear() {
 
   // clear everything
-  _stats->reset();
   _storage->clear();
   _rs->clear();
 }

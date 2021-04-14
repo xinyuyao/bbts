@@ -67,7 +67,7 @@ struct memory_storage_t {
   // make sure that all the tensors created or requested are aquired at the same time
   template<class fn>
   void local_transaction(const std::vector<tid_t> &get, 
-                         const std::vector<std::tuple<tid_t, bool, size_t>> &create,
+                         const std::vector<std::tuple<tid_t, size_t>> &create,
                          const fn &fun) {
 
     // lock this thing
@@ -86,7 +86,7 @@ struct memory_storage_t {
   void remote_transaction(command_id_t cmd,
                           const bbts::command_t::node_list_t &nodes,
                           const std::vector<tid_t> &get, 
-                          const std::vector<std::tuple<tid_t, bool, size_t>> &create,
+                          const std::vector<std::tuple<tid_t, size_t>> &create,
                           const fn &fun) {
     
     // lock this thing
@@ -105,7 +105,7 @@ struct memory_storage_t {
   void remote_transaction_p2p(command_id_t cmd,
                               node_id_t other,
                               const std::vector<tid_t> &get, 
-                              const std::vector<std::tuple<tid_t, bool, size_t>> &create,
+                              const std::vector<std::tuple<tid_t, size_t>> &create,
                               const fn &fun) {
     
     // lock this thing
@@ -120,10 +120,10 @@ struct memory_storage_t {
   }
 
   // allocate the tensor
-  tensor_t *_allocate_tensor(size_t num_bytes, bool used_by_gpu);
+  tensor_t *_allocate_tensor(size_t num_bytes);
 
   // free the allocated tensor
-  void free_tensor(tensor_t *tensor, bool used_by_gpu);
+  void free_tensor(tensor_t *tensor);
   
   // check if there is a tensor in the storage
   bool has_tensor(tid_t _id);
@@ -173,23 +173,20 @@ private:
 
     // the size of the tensor in bytes
     size_t num_bytes;
-
-    // is this the gpu 
-    bool is_gpu;
   };
 
   // returns a tensor for the tid, the tensor is always not initialized
-  tensor_ref_t _create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu);
+  tensor_ref_t _create_tensor(tid_t _id, size_t num_bytes);
 
   // returns an anonymous tensor, the tensor is always not initialized
-  tensor_ref_t _create_tensor(size_t num_bytes, bool used_by_gpu);
+  tensor_ref_t _create_tensor(size_t num_bytes);
 
   // an existing tensor by tid
   tensor_ref_t _get_by_tid(tid_t _id);
 
   // craete all the tensors we just reserved
   reservation_result_t _create_reserved(const std::vector<tid_t> &get, 
-                                       const std::vector<std::tuple<tid_t, bool, size_t>> &create);
+                                       const std::vector<std::tuple<tid_t, size_t>> &create);
 
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;

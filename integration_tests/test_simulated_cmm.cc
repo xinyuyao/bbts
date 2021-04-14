@@ -47,7 +47,7 @@ index_t create_matrix_tensors(char matrix, bbts::node_t &node, int n, int split,
         auto tensor_size = node._factory->get_tensor_size(dm);
 
 
-        node._storage->local_transaction({}, {{cur_tid, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+        node._storage->local_transaction({}, {{cur_tid, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
           // get the craeted tensor
           auto &t = res.create[0].get().tensor;

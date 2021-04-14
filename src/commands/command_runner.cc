@@ -10,10 +10,9 @@ bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
                                          bbts::udf_manager_ptr udm,
                                          bbts::reservation_station_ptr_t rs,
                                          bbts::communicator_ptr_t comm,
-                                         bbts::logger_ptr_t logger,
-                                         tensor_stats_ptr_t stats)  
+                                         bbts::logger_ptr_t logger)  
     : _ts(std::move(ts)), _tf(std::move(tf)), _udm(std::move(udm)),
-      _rs(std::move(rs)), _comm(std::move(comm)), _logger(std::move(logger)), _stats(std::move(stats)) {}
+      _rs(std::move(rs)), _comm(std::move(comm)), _logger(std::move(logger)) {}
 
 void bbts::command_runner_t::local_command_runner() {
 
@@ -46,7 +45,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the move operation
-        move_op_t op(*_comm, cmd->id, num_bytes, *_stats, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
+        move_op_t op(*_comm, cmd->id, num_bytes, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
 
         // do the apply
         op.apply();
@@ -74,7 +73,7 @@ void bbts::command_runner_t::local_command_runner() {
         auto nodes = cmd->get_nodes();
 
         // create the move operation
-        broadcast_op_t op(*_comm, *_ts, *_stats, nodes, cmd->id, num_bytes, cmd->get_input(0).tid);
+        broadcast_op_t op(*_comm, *_ts, nodes, cmd->id, num_bytes, cmd->get_input(0).tid);
 
         // do the apply
         op.apply();
@@ -95,7 +94,7 @@ void bbts::command_runner_t::local_command_runner() {
       }
 
       // reserve the outputs
-      std::vector<std::tuple<tid_t, bool, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
+      std::vector<std::tuple<tid_t, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
 
       // calculate the output size
       _ts->local_transaction(inputs, {}, [&](const storage_t::reservation_result_t &res) {
@@ -124,10 +123,9 @@ void bbts::command_runner_t::local_command_runner() {
           // the size of the tensor, tid and whether it is on the GPU
           auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
           auto tid = cmd->get_output(idx).tid;
-          auto is_gpu = _stats->is_gpu(tid);
 
           // store the outputs
-          outputs.push_back({tid, is_gpu, ts_size});
+          outputs.push_back({tid, ts_size});
         }
 
       });
@@ -194,7 +192,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the reduce op
-        local_reduce_op_t op(*_tf, *_ts, *_stats, inputs, { ._params = cmd->get_parameters() },
+        local_reduce_op_t op(*_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
                              cmd->get_output(0).tid, *ud);
 
         // do the apply
@@ -238,7 +236,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, *_stats, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();
@@ -274,7 +272,7 @@ void bbts::command_runner_t::remote_command_handler() {
           }
 
           // create the move operation
-          move_op_t op(*_comm, c->id, c->nfo.num_bytes, *_stats, c->get_input(0).tid, false, *_ts, c->get_input(0).node);
+          move_op_t op(*_comm, c->id, c->nfo.num_bytes, c->get_input(0).tid, false, *_ts, c->get_input(0).node);
 
           // do the apply
           op.apply();
@@ -296,7 +294,7 @@ void bbts::command_runner_t::remote_command_handler() {
           auto nodes = c->get_nodes();
 
           // create the move operation
-          broadcast_op_t op(*_comm, *_ts, *_stats, nodes, c->id, c->nfo.num_bytes, c->get_input(0).tid);
+          broadcast_op_t op(*_comm, *_ts, nodes, c->id, c->nfo.num_bytes, c->get_input(0).tid);
 
           // do the apply
           op.apply();
@@ -337,7 +335,7 @@ void bbts::command_runner_t::remote_command_handler() {
         }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, *_stats, nodes, c->id, inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud);
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();

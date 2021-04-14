@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
   if(comm->get_rank() % 2 == 0) {
 
     // init the tensor
-    storage.local_transaction({}, {{comm->get_rank(), false, size}}, [&](const storage_t::reservation_result_t &res) {
+    storage.local_transaction({}, {{comm->get_rank(), size}}, [&](const storage_t::reservation_result_t &res) {
 
       // get the craeted tensor
       auto &t = res.create[0].get().tensor;
@@ -54,22 +54,14 @@ int main(int argc, char **argv) {
       }
     });
 
-    // add some stats about the output
-    bbts::tensor_stats_t _stats;
-    _stats.add_tensor(comm->get_rank(), false);
-
     // create the move
-    auto move = move_op_t(*comm, comm->get_rank(), size, _stats, comm->get_rank(), true, storage, comm->get_rank() + 1);
+    auto move = move_op_t(*comm, comm->get_rank(), size, comm->get_rank(), true, storage, comm->get_rank() + 1);
     move.apply();
   }
   else {
 
-    // add some stats about the output
-    bbts::tensor_stats_t _stats;
-    _stats.add_tensor(comm->get_rank() - 1, false);
-
     // create the move
-    auto move = move_op_t(*comm, comm->get_rank() - 1, size, _stats, comm->get_rank() - 1, false, storage, comm->get_rank() - 1);
+    auto move = move_op_t(*comm, comm->get_rank() - 1, size, comm->get_rank() - 1, false, storage, comm->get_rank() - 1);
     move.apply();
 
     storage.local_transaction({comm->get_rank() - 1}, {}, [&](const storage_t::reservation_result_t &res) {

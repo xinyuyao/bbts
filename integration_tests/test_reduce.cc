@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
 
   // init the tensor
   bbts::tid_t input_tid = comm->get_rank() + 1;
-  storage.local_transaction({}, {{input_tid, false, size}}, [&](const bbts::storage_t::reservation_result_t &res) {
+  storage.local_transaction({}, {{input_tid, size}}, [&](const bbts::storage_t::reservation_result_t &res) {
 
     // get the craeted tensor
     auto &t = res.create[0].get().tensor;
@@ -61,9 +61,6 @@ int main(int argc, char **argv) {
     }
   });
 
-  // add some stats about the output
-  bbts::tensor_stats_t _stats;
-  _stats.add_tensor(0, false);
 
   // we are only involving the even ranks in teh computation
   bool success = true;
@@ -82,7 +79,6 @@ int main(int argc, char **argv) {
     auto reduce_op = bbts::reduce_op_t(*comm,
                                        *factory,
                                        storage,
-                                       _stats,
                                        bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
                                        111,
                                        _inputs,

@@ -1,4 +1,4 @@
-#include <bits/stdint-intn.h>
+#include <memory>
 #include <gtest/gtest.h>
 #include <cuda.h>
 #include <cuda_runtime.h>

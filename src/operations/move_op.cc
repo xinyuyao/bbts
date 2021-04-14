@@ -7,11 +7,10 @@ namespace bbts {
 
   // constructs the reduce operation
   move_op_t::move_op_t(bbts::communicator_t &_comm, command_id_t _cmd_id, 
-                       size_t _num_bytes, bbts::tensor_stats_t &_stats, tid_t _tid, 
+                       size_t _num_bytes, tid_t _tid, 
                        bool _is_sender, bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
                                                                                             _cmd_id(_cmd_id),
                                                                                             _num_bytes(_num_bytes),
-                                                                                            _stats(_stats),
                                                                                             _tid(_tid),
                                                                                             _is_sender(_is_sender),
                                                                                             _storage(_storage),
@@ -37,7 +36,7 @@ namespace bbts {
     } else {
 
       // do the recieving
-      _storage.remote_transaction_p2p(_cmd_id, _node, {}, {{_tid, _stats.is_gpu(_tid), _num_bytes}}, 
+      _storage.remote_transaction_p2p(_cmd_id, _node, {}, {{_tid, _num_bytes}}, 
       [&](const storage_t::reservation_result_t &res) {
 
         // allocate a buffer for the tensor

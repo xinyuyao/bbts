@@ -14,9 +14,6 @@ void bbts::node_t::init() {
   // the logger
   _logger = std::make_shared<logger_t>(_config);
 
-  // create the tensor stats
-  _stats = std::make_shared<tensor_stats_t>();
-
   // init the storage
   if constexpr(static_config::enable_storage) {
 
@@ -46,14 +43,14 @@ void bbts::node_t::init() {
 
   // this runs commands
   _command_runner = std::make_shared<bbts::command_runner_t>(_storage, _factory, _udf_manager,
-                                                             _res_station, _comm, _logger, _stats);
+                                                             _res_station, _comm, _logger);
 
   // the tensor notifier
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
   _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger,
-                                                 _storage, _command_runner, _tensor_notifier, _udf_manager, _factory,  _stats);
+                                                 _storage, _command_runner, _tensor_notifier, _udf_manager, _factory);
 }
 
 

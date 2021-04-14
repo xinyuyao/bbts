@@ -1,7 +1,6 @@
 #include "../communication/communicator.h"
 #include "../tensor/builtin_formats.h"
 #include "../storage/storage.h"
-#include "../commands/tensor_stats.h"
 #include "../ud_functions/udf_manager.h"
 #include <cstddef>
 #include <mpi.h>
@@ -34,12 +33,9 @@ public:
   // the node we are send or recieving from...
   bbts::node_id_t _node;
 
-  // the stats about the tensors
-  const bbts::tensor_stats_t &_stats;
-
   // constructs the reduce operation
   move_op_t(bbts::communicator_t &_comm, command_id_t _cmd_id, 
-            size_t _num_bytes, bbts::tensor_stats_t &_stats, tid_t _tid, 
+            size_t _num_bytes, tid_t _tid, 
             bool _is_sender, bbts::storage_t &_storage, bbts::node_id_t _node);
 
   // apply this operation

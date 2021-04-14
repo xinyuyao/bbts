@@ -2,13 +2,11 @@
 
 bbts::local_reduce_op_t::local_reduce_op_t(bbts::tensor_factory_t &_factory,
                                            bbts::storage_t &_storage,
-                                           bbts::tensor_stats_t &_stats,
                                            const std::vector<tid_t> &_inputs,
                                            const ud_impl_t::tensor_params_t &_params,
                                            bbts::tid_t _out_tid,
                                            const bbts::ud_impl_t &_reduce_op) : _factory(_factory),
                                                                                 _storage(_storage),
-                                                                                _stats(_stats),
                                                                                 _inputs(_inputs),
                                                                                 _params(_params),
                                                                                 _out_tid(_out_tid),
@@ -20,15 +18,9 @@ bbts::local_reduce_op_t::local_reduce_op_t(bbts::tensor_factory_t &_factory,
 
   // get the impl_id of the output
   _id = _factory.get_tensor_ftm(_reduce_op.outputTypes.front());
-
-  // check if this are gpu tensors
-  _is_gpu = _stats.is_gpu(_out_tid);
 }
 
 void bbts::local_reduce_op_t::apply() {
-
-  // is the output on the gpu (is this a gpu ud function)
-  bool is_gpu = _stats.is_gpu(_out_tid);
 
   // get the first left side
   tid_t lhs = _inputs.front();
@@ -57,7 +49,7 @@ void bbts::local_reduce_op_t::apply() {
 
     // perform the actual kernel
     tid_t out_tid;
-    _storage.local_transaction({lhs, rhs}, {{TID_NONE, _is_gpu, output_size}}, [&](const storage_t::reservation_result_t &res) {
+    _storage.local_transaction({lhs, rhs}, {{TID_NONE, output_size}}, [&](const storage_t::reservation_result_t &res) {
     
       // init the output tensor
       auto &out = res.create[0].get().tensor;

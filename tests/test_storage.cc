@@ -34,7 +34,7 @@ TEST(TestStorage, TestTwoTransactionSingleThreaded) {
   });
 
   // run the local transaction to create the tensor
-  storage->local_transaction({}, {{0, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+  storage->local_transaction({}, {{0, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
     // create the tensor
     auto ts = res.create[0].get().tensor;
@@ -112,7 +112,7 @@ TEST(TestStorage, TestNoEvictionMultiThreaded) {
         // get the size of the tensor we need to crate
         auto tensor_size = tf->get_tensor_size(dm);
 
-        storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+        storage->local_transaction({}, {{i + t * num_matrices, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
           // crate the tensor
           auto ts = res.create[0].get().tensor;
@@ -205,7 +205,7 @@ TEST(TestStorage, TestEvictionMultiThreaded) {
         // get the size of the tensor we need to crate
         auto tensor_size = tf->get_tensor_size(dm);
 
-        storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+        storage->local_transaction({}, {{i + t * num_matrices, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
           // crate the tensor
           auto ts = res.create[0].get().tensor;
@@ -302,7 +302,7 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads1) {
         // get the size of the tensor we need to crate
         auto tensor_size = tf->get_tensor_size(dm);
 
-        storage->local_transaction({}, {{i + t * num_matrices, false, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
+        storage->local_transaction({}, {{i + t * num_matrices, tensor_size}}, [&](const storage_t::reservation_result_t &res) {
 
           // crate the tensor
           auto ts = res.create[0].get().tensor;
@@ -404,9 +404,9 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads2) {
         // std::cout << i +       t * num_matrices * 3 << '\n' << std::flush;
         // std::cout << i +  1 +  t * num_matrices * 3 << '\n' << std::flush;
         // std::cout << i +  2 +  t * num_matrices * 3 << '\n' << std::flush;
-        storage->local_transaction({}, { {i +     t * num_matrices * 3, false, tensor_size}, 
-                                         {i + 1 + t * num_matrices * 3, false, tensor_size},
-                                         {i + 2 + t * num_matrices * 3, false, tensor_size} }, [&](const storage_t::reservation_result_t &res) {
+        storage->local_transaction({}, { {i +     t * num_matrices * 3, tensor_size}, 
+                                         {i + 1 + t * num_matrices * 3, tensor_size},
+                                         {i + 2 + t * num_matrices * 3, tensor_size} }, [&](const storage_t::reservation_result_t &res) {
 
           // crate the tensor
           auto ts0 = res.create[0].get().tensor;
@@ -518,9 +518,9 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRead) {
     auto tensor_size = tf->get_tensor_size(dm);
 
     // create the tensors
-    storage->local_transaction({}, { {i    , false, tensor_size}, 
-                                     {i + 1, false, tensor_size},
-                                     {i + 2, false, tensor_size} }, [&](const storage_t::reservation_result_t &res) {
+    storage->local_transaction({}, { {i    , tensor_size}, 
+                                     {i + 1, tensor_size},
+                                     {i + 2, tensor_size} }, [&](const storage_t::reservation_result_t &res) {
 
       // crate the tensor
       auto ts0 = res.create[0].get().tensor;

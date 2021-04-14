@@ -4,7 +4,7 @@
 namespace bbts {
 
 reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
-                         bbts::storage_t &_storage, bbts::tensor_stats_t &_stats, const bbts::command_t::node_list_t &_nodes,
+                         bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
                          command_id_t _tag, const std::vector<bbts::tid_t> &_inputs, const ud_impl_t::tensor_params_t &_params,
                          bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op) : _comm(_comm),
                                                                                     _factory(_factory),
@@ -22,9 +22,6 @@ reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_f
 
   // get the impl_id of the output
   _id = _factory.get_tensor_ftm(_reduce_op.outputTypes.front());
-
-  // check if this are gpu tensors
-  _is_gpu = _stats.is_gpu(_out_tid);
 }
 
 int32_t reduce_op_t::get_num_nodes() const {
@@ -82,7 +79,7 @@ void reduce_op_t::apply() {
         
         // do the recieving and calculate the output tensor size
         size_t output_size;
-        _storage.remote_transaction_p2p(_tag, rnk, {lhs}, {{TID_NONE, _is_gpu, rhs_size}}, 
+        _storage.remote_transaction_p2p(_tag, rnk, {lhs}, {{TID_NONE, rhs_size}}, 
         [&](const storage_t::reservation_result_t &res) {
           
           // get the left tensor as we need it for the output
@@ -114,7 +111,7 @@ void reduce_op_t::apply() {
         });
 
         tid_t out_tid;
-        _storage.local_transaction({lhs, rhs}, {{TID_NONE, _is_gpu, output_size}}, [&](const storage_t::reservation_result_t &res) {
+        _storage.local_transaction({lhs, rhs}, {{TID_NONE, output_size}}, [&](const storage_t::reservation_result_t &res) {
         
           // get the left and right tensor so we can apply the kernel
           auto l = res.get[0].get().tensor;
@@ -232,7 +229,7 @@ bbts::tid_t reduce_op_t::apply_preagg() {
 
     // perform the actual kernel
     tid_t out_tid;
-    _storage.local_transaction({lhs, rhs}, {{TID_NONE, _is_gpu, output_size}}, [&](const storage_t::reservation_result_t &res) {
+    _storage.local_transaction({lhs, rhs}, {{TID_NONE, output_size}}, [&](const storage_t::reservation_result_t &res) {
     
       // init the output tensor
       auto &out = res.create[0].get().tensor;

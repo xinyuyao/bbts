@@ -18,7 +18,7 @@ memory_storage_t::~memory_storage_t() {
 
   // go through each allocated tensor and free it
   for(auto &it : _tensor_nfo) {
-    free_tensor(it.second.address, it.second.is_gpu);
+    free_tensor(it.second.address);
   }
 }
 
@@ -30,13 +30,13 @@ memory_storage_t::tensor_ref_t memory_storage_t::_get_by_tid(tid_t _id) {
                                    tensor_ref_t{ .id = _id, .tensor = nullptr };
 }
 
-memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(tid_t _id, size_t num_bytes, bool used_by_gpu) {
+memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(tid_t _id, size_t num_bytes) {
 
   // malloc the tensor
-  tensor_t *ts = _allocate_tensor(num_bytes, used_by_gpu);
+  tensor_t *ts = _allocate_tensor(num_bytes);
 
   // store the info
-  _tensor_nfo[_id] = sto_tensor_nfo_t{.address = ts, .num_bytes = num_bytes, .is_gpu = used_by_gpu};
+  _tensor_nfo[_id] = sto_tensor_nfo_t{.address = ts, .num_bytes = num_bytes};
 
   // notify that the tensor is created
   if constexpr (static_config::enable_hooks) {
@@ -47,14 +47,14 @@ memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(tid_t _id, size_
   return {.id = _id, .tensor = ts};
 }
 
-memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(size_t num_bytes, bool used_by_gpu) {
+memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(size_t num_bytes) {
 
   // malloc the tensor
-  tensor_t *ts = _allocate_tensor(num_bytes, used_by_gpu);
+  tensor_t *ts = _allocate_tensor(num_bytes);
 
   // get a new tid for this
   auto tid = _current_anon--;
-  _tensor_nfo[tid] = { .address=ts, .num_bytes=num_bytes, .is_gpu=used_by_gpu };
+  _tensor_nfo[tid] = { .address=ts, .num_bytes=num_bytes};
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
@@ -67,49 +67,33 @@ memory_storage_t::tensor_ref_t memory_storage_t::_create_tensor(size_t num_bytes
   return {.id = tid, .tensor = ts};
 }
 
-tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes, bool used_by_gpu) {
+tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
 
   // malloc the tensor
   tensor_t *ts;
-  if(used_by_gpu) {
 
-    // check if we even support the GPU
-    if constexpr(static_config::enable_gpu) {
-      
-      // allocate the GPU
-      checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
-    }
-    else {
-
-      // we can not do this
-      throw std::runtime_error("Somehow a GPU tensor was requested but,"
-                               " TOS was not compiled with GPU support.");
-    }
+  // check if we even support the GPU
+  if constexpr(static_config::enable_gpu) {
+    
+    // allocate the GPU
+    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
   }
   else {
+
+    // we can not do this
     ts = (tensor_t*) malloc(num_bytes); 
   }
 
   return ts;
 }
 
-void memory_storage_t::free_tensor(tensor_t *tensor, bool used_by_gpu) {
+void memory_storage_t::free_tensor(tensor_t *tensor) {
 
-  // is this used by the GPU
-  if(used_by_gpu) {
-
-    // check if we even support the GPU
-    if constexpr(static_config::enable_gpu) {
-      
-      // free the GPU
-      checkCudaErrors(cudaFree(tensor));
-    }
-    else {
-
-      // we can not do this
-      throw std::runtime_error("Somehow a GPU tensor was requested but,"
-                               " TOS was not compiled with GPU support.");
-    }
+  // check if we even support the GPU
+  if constexpr(static_config::enable_gpu) {
+    
+    // free the GPU
+    checkCudaErrors(cudaFree(tensor));
   }
   else {
 
@@ -139,7 +123,7 @@ bool memory_storage_t::remove_by_tid(tid_t _id) {
   }
 
   // free the tensor
-  free_tensor(it->second.address, it->second.is_gpu);
+  free_tensor(it->second.address);
 
   // remove the tensor
   _tensor_nfo.erase(it);
@@ -196,9 +180,9 @@ void memory_storage_t::print(std::stringstream &ss) {
   std::unique_lock<std::mutex> lck (_m);
 
   // print all the allocated tensors
-  ss << bbts::green << "TID\tGPU\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  ss << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
-    ss << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
+    ss << t.first << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
   }
 }
 
@@ -211,13 +195,13 @@ void memory_storage_t::clear() {
   for(auto &it : _tensor_nfo) {
     
     // is it gpu
-    free_tensor(it.second.address, it.second.is_gpu);
+    free_tensor(it.second.address);
   }
   _tensor_nfo.clear();
 }
 
 memory_storage_t::reservation_result_t memory_storage_t::_create_reserved(const std::vector<tid_t> &get,
-                                                                   const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+                                                                         const std::vector<std::tuple<tid_t, size_t>> &create) {
 
   // get all the tensors
   std::vector<tensor_ref_t> out_get;
@@ -232,11 +216,11 @@ memory_storage_t::reservation_result_t memory_storage_t::_create_reserved(const 
   for (auto ct : create) {
 
     // create all the necessary tensors
-    auto [id, is_gpu, num_bytes] = ct;
+    auto [id, num_bytes] = ct;
     if (id != TID_NONE) {
-      out_create.push_back(_create_tensor(id, num_bytes, is_gpu));
+      out_create.push_back(_create_tensor(id, num_bytes));
     } else {
-      out_create.push_back(_create_tensor(num_bytes, is_gpu));
+      out_create.push_back(_create_tensor(num_bytes));
     }
   }
 

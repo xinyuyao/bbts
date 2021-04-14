@@ -167,7 +167,7 @@ struct nvme_storage_t {
   // make sure that all the tensors created or requested are aquired at the same time
   template<class fn>
   void local_transaction(const std::vector<tid_t> &get, 
-                         std::vector<std::tuple<tid_t, bool, size_t>> create,
+                         std::vector<std::tuple<tid_t, size_t>> create,
                          const fn &fun) {
   
     for(;;) {
@@ -209,7 +209,7 @@ struct nvme_storage_t {
   void remote_transaction(command_id_t cmd,
                           const bbts::command_t::node_list_t &nodes,
                           const std::vector<tid_t> &get, 
-                          std::vector<std::tuple<tid_t, bool, size_t>> create,
+                          std::vector<std::tuple<tid_t, size_t>> create,
                           const fn &fun) {
     
     for(;;) {
@@ -258,7 +258,7 @@ struct nvme_storage_t {
   void remote_transaction_p2p(command_id_t cmd,
                               node_id_t other,
                               const std::vector<tid_t> &get, 
-                              std::vector<std::tuple<tid_t, bool, size_t>> create,
+                              std::vector<std::tuple<tid_t, size_t>> create,
                               const fn &fun) {
     
     for(;;) {
@@ -368,9 +368,6 @@ private:
     // the size of the tensor in bytes
     size_t num_bytes = 0;
 
-    // is this the gpu 
-    bool is_gpu = false;
-
     // the number of references to this tensor
     size_t num_ref = 0;
 
@@ -394,7 +391,7 @@ private:
     const std::vector<tid_t> *get;
 
     // the tensors we want to create
-    const std::vector<std::tuple<tid_t, bool, size_t>> *create;
+    const std::vector<std::tuple<tid_t, size_t>> *create;
   };
 
   // maps to the information
@@ -402,28 +399,28 @@ private:
 
   // this reserves space for the tensors in get to be loaded and tensors in create to created
   bool _try_reserve(const std::vector<tid_t> &get,
-                    std::vector<std::tuple<tid_t, bool, size_t>> &create);
+                    std::vector<std::tuple<tid_t, size_t>> &create);
 
   // craete all the tensors we just reserved
   std::future<nvme_storage_t::reservation_result_t> _create_reserved(const std::vector<tid_t> &get,
-                                                                     const std::vector<std::tuple<tid_t, bool, size_t>> &create);
+                                                                     const std::vector<std::tuple<tid_t, size_t>> &create);
 
   // call this to release a already reserved request
   void _release_reservation(const std::vector<tid_t> &get,
-                            const std::vector<std::tuple<tid_t, bool, size_t>> &create);
+                            const std::vector<std::tuple<tid_t, size_t>> &create);
 
   // call this to cancel a request that was not reserved
   void _cancel_reservation(const std::vector<tid_t> &get,
-                           const std::vector<std::tuple<tid_t, bool, size_t>> &create);
+                           const std::vector<std::tuple<tid_t, size_t>> &create);
 
   // evict some tensors until we have the required 
   void _evict_some(std::unique_lock<std::mutex> &lck, size_t required);
 
   // allocate the tensor
-  tensor_t *_allocate_tensor(size_t num_bytes, bool used_by_gpu);
+  tensor_t *_allocate_tensor(size_t num_bytes);
 
   // free the allocated tensor
-  void free_tensor(tensor_t *tensor, bool used_by_gpu);
+  void free_tensor(tensor_t *tensor);
 
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;

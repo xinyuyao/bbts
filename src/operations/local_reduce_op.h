@@ -2,7 +2,6 @@
 
 #include "../communication/communicator.h"
 #include "../tensor/builtin_formats.h"
-#include "../commands/tensor_stats.h"
 #include "../storage/storage.h"
 #include "../ud_functions/udf_manager.h"
 #include <iostream>
@@ -15,7 +14,6 @@ public:
 
   local_reduce_op_t(bbts::tensor_factory_t &_factory, 
                     bbts::storage_t &_storage,
-                    bbts::tensor_stats_t &_stats,
                     const std::vector<tid_t> &_inputs,
                     const ud_impl_t::tensor_params_t &_params,
                     bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
@@ -27,8 +25,6 @@ public:
 
   bbts::storage_t &_storage;
 
-  bbts::tensor_stats_t &_stats;
-
   const std::vector<tid_t> &_inputs;
 
   const ud_impl_t::tensor_params_t &_params;
@@ -36,9 +32,6 @@ public:
   bbts::tid_t _out_tid;
 
   const bbts::ud_impl_t &_reduce_op;
-
-  // is this a gpu reduce
-  bool _is_gpu;
 
   // make empty input arguments
   bbts::tensor_meta_t _out_meta{};

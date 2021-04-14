@@ -25,7 +25,7 @@ nvme_storage_t::~nvme_storage_t() {
   // free all the tensors
   for(auto &nfo : _tensor_nfo) {
     if(nfo.second.state == tensor_state_t::LOADED) {
-      free_tensor(nfo.second.data.get().tensor, nfo.second.is_gpu);
+      free_tensor(nfo.second.data.get().tensor);
     }
   } 
 }
@@ -100,7 +100,7 @@ void nvme_storage_t::request_thread() {
     for(auto &c : *res.create) {
       
       // the the info about the tensor we need to create
-      auto [tid, is_gpu, num_bytes] = c;
+      auto [tid, num_bytes] = c;
 
       // make an entry
       auto &ts = _tensor_nfo[tid];
@@ -108,7 +108,6 @@ void nvme_storage_t::request_thread() {
       // set the values
       ts.id = tid;
       ts.num_bytes = num_bytes;
-      ts.is_gpu = is_gpu;
       ts.num_ref = 1;
       ts.file_offset = -1;
       ts.state = tensor_state_t::LOADED;
@@ -130,14 +129,13 @@ void nvme_storage_t::request_thread() {
     // allocate the necessary tensors
     for(auto &c : *res.create) {
       
-      auto [tid, is_gpu, num_bytes] = c;
+      auto [tid, num_bytes] = c;
 
       // get an entry
       auto &ts = _tensor_nfo[tid];
 
       // set the value
-      ts.promise.set_value(tensor_ref_t{.id = tid, 
-                                        .tensor = _allocate_tensor(num_bytes, is_gpu)});
+      ts.promise.set_value(tensor_ref_t{.id = tid, .tensor = _allocate_tensor(num_bytes)});
 
       // we just allocated
       _cur_allocated += num_bytes;
@@ -150,7 +148,7 @@ void nvme_storage_t::request_thread() {
       auto &[nfo, t] = l;
     
       // allocate the tensor
-      t = _allocate_tensor(nfo->num_bytes, nfo->is_gpu);
+      t = _allocate_tensor(nfo->num_bytes);
 
       // we just allocated
       _cur_allocated += nfo->num_bytes;
@@ -215,7 +213,7 @@ bool nvme_storage_t::remove_by_tid(tid_t _id) {
   _cur_allocated -= it->second.num_bytes;
 
   // free the memory allocated
-  free_tensor(it->second.data.get().tensor, it->second.is_gpu);
+  free_tensor(it->second.data.get().tensor);
 
   // remove it
   _tensor_nfo.erase(it);
@@ -242,7 +240,6 @@ bool nvme_storage_t::assign_tid(tid_t _anon_id, tid_t _id) {
   nfo.data = it->second.data;
   nfo.file_offset = it->second.file_offset;
   nfo.id = it->second.id;
-  nfo.is_gpu = it->second.is_gpu;
   nfo.num_bytes = it->second.num_bytes;
   nfo.num_ref = it->second.num_ref;
   nfo.state = it->second.state;
@@ -310,14 +307,14 @@ void nvme_storage_t::print(std::stringstream &ss) {
   std::unique_lock<std::mutex> lck (_m);
 
   // print all the allocated tensors
-  ss << bbts::green << "TID\tGPU\tSize (in bytes)\t\taddress\n" << bbts::reset;
+  ss << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
 
     // get the address
     void *address = t.second.state == tensor_state_t::LOADED ? t.second.data.get().tensor : nullptr;
 
     // print it out
-    ss << t.first << "\t" << t.second.is_gpu << "\t" << t.second.num_bytes << "\t\t" << (void*) address << '\n';
+    ss << t.first << "\t" << t.second.num_bytes << "\t\t" << (void*) address << '\n';
   }
 }
 
@@ -329,7 +326,7 @@ void nvme_storage_t::clear() {
   // free all the tensors
   for(auto &nfo : _tensor_nfo) {
     if(nfo.second.state == tensor_state_t::LOADED) {
-      free_tensor(nfo.second.data.get().tensor, nfo.second.is_gpu);
+      free_tensor(nfo.second.data.get().tensor);
     }
   }
 
@@ -356,7 +353,7 @@ void nvme_storage_t::shutdown() {
 }
 
 bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
-                                  std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+                                  std::vector<std::tuple<tid_t, size_t>> &create) {
 
   // go through all the tensor we need to get
   size_t required = 0;
@@ -374,7 +371,7 @@ bool nvme_storage_t::_try_reserve(const std::vector<tid_t> &get,
   for(auto &c : create) {
 
     // add it to the required
-    required += std::get<2>(c);
+    required += std::get<1>(c);
   }
 
   // make sure it is acutally possible to process this
@@ -424,7 +421,7 @@ bool nvme_storage_t::has_tensor(tid_t _id) {
 }
 
 std::future<nvme_storage_t::reservation_result_t> nvme_storage_t::_create_reserved(const std::vector<tid_t> &get,
-                                                                                   const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+                                                                                   const std::vector<std::tuple<tid_t, size_t>> &create) {
   
 
   // get the future that is going to return the reservation result
@@ -442,7 +439,7 @@ std::future<nvme_storage_t::reservation_result_t> nvme_storage_t::_create_reserv
 }
 
 void nvme_storage_t::_release_reservation(const std::vector<tid_t> &get,
-                                          const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+                                          const std::vector<std::tuple<tid_t, size_t>> &create) {
   
   // go through all the tensor we wanted to get
   for(auto &t : get) {
@@ -477,7 +474,7 @@ void nvme_storage_t::_release_reservation(const std::vector<tid_t> &get,
     assert(it->second.num_ref == 0);
 
     // remove the reserved
-    _cur_reserved -= std::get<2>(c);
+    _cur_reserved -= std::get<1>(c);
 
     // add it to the lru, as it should have zero references
     _lru.add(it->second.id);
@@ -485,7 +482,7 @@ void nvme_storage_t::_release_reservation(const std::vector<tid_t> &get,
 }
 
 void nvme_storage_t::_cancel_reservation(const std::vector<tid_t> &get,
-                                         const std::vector<std::tuple<tid_t, bool, size_t>> &create) {
+                                         const std::vector<std::tuple<tid_t, size_t>> &create) {
   
   // go through all the tensor we wanted to get
   for(auto &t : get) {
@@ -513,54 +510,36 @@ void nvme_storage_t::_cancel_reservation(const std::vector<tid_t> &get,
   for(auto &c : create) {
     
     // remove the reserved
-    _cur_reserved -= std::get<2>(c);
+    _cur_reserved -= std::get<1>(c);
   }
 
 }
 
-tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes, bool used_by_gpu) {
+tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes) {
 
   // malloc the tensor
   tensor_t *ts;
-  if(used_by_gpu) {
-
-    // check if we even support the GPU
-    if constexpr(static_config::enable_gpu) {
-      
-      // allocate the GPU
-      checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
-    }
-    else {
-
-      // we can not do this
-      throw std::runtime_error("Somehow a GPU tensor was requested but,"
-                               " TOS was not compiled with GPU support.");
-    }
+  if constexpr(static_config::enable_gpu) {
+    
+    // allocate the GPU
+    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
   }
   else {
+    
+    // this is a CPU
     ts = (tensor_t*) malloc(num_bytes); 
   }
 
   return ts;
 }
 
-void nvme_storage_t::free_tensor(tensor_t *tensor, bool used_by_gpu) {
+void nvme_storage_t::free_tensor(tensor_t *tensor) {
 
-  // is this used by the GPU
-  if(used_by_gpu) {
-
-    // check if we even support the GPU
-    if constexpr(static_config::enable_gpu) {
-      
-      // free the GPU
-      checkCudaErrors(cudaFree(tensor));
-    }
-    else {
-
-      // we can not do this
-      throw std::runtime_error("Somehow a GPU tensor was requested but,"
-                               " TOS was not compiled with GPU support.");
-    }
+  // check if we even support the GPU
+  if constexpr(static_config::enable_gpu) {
+    
+    // free the GPU
+    checkCudaErrors(cudaFree(tensor));
   }
   else {
 
@@ -614,7 +593,7 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
     else if(it->second.state == tensor_state_t::DELETED) {
       
       // free the memory
-      free_tensor(it->second.data.get().tensor, it->second.is_gpu);
+      free_tensor(it->second.data.get().tensor);
       _cur_allocated -= it->second.num_bytes;
 
       // if the tensor was delted in the mean time just kill it and add the memory
@@ -627,7 +606,7 @@ void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t requi
       it->second.state = tensor_state_t::NOT_LOADED;
 
       // free the memory
-      free_tensor(it->second.data.get().tensor, it->second.is_gpu);
+      free_tensor(it->second.data.get().tensor);
     }
   }
 }

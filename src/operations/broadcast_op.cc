@@ -6,13 +6,11 @@ namespace bbts {
 
 broadcast_op_t::broadcast_op_t(bbts::communicator_t &_comm,
                                bbts::storage_t &_storage,
-                               bbts::tensor_stats_t &_stats,
                                const bbts::command_t::node_list_t &_nodes,
                                int32_t _tag, 
                                size_t _num_bytes,
                                bbts::tid_t _tid): _comm(_comm),
                                                   _storage(_storage),
-                                                  _stats(_stats),
                                                   _nodes(_nodes),
                                                   _tag(_tag),
                                                   _num_bytes(_num_bytes),
@@ -44,12 +42,12 @@ void broadcast_op_t::apply() {
 
   // figure out what we need to do
   std::vector<tid_t> get;
-  std::vector<std::tuple<tid_t, bool, size_t>> create;
+  std::vector<std::tuple<tid_t, size_t>> create;
   if(vrank == 0) {
     get = { _tid };
   }
   else {
-    create = {{_tid, _stats.is_gpu(_tid), _num_bytes }};
+    create = {{_tid, _num_bytes }};
   }
 
   // init a remote transaction on all nodes
