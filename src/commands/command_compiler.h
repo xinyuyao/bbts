@@ -905,16 +905,17 @@ private:
   void _insert_deletions(std::vector<bbts::command_ptr_t> &out_commands, command_id_t cur_cmd) {
     
     // 
-    std::vector<command_t::tid_node_id_t> in;
+    std::vector<command_t::tid_node_id_t> in(1);
     for(auto &it : _moved_tensors) {
       
       // resize the inputs
       auto cmd = out_commands[it.second].get();
-      in.resize(cmd->get_num_outputs());
+
+      // make a delete for each of them
       for(size_t idx = 0; idx < cmd->get_num_outputs(); idx++) {
-        in[idx] = cmd->get_output(idx);
+        in[0] = cmd->get_output(idx);
+        out_commands.push_back(command_t::create_delete(cur_cmd++, in));
       }
-      out_commands.push_back(command_t::create_delete(cur_cmd++, in));
     }
   }
 

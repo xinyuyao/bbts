@@ -168,7 +168,7 @@ struct command_t {
     ss << ".type : ";
 
     switch (type) {
-      case MOVE : ss << "MOVE "; break;
+      case MOVE : ss << (_num_outputs == 1 ? "MOVE " : "BROADCAST ") ; break;
       case APPLY : ss << "APPLY "; break;
       case DELETE : ss << "DELETE "; break;
       case REDUCE : ss << "REDUCE "; break;
