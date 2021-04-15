@@ -311,7 +311,7 @@ struct command_t {
     ////auto it = std::unique(out.begin(), out.end());
     ////assert((it == out.end()));
 
-    // create the output
+    // create  the output
     auto tmp = allocate_command(_num_bytes(0, 1u + out.size(), 1, out.size()));
 
     // set the id type and function

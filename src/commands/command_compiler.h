@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -536,6 +537,10 @@ command_compiler_t(cost_model_ptr_t cost_model, size_t num_nodes) : cost_model(c
       }
     }
 
+    // insert the postprocess deletions
+    _insert_deletions(out_commands, cur_cmd);
+
+    // return the commands
     return std::move(out_commands);
   }
 
@@ -737,20 +742,37 @@ private:
         // if it is not here we need to move it
         if(tensor_locations[best_node].find(std::get<0>(u)) == tensor_locations[best_node].end()) {
           
-          // find the node to fetch from
-          auto from_node = _find_node_to_fetch(std::get<0>(u), tensor_locations, costs);
+          auto it = _moved_tensors.find(std::get<0>(u));
+          if(it == _moved_tensors.end()) {
 
-          // create the move command to this node
-          auto cmd = command_t::create_move(cur_cmd++, command_t::tid_node_id_t{.tid = std::get<0>(u), .node = from_node},
-                                                      command_t::tid_node_id_t{.tid = std::get<0>(u), .node = best_node});
+            // find the node to fetch from
+            auto from_node = _find_node_to_fetch(std::get<0>(u), tensor_locations, costs);
 
-          // increase the transfer cost on this node
-          costs[from_node].transfer_cost += std::get<1>(u);
-          costs[best_node].transfer_cost += std::get<1>(u);
+            // create the move command to this node
+            _moved_tensors[std::get<0>(u)] = cur_cmd;
+            auto cmd = command_t::create_move(cur_cmd++, command_t::tid_node_id_t{.tid = std::get<0>(u), .node = from_node},
+                                                         command_t::tid_node_id_t{.tid = std::get<0>(u), .node = best_node});
 
-          // store the command
-          out_commands.push_back(std::move(cmd));
-          tensor_locations[best_node].insert(std::get<0>(u));
+            // increase the transfer cost on this node
+            costs[from_node].transfer_cost += std::get<1>(u);
+            costs[best_node].transfer_cost += std::get<1>(u);
+
+            // store the command
+            out_commands.push_back(std::move(cmd));
+            tensor_locations[best_node].insert(std::get<0>(u));
+          }
+          else  {
+            
+            // the command 
+            auto cmd_id = it->second;
+
+            // update the move op
+            _update_move(out_commands, cmd_id, best_node);
+            costs[best_node].transfer_cost += std::get<1>(u);
+
+            // mark the location
+            tensor_locations[best_node].insert(std::get<0>(u));
+          }
         }
     }
 
@@ -863,12 +885,47 @@ private:
     }
   }
 
+  // update the move op
+  void _update_move(std::vector<bbts::command_ptr_t> &out_commands, command_id_t &cmd_id, node_id_t best_node) {
+
+    // store the previous command
+    auto cmd = std::move(out_commands[cmd_id]);
+
+    // copy the previous
+    std::vector<command_t::tid_node_id_t> out; out.reserve(cmd->get_num_outputs() + 1);
+    for(int32_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
+      out.push_back(cmd->get_output(idx));
+    }
+    out.push_back(command_t::tid_node_id_t{.tid = cmd->get_input(0).tid, .node = best_node});
+
+    // store the command
+    out_commands[cmd_id] = command_t::create_broadcast(cmd_id, cmd->get_input(0), out);
+  }
+
+  void _insert_deletions(std::vector<bbts::command_ptr_t> &out_commands, command_id_t cur_cmd) {
+    
+    // 
+    std::vector<command_t::tid_node_id_t> in;
+    for(auto &it : _moved_tensors) {
+      
+      // resize the inputs
+      auto cmd = out_commands[it.second].get();
+      in.resize(cmd->get_num_outputs());
+      for(size_t idx = 0; idx < cmd->get_num_outputs(); idx++) {
+        in[idx] = cmd->get_output(idx);
+      }
+      out_commands.push_back(command_t::create_delete(cur_cmd++, in));
+    }
+  }
+
   // the cost model
   cost_model_ptr_t cost_model;
 
   // the number of nodes
   size_t num_nodes;
 
+  // the tensors what are moved
+  std::unordered_map<tid_t, command_id_t> _moved_tensors;
 };
 
 struct compile_source_file_t {
