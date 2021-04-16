@@ -18,3 +18,5 @@ tmp.*
 *.nvprof
 *.nvvp
 libraries
+commands*
+kernels*

@@ -1,7 +1,13 @@
 #include <bits/stdint-intn.h>
+#include <cstddef>
 #include <cstdlib>
+#include <cstring>
+#include <exception>
 #include <iostream>
 #include <memory>
+#include <string>
+#include <unistd.h>
+#include <filesystem>
 #include "../src/tensor/tensor.h"
 #include "../src/tensor/tensor_factory.h"
 #include "../src/server/node.h"
@@ -86,6 +92,55 @@ void compile_commands(std::ostream &out, bbts::node_t &node, const std::string &
     out << bbts::red << "Failed to compile the : \"" << message << "\"\n" << bbts::reset;
   } else {
     out << bbts::green << message << bbts::reset;
+  }
+}
+
+void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_kernel_size, 
+                              const std::string &file_path, std::vector<std::string> file_args) {
+  
+  std::vector<std::string> args;
+
+  std::filesystem::path p = "./bin/toBarbaTos";
+  auto absPath = std::filesystem::absolute(p);
+
+  // the command we want to run
+  std::string command;
+  command += absPath.c_str();
+  command += ' ';
+
+  // the generator parameters
+  command += "-n ";
+  command += "0 ";
+  command += "-x ";
+  command += std::to_string(max_kernel_size) + " ";
+
+  // the file and the arguments
+  command += file_path + " ";
+  for(auto &arg : file_args) {
+    command += arg + " ";
+  }
+  command.pop_back();
+  
+  // execute the file
+  FILE* pipe = popen(command.c_str(), "r");
+  if (!pipe)
+  {
+      out << bbts::red << "The toBarbaTos command not found!" << bbts::reset << std::endl;
+      return;
+  }
+
+  // write out the output
+  char buffer[128];
+  std::string result = "";
+  while (fgets(buffer, 128, pipe) != NULL) {
+      out << buffer;
+  }
+  auto success = pclose(pipe) == 0;
+  if(!success) {
+    out << bbts::red << "ERROR\n" << bbts::reset;
+  }
+  else {
+    out << bbts::green << "SUCCESS!\n" << bbts::reset;
   }
 }
 
@@ -410,12 +465,48 @@ void prompt(bbts::node_t &node) {
   },"Prints command stored in a file. Usage : print <file>\n");
 
 
-  rootMenu->Insert("compile",[&](std::ostream &out, const std::string &file) {
+  auto compileSubMenu = std::make_unique<Menu>("compile");
+
+  compileSubMenu->Insert("raw",[&](std::ostream &out, const std::string &file) {
 
     compile_commands(out, node, file);
 
-  },"Prints command stored in a file. Usage : print <file>\n");
+  },"Compiles a command raw .sbbts file. Usage : compile raw <file>\n");
 
+  compileSubMenu->Insert("einkorn",[&](std::ostream &out, const std::vector<std::string> &args) {
+
+    // check the number of arguments
+    if(args.size() < 2) {
+      out << bbts::red << "Wong number of arguments" << bbts::reset;
+      return;
+    }
+
+    int32_t max_kernel_size;
+    try {
+
+      size_t ptr;
+      max_kernel_size = std::stoi(args[0].c_str(), &ptr);
+    }
+    catch(std::exception ignore) {
+      out << bbts::red << "Wrong kernel size" << bbts::reset;  
+      return;
+    }
+
+    // get the file
+    std::string file = args[1];
+    
+    // copy the argments
+    std::vector<std::string> file_args;
+    for(size_t idx = 2; idx < args.size(); idx++) {
+      file_args.push_back(args[idx]);
+    }
+
+    // compile einkorn
+    compile_einkorn_commands(out, node, max_kernel_size, file, file_args);
+
+  },"Compiles a einkorn program and loads it as .sbbts commands. Usage : compile einkorn <max_kernel_size> <file> <arg1> <arg2>...\n");
+
+  rootMenu->Insert(std::move(compileSubMenu));
 
   rootMenu->Insert("clear",[&](std::ostream &out) {
 

@@ -143,9 +143,16 @@ include(libraries/Libraries.cmake)
 if(${ENABLE_EINKORN})
 
 # build einkorn
-add_custom_command(TARGET node_cli PRE_BUILD
-                   COMMAND cabal build VERBATIM
-                   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third_party/einkorn/)
+add_custom_target(build_einkorn 
+                  COMMAND cabal build VERBATIM
+                  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third_party/einkorn/)
+                  
+add_custom_target(copy_einkorn 
+                  COMMAND cp ${PROJECT_SOURCE_DIR}/third_party/einkorn/dist/build/toBarbaTos/toBarbaTos ${PROJECT_SOURCE_DIR}/bin VERBATIM)
+
+# add dependencies
+add_dependencies(build_einkorn copy_einkorn)
+add_dependencies(node_cli build_einkorn)
 
 # add the definition for einkorn
 add_compile_definitions(ENABLE_EINKORN)
