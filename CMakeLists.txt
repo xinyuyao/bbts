@@ -137,3 +137,17 @@ include(tests/Tests.cmake)
 include(integration_tests/Integration.cmake)
 include(applications/Applications.cmake)
 include(libraries/Libraries.cmake)
+
+
+# enable einkorn if necesasry
+if(${ENABLE_EINKORN})
+
+# build einkorn
+add_custom_command(TARGET node_cli PRE_BUILD
+                   COMMAND cabal build VERBATIM
+                   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/third_party/einkorn/)
+
+# add the definition for einkorn
+add_compile_definitions(ENABLE_EINKORN)
+
+endif()
