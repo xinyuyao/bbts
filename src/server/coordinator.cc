@@ -490,7 +490,7 @@ bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_siz
   std::string filename = std::string("/tmp/bbts_lib_") + std::to_string(shared_library_item_t::last_so) + ".so";
 
   // this will modify filename
-  int filedes = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
+  int filedes = open(filename.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
 
   // check if we could actually open this
   if(filedes == -1) {
@@ -502,10 +502,13 @@ bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_siz
     return false;
   }
 
+  // close the file
+  close(filedes);
+
   // open the newly created temporary file
   void* so_handle = dlopen(filename.c_str(), RTLD_LOCAL | RTLD_NOW);
   if(!so_handle) {
-    ss << bbts::red << "Could not open temporary shared library object!\n" << bbts::reset;
+    ss << bbts::red << "Could not open temporary shared library object " << dlerror() << "!\n" << bbts::reset;
     return false;
   }
 

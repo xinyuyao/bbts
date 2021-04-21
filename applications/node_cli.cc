@@ -241,7 +241,7 @@ void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_ker
   }
 
   // try to find the compiler
-  command = cmds[compiler_choice] + " -shared -fPIC -o ./generated/libkernel.so ./generated/kernels"  + std::to_string(kernel_choice) + ".cc";
+  command = cmds[compiler_choice] + " -shared -fPIC -rdynamic -o ./generated/libkernel.so ./generated/kernels"  + std::to_string(kernel_choice) + ".cc";
   pipe = popen(command.c_str(), "r");
   if (!pipe)
   {
@@ -265,7 +265,7 @@ void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_ker
   out << bbts::green << "COMPILED!\n";
   bool didLoad = load_shared_library(out, node, "./generated/libkernel.so"); 
 
-  
+
 }
 
 void run_commands(std::ostream &out, bbts::node_t &node) {
