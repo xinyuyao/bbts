@@ -362,7 +362,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::load_shared_library(char* fil
 
   // sync everything
   std::tuple<bool, std::string> out;
-  if(val) {
+  if(!val) {
     out = {val, ss.str()};
   }
   else {

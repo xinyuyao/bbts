@@ -138,6 +138,8 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
     out << bbts::green << message << bbts::reset;
     return true;
   }
+
+  
 }
 
 void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_kernel_size, 
@@ -264,8 +266,13 @@ void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_ker
   // great we compiled this now we need to load the libarry
   out << bbts::green << "COMPILED!\n";
   bool didLoad = load_shared_library(out, node, "./generated/libkernel.so"); 
+  if(!didLoad) {
+    return;
+  }
 
-
+  // compile the commands
+  std::string cmdsPath = "./generated/commands" + std::to_string(kernel_choice);
+  compile_commands(out, node, cmdsPath);
 }
 
 void run_commands(std::ostream &out, bbts::node_t &node) {
