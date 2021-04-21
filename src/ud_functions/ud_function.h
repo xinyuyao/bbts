@@ -70,6 +70,9 @@ struct ud_impl_t {
     // this gets the arguments at runtime
     const T &get_by_idx(size_t idx) const { return *arguments[idx]; }
 
+    // this gets the arguments at runtime
+    T &get_by_idx(size_t idx)  { return *arguments[idx]; }
+
     // sets the argument
     template<size_t n>
     void set(T &_in) {

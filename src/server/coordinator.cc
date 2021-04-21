@@ -131,18 +131,18 @@ std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_tr
   std::vector<std::unordered_set<bbts::tid_t>> locations;
   _fetch_tensor_info(meta, locations);
 
-  // make the cost
-  cost_model_ptr_t cost = std::make_shared<cost_model_t>(meta,
-                                                         funs,
-                                                         _tf, 
-                                                         _udf_manager, 
-                                                         gpu_transfer_cost_per_byte, 
-                                                         send_cost_per_byte);
-
-  // init the compiler
-  command_compiler_t compiler(cost, _comm->get_num_nodes());
-
   try {
+
+    // make the cost
+    cost_model_ptr_t cost = std::make_shared<cost_model_t>(meta,
+                                                          funs,
+                                                          _tf, 
+                                                          _udf_manager, 
+                                                          gpu_transfer_cost_per_byte, 
+                                                          send_cost_per_byte);
+
+    // init the compiler
+    command_compiler_t compiler(cost, _comm->get_num_nodes());
 
     // the compiled commands
     auto compiled_cmds = compiler.compile(cmds, locations);

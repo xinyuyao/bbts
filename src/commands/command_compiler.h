@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <fstream>
 #include <stdexcept>
+#include <string>
 #include <unordered_set>
 #include "../commands/command.h"
 #include "../tensor/tensor.h"
@@ -121,6 +122,9 @@ public:
 
       // get the matcher
       auto matcher = udm->get_matcher_for(f.ud_name);
+      if(matcher == nullptr) {
+        throw std::runtime_error("Could not match ud " + f.ud_name);
+      }
 
       // the inplementation
       auto impl_cpu = matcher->findMatch(f.input_types, f.output_types, false);

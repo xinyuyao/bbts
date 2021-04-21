@@ -120,6 +120,10 @@ void bbts::command_runner_t::local_command_runner() {
         ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
         for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
 
+          // get the type of the output
+          auto &type = ud->outputTypes[idx];
+          output_meta_args.get_by_idx(idx).fmt_id = _tf->get_tensor_ftm(type);
+
           // the size of the tensor, tid and whether it is on the GPU
           auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
           auto tid = cmd->get_output(idx).tid;
