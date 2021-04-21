@@ -95,6 +95,51 @@ void compile_commands(std::ostream &out, bbts::node_t &node, const std::string &
   }
 }
 
+bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
+
+  // kick off a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message(out, "Loading the library file", b);
+
+  // try to open the file
+  std::ifstream in(file_path, std::ifstream::ate | std::ifstream::binary);
+
+  if(in.fail()) {
+    // finish the loading message
+    b = true; t.join();
+
+    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+    return false;
+  }
+
+  auto file_len = (size_t) in.tellg();
+  in.seekg (0, std::ifstream::beg);
+
+  auto file_bytes = new char[file_len];
+  in.readsome(file_bytes, file_len);
+
+  // finish the loading message  
+  b = true; t.join();
+
+  // kick off a registering message
+  b = false;
+  t = loading_message(out, "Registering the library", b);
+
+  auto [did_load, message] = node.load_shared_library(file_bytes, file_len);
+  delete[] file_bytes;
+
+  // finish the registering message
+  b = true; t.join();
+
+  if(!did_load) {
+    out << bbts::red << "Failed to register the library : \"" << message << "\"\n" << bbts::reset;
+    return false;
+  } else {
+    out << bbts::green << message << bbts::reset;
+    return true;
+  }
+}
+
 void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_kernel_size, 
                               const std::string &file_path, std::vector<std::string> file_args) {
   
@@ -113,6 +158,8 @@ void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_ker
   command += "0 ";
   command += "-x ";
   command += std::to_string(max_kernel_size) + " ";
+  command += "-l generated/kernels ";
+  command += "-c generated/commands ";
 
   // the file and the arguments
   command += file_path + " ";
@@ -138,53 +185,87 @@ void compile_einkorn_commands(std::ostream &out, bbts::node_t &node, int max_ker
   auto success = pclose(pipe) == 0;
   if(!success) {
     out << bbts::red << "ERROR\n" << bbts::reset;
-  }
-  else {
-    out << bbts::green << "SUCCESS!\n" << bbts::reset;
-  }
-}
-
-void load_shared_library(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
-
-  // kick off a loading message
-  std::atomic_bool b; b = false;
-  auto t = loading_message(out, "Loading the library file", b);
-
-  // try to open the file
-  std::ifstream in(file_path, std::ifstream::ate | std::ifstream::binary);
-
-  if(in.fail()) {
-    // finish the loading message
-    b = true; t.join();
-
-    std::cout << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
     return;
   }
 
-  auto file_len = (size_t) in.tellg();
-  in.seekg (0, std::ifstream::beg);
+  out << bbts::green << "SUCCESS!\n" << bbts::reset;
+  out << "Gnerated multiple kernels pick one : \n";
+  
+  int32_t idx = 0;
+  while(true) {
 
-  auto file_bytes = new char[file_len];
-  in.readsome(file_bytes, file_len);
-
-  // finish the loading message  
-  b = true; t.join();
-
-  // kick off a registering message
-  b = false;
-  t = loading_message(out, "Registering the library", b);
-
-  auto [did_load, message] = node.load_shared_library(file_bytes, file_len);
-  delete[] file_bytes;
-
-  // finish the registering message
-  b = true; t.join();
-
-  if(!did_load) {
-    out << bbts::red << "Failed to register the library : \"" << message << "\"\n" << bbts::reset;
-  } else {
-    out << bbts::green << message << bbts::reset;
+    // check if the file exists if it does check for the next one
+    if(std::filesystem::exists("./generated/commands" + std::to_string(idx))) {
+      idx++;
+      continue;
+    }
+    break;
   }
+  if(idx == 0) {
+    out << bbts::red << "ERROR no kenels generated!\n" << bbts::reset;
+    return;
+  }
+  out << "Options : [" << 0 << " ... " << idx - 1 << "] or -1 for exit\n";
+  
+  // input chose one of the kernels
+  int kernel_choice;
+  while (true) {
+    std::cin >> kernel_choice;
+    if(kernel_choice == -1) { return; }
+
+    if(kernel_choice >= 0 && kernel_choice < idx) { break; }
+  }
+  
+  // compiling kernel
+  out << "Compiling kernel " << kernel_choice << " which compiler to use : \n";
+  out << "-1) to abort\n";
+  std::vector<std::string> cmds;
+  for(size_t cv = 0; cv <= 12; ++cv) {
+    std::string path = "/usr/bin/clang++" + (cv == 0 ? "" : "-" + std::to_string(cv));
+    if(std::filesystem::exists(path)) {
+      out << cmds.size() << ") " << path << '\n';
+      cmds.push_back(path);
+    }
+  }
+  
+  // compiler choice
+  int compiler_choice;
+  while (true) {
+
+    // get the choice
+    std::cin >> compiler_choice;
+
+    // check the choice
+    if(compiler_choice == -1) { return; }
+    if(compiler_choice >= 0 && compiler_choice < cmds.size()) { break; }
+  }
+
+  // try to find the compiler
+  command = cmds[compiler_choice] + " -shared -fPIC -o ./generated/libkernel.so ./generated/kernels"  + std::to_string(kernel_choice) + ".cc";
+  pipe = popen(command.c_str(), "r");
+  if (!pipe)
+  {
+      out << bbts::red << "Could not find the compiler!" << bbts::reset << std::endl;
+      return;
+  }
+
+  // get the compile output
+  out << bbts::yellow;
+  while (fgets(buffer, 128, pipe) != NULL) {
+      out << buffer;
+  }
+  out << bbts::reset;
+  success = pclose(pipe) == 0;
+  if(!success) {
+    out << bbts::red << "ERROR\n" << bbts::reset;
+    return;
+  }
+
+  // great we compiled this now we need to load the libarry
+  out << bbts::green << "COMPILED!\n";
+  bool didLoad = load_shared_library(out, node, "./generated/libkernel.so"); 
+
+  
 }
 
 void run_commands(std::ostream &out, bbts::node_t &node) {
