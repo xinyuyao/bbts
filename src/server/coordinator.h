@@ -13,6 +13,7 @@
 #include "../server/coordinator_ops.h"
 #include "../server/logger.h"
 #include "../commands/command.h"
+#include "../commands/command_profiler.h"
 #include "../commands/reservation_station.h"
 #include "../commands/command_runner.h"
 #include "../commands/tensor_notifier.h"
@@ -56,6 +57,9 @@ public:
 
   // set the verbose status
   std::tuple<bool, std::string> set_verbose(bool val);
+
+  // set the profiling status
+  std::tuple<bool, std::string> set_profile(bool val);
 
   // sets the number of threads to use
   std::tuple<bool, std::string> set_num_threads(std::uint32_t set_num_threads);
@@ -130,6 +134,8 @@ private:
 
   void _set_verbose(bool val);
 
+  void _set_profile(bool val);
+
   template<class T = storage_t>
   void _set_max_storage(size_t val) {
     if constexpr(static_config::enable_storage) {
@@ -164,6 +170,9 @@ private:
 
   // the logger
   bbts::logger_ptr_t _logger;
+
+  // the profiler
+  bbts::command_profiler_ptr_t _profiler;
 
   // shutdown
   std::atomic<bool> _is_down{};

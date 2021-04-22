@@ -188,12 +188,29 @@ std::tuple<bool, std::string> bbts::coordinator_t::run_commands() {
 std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
 
   if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::VERBOSE,
-      ._val = static_cast<size_t>(val)})) {
+                                             ._val = static_cast<size_t>(val)})) {
     return {false, "Failed to set the verbose flag!\n"};
   }
 
   // run everything
   _set_verbose(val);
+
+  // collect the responses from all the nodes
+  std::tuple<bool, std::string> out = {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
+  _collect(out);
+
+  return out;
+}
+
+std::tuple<bool, std::string> bbts::coordinator_t::set_profile(bool val) {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PROFILE,
+      ._val = static_cast<size_t>(val)})) {
+    return {false, "Failed to set the verbose flag!\n"};
+  }
+
+  // run everything
+  _set_profile(val);
 
   // collect the responses from all the nodes
   std::tuple<bool, std::string> out = {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
@@ -433,6 +450,11 @@ void bbts::coordinator_t::_clear() {
 
 void bbts::coordinator_t::_set_verbose(bool val) {
   _logger->set_enabled(val);
+}
+
+
+void bbts::coordinator_t::_set_profile(bool val) {
+  _profiler->set_enabled(val);
 }
 
 void bbts::coordinator_t::_print_storage(std::stringstream &ss) {

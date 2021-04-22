@@ -81,6 +81,9 @@ public:
   // set the verbose
   std::tuple<bool, std::string> set_verbose(bool val);
 
+  // set profiling
+  std::tuple<bool, std::string> set_profile(bool val);
+
   // set the number of threads
   std::tuple<bool, std::string> set_num_threads(std::uint32_t set_num_threads);
 

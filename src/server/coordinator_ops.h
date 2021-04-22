@@ -16,7 +16,8 @@ enum class coordinator_op_types_t : int32_t {
   PRINT_STORAGE, // prints the storage of the node
   PRINT_TENSOR, // prints tensor
   REGISTER, // register a library
-  FETCH_META // fetches meta data from each node
+  FETCH_META, // fetches meta data from each node
+  PROFILE // sets the profile flag
 };
 
 struct coordinator_op_t {

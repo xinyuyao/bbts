@@ -234,6 +234,10 @@ std::tuple<bool, std::string> bbts::node_t::set_verbose(bool val) {
   return _coordinator->set_verbose(val);
 }
 
+std::tuple<bool, std::string> bbts::node_t::set_profile(bool val) {
+  return _coordinator->set_profile(val);
+}
+
 std::tuple<bool, std::string> bbts::node_t::set_num_threads(std::uint32_t set_num_threads){
   return _coordinator->set_num_threads(set_num_threads);
 }

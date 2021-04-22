@@ -451,6 +451,27 @@ void verbose(std::ostream &out, bbts::node_t &node, bool val) {
   }
 }
 
+void profile(std::ostream &out, bbts::node_t &node, bool val) {
+
+  // kick of a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message(out, "Set profile", b);
+
+  // run all the commands
+  auto [did_load, message] = node.set_profile(val);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_load) {
+    out << bbts::red << "Set to fail profile : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    out << bbts::green << message << bbts::reset;
+  }
+}
+
 void shutdown(std::ostream &out, bbts::node_t &node) {
 
   // kick of a loading message
@@ -545,6 +566,12 @@ void prompt(bbts::node_t &node) {
     verbose(out, node, val);
 
   },"Enables or disables debug messages. verbose [true|false]\n");
+  
+  rootMenu->Insert("profile",[&](std::ostream &out, bool val) {
+
+    profile(out, node, val);
+
+  },"Enables or disables profiling. profile [true|false]\n");
 
   rootMenu->Insert("print",[&](std::ostream &out, const std::string &file) {
 
