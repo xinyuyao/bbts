@@ -3,18 +3,21 @@
 #include "../operations/reduce_op.h"
 #include "../operations/broadcast_op.h"
 #include "../operations/local_reduce_op.h"
+#include <cstdint>
+#include <limits>
 #include <thread>
 
-bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
-                                         bbts::tensor_factory_ptr_t tf,
-                                         bbts::udf_manager_ptr udm,
-                                         bbts::reservation_station_ptr_t rs,
-                                         bbts::communicator_ptr_t comm,
-                                         bbts::logger_ptr_t logger)  
+bbts::command_runner_t::command_runner_t(storage_ptr_t ts,
+                                         tensor_factory_ptr_t tf,
+                                         udf_manager_ptr udm,
+                                         reservation_station_ptr_t rs,
+                                         communicator_ptr_t comm,
+                                         logger_ptr_t logger,
+                                         command_profiler_ptr_t &_command_profiler)  
     : _ts(std::move(ts)), _tf(std::move(tf)), _udm(std::move(udm)),
-      _rs(std::move(rs)), _comm(std::move(comm)), _logger(std::move(logger)) {}
+      _rs(std::move(rs)), _comm(std::move(comm)), _logger(std::move(logger)), _command_profiler(std::move(_command_profiler)) {}
 
-void bbts::command_runner_t::local_command_runner() {
+void bbts::command_runner_t::local_command_runner(int32_t thread_id) {
 
   while (true) {
 
@@ -23,6 +26,9 @@ void bbts::command_runner_t::local_command_runner() {
     if (cmd == nullptr) {
       break;
     }
+
+    // the command execution started
+    _command_profiler->command_event(cmd->id, command_profiler_t::event_t::START, thread_id);
 
     // if we have a move
     if (cmd->type == command_t::MOVE) {
@@ -45,7 +51,7 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the move operation
-        move_op_t op(*_comm, cmd->id, num_bytes, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
+        move_op_t op(thread_id, cmd->id, *_comm, num_bytes, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node, *_command_profiler);
 
         // do the apply
         op.apply();
@@ -73,7 +79,7 @@ void bbts::command_runner_t::local_command_runner() {
         auto nodes = cmd->get_nodes();
 
         // create the move operation
-        broadcast_op_t op(*_comm, *_ts, nodes, cmd->id, num_bytes, cmd->get_input(0).tid);
+        broadcast_op_t op(thread_id, cmd->id, *_comm, *_ts, nodes, cmd->id, num_bytes, cmd->get_input(0).tid, *_command_profiler);
 
         // do the apply
         op.apply();
@@ -95,6 +101,9 @@ void bbts::command_runner_t::local_command_runner() {
 
       // reserve the outputs
       std::vector<std::tuple<tid_t, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
+
+      // we started a storage op
+      _command_profiler->command_event(cmd->id, command_profiler_t::event_t::STORAGE_OP_START, thread_id);
 
       // calculate the output size
       _ts->local_transaction(inputs, {}, [&](const storage_t::reservation_result_t &res) {
@@ -134,8 +143,14 @@ void bbts::command_runner_t::local_command_runner() {
 
       });
 
+      // we ended a storage op
+      _command_profiler->command_event(cmd->id, command_profiler_t::event_t::STORAGE_OP_END, thread_id);
+
       // log what is happening
       _logger->message("APPLY " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
+        
+      // we started a storage op
+      _command_profiler->command_event(cmd->id, command_profiler_t::event_t::STORAGE_OP_START, thread_id);
 
       // create the outputs and run the ud 
       _ts->local_transaction(inputs, outputs, [&](const storage_t::reservation_result_t &res) {
@@ -163,9 +178,18 @@ void bbts::command_runner_t::local_command_runner() {
           output_args.set(idx, *t);
         }
         
+        // we started a kernel execution
+        _command_profiler->command_event(cmd->id, command_profiler_t::event_t::KERNEL_START, thread_id);
+
         // apply the ud function
         ud->call_ud(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
+
+        // we finished a kernel execution
+        _command_profiler->command_event(cmd->id, command_profiler_t::event_t::KERNEL_END, thread_id);
       });
+
+      // we ended a storage op
+      _command_profiler->command_event(cmd->id, command_profiler_t::event_t::STORAGE_OP_END, thread_id);
 
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));
@@ -196,8 +220,8 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the reduce op
-        local_reduce_op_t op(*_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
-                             cmd->get_output(0).tid, *ud);
+        local_reduce_op_t op(thread_id, cmd->id, *_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
+                             cmd->get_output(0).tid, *ud, *_command_profiler);
 
         // do the apply
         op.apply();
@@ -240,7 +264,8 @@ void bbts::command_runner_t::local_command_runner() {
         }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
+        reduce_op_t op(thread_id, cmd->id, *_comm, *_tf, *_ts, nodes, cmd->id, 
+                       inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud, *_command_profiler);
 
         // do the apply
         op.apply();
@@ -250,6 +275,10 @@ void bbts::command_runner_t::local_command_runner() {
 
         _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
       }
+
+      // the command execution ended
+     _command_profiler->command_event(cmd->id, command_profiler_t::event_t::END, thread_id);
+
     }
   }
 }
@@ -257,10 +286,14 @@ void bbts::command_runner_t::local_command_runner() {
 void bbts::command_runner_t::remote_command_handler() {
 
   // while we
+  int32_t thread_id = 0;
   while (true) {
 
     // get the remote command
     auto cmd = _comm->expect_op_request();
+
+    // another one goes... :)
+    thread_id = thread_id == std::numeric_limits<int>::min() ? -1 : thread_id - 1;
 
     // if this is a shutdown just finish immediately
     if(cmd->type == bbts::command_t::MOVE) {
@@ -269,14 +302,23 @@ void bbts::command_runner_t::remote_command_handler() {
       if(cmd->is_move()) {
 
         // kick off a thread to process the request
-        std::thread child = std::thread([this, c = std::move(cmd)]() mutable {
+        
+        std::thread child = std::thread([this, c = std::move(cmd), thread_id]() mutable {
 
           if(c->nfo.num_bytes == 0) {
             std::cout << "Empty tensor " << '\n' << std::flush;
           }
 
           // create the move operation
-          move_op_t op(*_comm, c->id, c->nfo.num_bytes, c->get_input(0).tid, false, *_ts, c->get_input(0).node);
+          move_op_t op(thread_id, 
+                       c->id, 
+                       *_comm, 
+                       c->nfo.num_bytes, 
+                       c->get_input(0).tid, 
+                       false, 
+                       *_ts, 
+                       c->get_input(0).node, 
+                       *_command_profiler);
 
           // do the apply
           op.apply();
@@ -292,13 +334,14 @@ void bbts::command_runner_t::remote_command_handler() {
       else {
 
         // kick off a thread to process the request
-        std::thread child = std::thread([this, c = std::move(cmd)]() mutable {
+        std::thread child = std::thread([this, c = std::move(cmd), thread_id]() mutable {
 
           // get the nodes involved
           auto nodes = c->get_nodes();
 
           // create the move operation
-          broadcast_op_t op(*_comm, *_ts, nodes, c->id, c->nfo.num_bytes, c->get_input(0).tid);
+          broadcast_op_t op(thread_id, c->id, *_comm, *_ts, nodes, c->id, c->nfo.num_bytes, 
+                            c->get_input(0).tid, *_command_profiler);
 
           // do the apply
           op.apply();
@@ -314,7 +357,7 @@ void bbts::command_runner_t::remote_command_handler() {
     else if(cmd->type == bbts::command_t::REDUCE) {
 
       // kick off a thread to process the request
-      std::thread child = std::thread([this, c = std::move(cmd)]() mutable {
+      std::thread child = std::thread([this, c = std::move(cmd), thread_id]() mutable {
 
         // get the nodes involved
         auto nodes = c->get_nodes();
@@ -339,7 +382,8 @@ void bbts::command_runner_t::remote_command_handler() {
         }
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud);
+        reduce_op_t op(thread_id, c->id, *_comm, *_tf, *_ts, nodes, c->id, 
+                       inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud, *_command_profiler);
 
         // do the apply
         op.apply();

@@ -34,6 +34,7 @@ public:
                 bbts::gpu_scheduler_ptr_t _gpu_scheduler,
                 bbts::reservation_station_ptr_t _rs,
                 bbts::logger_ptr_t _logger,
+                bbts::command_profiler_ptr_t _command_profiler,
                 storage_ptr_t _storage,
                 bbts::command_runner_ptr_t _command_runner,
                 bbts::tensor_notifier_ptr_t _tensor_notifier,
@@ -188,6 +189,9 @@ private:
 
   // the udf manager
   bbts::udf_manager_ptr _udf_manager;
+
+  // the command profiler 
+  bbts::command_profiler_ptr_t _command_profiler;
 
   // This struct will handle removing temporary files opened by 
   // load_shared_library and hold onto the so_handle. 

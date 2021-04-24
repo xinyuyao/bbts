@@ -4,6 +4,7 @@
 #include "reservation_station.h"
 #include "../ud_functions/udf_manager.h"
 #include "../communication/communicator.h"
+#include "../commands/command_profiler.h"
 #include "../server/logger.h"
 
 namespace bbts {
@@ -16,10 +17,11 @@ public:
                    udf_manager_ptr udm,
                    reservation_station_ptr_t rs,
                    communicator_ptr_t comm,
-                   logger_ptr_t logger);
+                   logger_ptr_t logger,
+                   command_profiler_ptr_t &_command_profiler);
 
   // runs local command
-  void local_command_runner();
+  void local_command_runner(int32_t thread_id);
 
   // handles the incoming request for remote commands
   void remote_command_handler();
@@ -50,6 +52,9 @@ private:
 
   // logger
   logger_ptr_t _logger;
+
+  // the profiler
+  command_profiler_ptr_t _command_profiler;
 };
 
 using command_runner_ptr_t = std::shared_ptr<command_runner_t>;

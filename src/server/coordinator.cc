@@ -15,6 +15,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
                                    bbts::gpu_scheduler_ptr_t _gpu_scheduler,
                                    bbts::reservation_station_ptr_t _rs,
                                    bbts::logger_ptr_t _logger,
+                                   bbts::command_profiler_ptr_t _command_profiler,
                                    storage_ptr_t _storage,
                                    bbts::command_runner_ptr_t _command_runner,
                                    bbts::tensor_notifier_ptr_t _tensor_notifier,
@@ -25,6 +26,7 @@ bbts::coordinator_t::coordinator_t(bbts::communicator_ptr_t _comm,
       _gpu_scheduler(std::move(_gpu_scheduler)),
       _rs(std::move(_rs)),
       _logger(std::move(_logger)),
+      _command_profiler(std::move(_command_profiler)),
       _storage(std::move(_storage)),
       _command_runner(std::move(_command_runner)),
       _tensor_notifier(std::move(_tensor_notifier)),
@@ -83,6 +85,10 @@ void bbts::coordinator_t::accept() {
       }
       case coordinator_op_types_t::FETCH_META : {
         _handle_fetch_meta(ss);
+        break;
+      }
+      case coordinator_op_types_t::PROFILE : {
+        _set_profile(static_cast<bool>(op._val));
         break;
       }
     }

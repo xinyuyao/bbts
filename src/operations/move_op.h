@@ -2,6 +2,7 @@
 #include "../tensor/builtin_formats.h"
 #include "../storage/storage.h"
 #include "../ud_functions/udf_manager.h"
+#include "../commands/command_profiler.h"
 #include <cstddef>
 #include <mpi.h>
 #include <iostream>
@@ -33,10 +34,22 @@ public:
   // the node we are send or recieving from...
   bbts::node_id_t _node;
 
+  // the profiler
+  command_profiler_t &_profiler;
+
+  // thread id
+  int32_t _thread_id;
+
   // constructs the reduce operation
-  move_op_t(bbts::communicator_t &_comm, command_id_t _cmd_id, 
-            size_t _num_bytes, tid_t _tid, 
-            bool _is_sender, bbts::storage_t &_storage, bbts::node_id_t _node);
+  move_op_t(int32_t thread_id,
+            command_id_t _cmd_id,
+            bbts::communicator_t &_comm,
+            size_t _num_bytes, 
+            tid_t _tid, 
+            bool _is_sender, 
+            bbts::storage_t &_storage,
+            bbts::node_id_t _node,
+            command_profiler_t &_profiler);
 
   // apply this operation
   void apply();

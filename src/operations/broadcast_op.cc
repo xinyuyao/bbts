@@ -4,17 +4,23 @@
 
 namespace bbts {
 
-broadcast_op_t::broadcast_op_t(bbts::communicator_t &_comm,
+broadcast_op_t::broadcast_op_t(int32_t thread_id, 
+                               bbts::command_id_t _command_id,
+                               bbts::communicator_t &_comm,
                                bbts::storage_t &_storage,
                                const bbts::command_t::node_list_t &_nodes,
                                int32_t _tag, 
-                               size_t _num_bytes,
-                               bbts::tid_t _tid): _comm(_comm),
-                                                  _storage(_storage),
-                                                  _nodes(_nodes),
-                                                  _tag(_tag),
-                                                  _num_bytes(_num_bytes),
-                                                  _tid(_tid) {}
+                               size_t _num_bytes, 
+                               bbts::tid_t _tid,
+                               command_profiler_t &_profiler): _thread_id(thread_id),
+                                                               _command_id(_command_id),
+                                                               _comm(_comm),
+                                                               _storage(_storage),
+                                                               _nodes(_nodes),
+                                                               _tag(_tag),
+                                                               _num_bytes(_num_bytes),
+                                                               _tid(_tid),
+                                                               _profiler(_profiler) {}
 
 int32_t broadcast_op_t::get_num_nodes() const {
   return _nodes.size();
@@ -49,6 +55,9 @@ void broadcast_op_t::apply() {
   else {
     create = {{_tid, _num_bytes }};
   }
+
+  // we have a storage op here
+  _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_START, _thread_id);
 
   // init a remote transaction on all nodes
   bool success = true;
@@ -112,6 +121,9 @@ void broadcast_op_t::apply() {
       }
     }
   });
+
+  // we have a storage op here
+  _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_END, _thread_id);
 
   if(!success) {
     std::cout << "Failed to forward a tensor\n";

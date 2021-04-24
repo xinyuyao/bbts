@@ -4,8 +4,10 @@
 #include "../storage/storage.h"
 #include "../tensor/builtin_formats.h"
 #include "../ud_functions/udf_manager.h"
+#include "../commands/command_profiler.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <algorithm>
 #include <mpi.h>
@@ -17,12 +19,15 @@ class broadcast_op_t {
 public:
 
   // constructs the broadcast operation, the root node is assumed to be the first in the _nodes array
-  broadcast_op_t(bbts::communicator_t &_comm,
+  broadcast_op_t(int32_t thread_id,
+                 bbts::command_id_t _command_id,
+                 bbts::communicator_t &_comm,
                  bbts::storage_t &_storage,
                  const bbts::command_t::node_list_t &_nodes,
                  int32_t _tag, 
                  size_t _num_bytes, 
-                 bbts::tid_t _tid);
+                 bbts::tid_t _tid,
+                 command_profiler_t &_profiler);
 
   // the mpi communicator we are going to use to perform the communication
   bbts::communicator_t &_comm;
@@ -44,6 +49,15 @@ public:
 
   // the tid
   bbts::tid_t _tid;
+
+  // the command id
+  bbts::command_id_t _command_id;
+
+  // thread id
+  int32_t _thread_id;
+
+  // the profiler
+  command_profiler_t &_profiler;
 
   // calculates the highest bit in an integer
   static inline int opal_hibit(int value, int start) {

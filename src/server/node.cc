@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -13,6 +14,9 @@ void bbts::node_t::init() {
 
   // the logger
   _logger = std::make_shared<logger_t>(_config);
+
+  // init the command profiler
+  _command_profiler = std::make_shared<command_profiler_t>(_config);
 
   // init the storage
   if constexpr(static_config::enable_storage) {
@@ -43,13 +47,13 @@ void bbts::node_t::init() {
 
   // this runs commands
   _command_runner = std::make_shared<bbts::command_runner_t>(_storage, _factory, _udf_manager,
-                                                             _res_station, _comm, _logger);
+                                                             _res_station, _comm, _logger, _command_profiler);
 
   // the tensor notifier
   _tensor_notifier = std::make_shared<bbts::tensor_notifier_t>(_comm, _res_station);
 
   // the scheduler
-  _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger,
+  _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger, _command_profiler,
                                                  _storage, _command_runner, _tensor_notifier, _udf_manager, _factory);
 }
 
@@ -65,7 +69,7 @@ void bbts::node_t::run() {
   std::vector<std::thread> command_processing_threads;
   command_processing_threads.reserve(_comm->get_num_nodes());
   for (node_id_t t = 0; t < _config->num_threads; ++t) {
-    command_processing_threads.push_back(std::move(create_command_processing_thread()));
+    command_processing_threads.push_back(std::move(create_command_processing_thread(t)));
   }
 
   // create all the request threads if we are using storage
@@ -92,7 +96,7 @@ void bbts::node_t::run() {
 
   // notification sender
   std::vector<std::thread> remote_notification_sender;
-  remote_notification_sender.reserve(_config->num_threads);
+  remote_notification_sender.reserve(_comm->get_num_nodes());
   for(node_id_t node = 0; node < _comm->get_num_nodes(); ++node) {
 
     // no need to notify self so skip that
@@ -101,7 +105,7 @@ void bbts::node_t::run() {
     }
 
     // create the notifier thread
-    remote_notification_sender.push_back(remote_tensor_notification_sender(node));
+    remote_notification_sender.push_back(remote_tensor_notification_sender(_config->num_threads + node));
   }
 
   /// 2.0 Wait for stuff to finish
@@ -275,12 +279,12 @@ std::thread bbts::node_t::create_deleter_thread() {
     _command_runner->run_deleter();
   });
 }
-std::thread bbts::node_t::create_command_processing_thread() {
+std::thread bbts::node_t::create_command_processing_thread(int32_t thread_id) {
 
   // create the thread to pull
-  std::thread t = std::thread([this]() {
+  std::thread t = std::thread([this, thread_id]() {
 
-    _command_runner->local_command_runner();
+    _command_runner->local_command_runner(thread_id);
   });
 
   return std::move(t);

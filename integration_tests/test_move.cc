@@ -1,4 +1,5 @@
 #include "../src/operations/move_op.h"
+#include <memory>
 
 using namespace bbts;
 
@@ -6,6 +7,9 @@ int main(int argc, char **argv) {
 
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
+
+  // make a profiler
+  auto profiler = std::make_shared<command_profiler_t>(config);
 
   // create the tensor factory
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
@@ -55,13 +59,13 @@ int main(int argc, char **argv) {
     });
 
     // create the move
-    auto move = move_op_t(*comm, comm->get_rank(), size, comm->get_rank(), true, storage, comm->get_rank() + 1);
+    auto move = move_op_t(0, comm->get_rank(), *comm, size, comm->get_rank(), true, storage, comm->get_rank() + 1, *profiler);
     move.apply();
   }
   else {
 
     // create the move
-    auto move = move_op_t(*comm, comm->get_rank() - 1, size, comm->get_rank() - 1, false, storage, comm->get_rank() - 1);
+    auto move = move_op_t(0, comm->get_rank() - 1, *comm, size, comm->get_rank() - 1, false, storage, comm->get_rank() - 1, *profiler);
     move.apply();
 
     storage.local_transaction({comm->get_rank() - 1}, {}, [&](const storage_t::reservation_result_t &res) {

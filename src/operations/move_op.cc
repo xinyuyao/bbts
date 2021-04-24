@@ -6,19 +6,25 @@
 namespace bbts {
 
   // constructs the reduce operation
-  move_op_t::move_op_t(bbts::communicator_t &_comm, command_id_t _cmd_id, 
-                       size_t _num_bytes, tid_t _tid, 
-                       bool _is_sender, bbts::storage_t &_storage, bbts::node_id_t _node) : _comm(_comm),
-                                                                                            _cmd_id(_cmd_id),
-                                                                                            _num_bytes(_num_bytes),
-                                                                                            _tid(_tid),
-                                                                                            _is_sender(_is_sender),
-                                                                                            _storage(_storage),
-                                                                                            _node(_node) {}
+  move_op_t::move_op_t(int32_t thread_id, command_id_t _cmd_id, bbts::communicator_t &_comm, 
+                       size_t _num_bytes, tid_t _tid,  bool _is_sender, 
+                       bbts::storage_t &_storage, bbts::node_id_t _node,
+                       command_profiler_t &_profiler) : _thread_id(thread_id),
+                                                              _comm(_comm),
+                                                              _cmd_id(_cmd_id),
+                                                              _num_bytes(_num_bytes),
+                                                              _tid(_tid),
+                                                              _is_sender(_is_sender),
+                                                              _storage(_storage),
+                                                              _node(_node),
+                                                              _profiler(_profiler) {}
 
   // apply this operation
   void move_op_t::apply() {
-    
+
+    // we have a storage op here
+    _profiler.command_event(_cmd_id, command_profiler_t::event_t::STORAGE_OP_START, _thread_id);
+
     // is this the sender, if so we initiate a send request
     if(_is_sender) {
 
@@ -49,6 +55,9 @@ namespace bbts {
         }
       });
     }
+
+    // we are done with the storage op
+    _profiler.command_event(_cmd_id, command_profiler_t::event_t::STORAGE_OP_END, _thread_id);
   }
 
 }

@@ -1,4 +1,5 @@
 #include "../src/operations/broadcast_op.h"
+#include "../src/commands/command_profiler.h"
 
 int main(int argc, char **argv) {
 
@@ -7,6 +8,9 @@ int main(int argc, char **argv) {
 
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc = argc, .argv = argv});
+  
+  // make a profiler
+  auto profiler = std::make_shared<bbts::command_profiler_t>(config);
 
   // create the tensor factory
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
@@ -68,12 +72,14 @@ int main(int argc, char **argv) {
   if (comm->get_rank() % 2 == 0) {
 
     // make a broadcast
-    bbts::broadcast_op_t bcst(*comm,
+    bbts::broadcast_op_t bcst(0, 0,
+                              *comm,
                               storage,
                               bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
                               888,
                               size,
-                              12);
+                              12,
+                              *profiler);
 
     // execute the broadcast
     bcst.apply();

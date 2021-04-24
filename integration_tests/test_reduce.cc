@@ -8,6 +8,9 @@ int main(int argc, char **argv) {
   // make the configuration
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
 
+  // make a profiler
+  auto profiler = std::make_shared<bbts::command_profiler_t>(config);
+
   // create the tensor factory
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
 
@@ -76,7 +79,8 @@ int main(int argc, char **argv) {
     // craete the reduce
     std::vector<bbts::tid_t> _inputs = { input_tid };
 
-    auto reduce_op = bbts::reduce_op_t(*comm,
+    auto reduce_op = bbts::reduce_op_t(0, 0,
+                                       *comm,
                                        *factory,
                                        storage,
                                        bbts::command_t::node_list_t{._data = nodes.data(), ._num_elements = nodes.size()},
@@ -84,7 +88,8 @@ int main(int argc, char **argv) {
                                        _inputs,
                                        { ._params = bbts::command_param_list_t {._data = nullptr, ._num_elements = 0} },
                                        0,
-                                       *ud);
+                                       *ud,
+                                       *profiler);
     reduce_op.apply();
 
     if (comm->get_rank() == root_node) {

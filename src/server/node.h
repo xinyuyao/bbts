@@ -132,7 +132,7 @@ public:
   // the reservation station needs a deleter thread
   std::thread create_deleter_thread();
 
-  std::thread create_command_processing_thread();
+  std::thread create_command_processing_thread(int32_t thread_id);
 
   std::thread expect_remote_command();
 
@@ -150,6 +150,9 @@ public:
 
   // the communicator, this is doing all the sending
   communicator_ptr_t _comm;
+
+  // the profiler
+  command_profiler_ptr_t _command_profiler;
 
   // the reservation station
   reservation_station_ptr_t _res_station;

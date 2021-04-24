@@ -4,6 +4,7 @@
 #include "../tensor/builtin_formats.h"
 #include "../storage/storage.h"
 #include "../ud_functions/udf_manager.h"
+#include "../commands/command_profiler.h"
 #include <mpi.h>
 #include <iostream>
 #include <algorithm>
@@ -69,11 +70,21 @@ public:
   // the output tid
   bbts::tid_t _out_tid;
 
+  // the profiler
+  command_profiler_t &_profiler;
+
+  // the command id
+  bbts::command_id_t _command_id;
+
+  // thread id
+  int32_t _thread_id;
+
   // constructs the reduce operation
-  reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
+  reduce_op_t(int32_t thread_id, bbts::command_id_t _command_id, bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
               bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
               command_id_t _tag, const std::vector<bbts::tid_t> &_inputs, const ud_impl_t::tensor_params_t &_params,
-              bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op);
+              bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op,
+              command_profiler_t &_profiler);
 
   // get the number of nodes
   [[nodiscard]] int32_t get_num_nodes() const;

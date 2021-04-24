@@ -1,20 +1,26 @@
 #include "local_reduce_op.h"
 
-bbts::local_reduce_op_t::local_reduce_op_t(bbts::tensor_factory_t &_factory,
+bbts::local_reduce_op_t::local_reduce_op_t(int32_t thread_id, 
+                                           bbts::command_id_t _command_id,
+                                           bbts::tensor_factory_t &_factory,
                                            bbts::storage_t &_storage,
                                            const std::vector<tid_t> &_inputs,
                                            const ud_impl_t::tensor_params_t &_params,
                                            bbts::tid_t _out_tid,
-                                           const bbts::ud_impl_t &_reduce_op) : _factory(_factory),
-                                                                                _storage(_storage),
-                                                                                _inputs(_inputs),
-                                                                                _params(_params),
-                                                                                _out_tid(_out_tid),
-                                                                                _reduce_op(_reduce_op),
-                                                                                _input_tensors({nullptr, nullptr}),
-                                                                                _output_tensor({nullptr}),
-                                                                                _input_meta({nullptr, nullptr}),
-                                                                                _output_meta({&_out_meta})  {
+                                           const bbts::ud_impl_t &_reduce_op,
+                                           command_profiler_t &_profiler) : _thread_id(thread_id),
+                                                                            _command_id(_command_id),
+                                                                            _factory(_factory),
+                                                                            _storage(_storage),
+                                                                            _inputs(_inputs),
+                                                                            _params(_params),
+                                                                            _out_tid(_out_tid),
+                                                                            _reduce_op(_reduce_op),
+                                                                            _input_tensors({nullptr, nullptr}),
+                                                                            _output_tensor({nullptr}),
+                                                                            _input_meta({nullptr, nullptr}),
+                                                                            _output_meta({&_out_meta}),
+                                                                            _profiler(_profiler)  {
 
   // get the impl_id of the output
   _id = _factory.get_tensor_ftm(_reduce_op.outputTypes.front());
@@ -28,6 +34,9 @@ void bbts::local_reduce_op_t::apply() {
 
     // get the other side
     tid_t rhs = _inputs[idx];
+
+    // we have a storage op here
+    _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_START, _thread_id);
 
     // calculate the size of the output tensor
     size_t output_size;
@@ -46,6 +55,12 @@ void bbts::local_reduce_op_t::apply() {
       // return the size of the tensor
       output_size = _factory.get_tensor_size(_output_meta.get<0>());
     });
+
+    // we are done here
+    _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_END, _thread_id);
+
+    // we have a storage op here
+    _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_START, _thread_id);
 
     // perform the actual kernel
     tid_t out_tid;
@@ -67,11 +82,16 @@ void bbts::local_reduce_op_t::apply() {
       _output_tensor.set<0>(*out);
 
       // run the function
+      _profiler.command_event(_command_id, command_profiler_t::event_t::KERNEL_START, _thread_id);
       _reduce_op.call_ud(_params, _input_tensors, _output_tensor);
+      _profiler.command_event(_command_id, command_profiler_t::event_t::KERNEL_END, _thread_id);
 
       // set the output tid
       out_tid = res.create[0].get().id;
     });
+
+    // we are done here
+    _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_END, _thread_id);
 
     // remove additionally every allocated tensor
     if(idx != 1) {

@@ -3,10 +3,13 @@
 
 namespace bbts {
 
-reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
+reduce_op_t::reduce_op_t(int32_t thread_id, bbts::command_id_t _command_id, bbts::communicator_t &_comm, bbts::tensor_factory_t &_factory,
                          bbts::storage_t &_storage, const bbts::command_t::node_list_t &_nodes,
                          command_id_t _tag, const std::vector<bbts::tid_t> &_inputs, const ud_impl_t::tensor_params_t &_params,
-                         bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op) : _comm(_comm),
+                         bbts::tid_t _out_tid, const bbts::ud_impl_t &_reduce_op, command_profiler_t &_profiler) : 
+                                                                                    _thread_id(thread_id),
+                                                                                    _command_id(_command_id),
+                                                                                    _comm(_comm),
                                                                                     _factory(_factory),
                                                                                     _storage(_storage),
                                                                                     _nodes(_nodes),
@@ -18,7 +21,8 @@ reduce_op_t::reduce_op_t(bbts::communicator_t &_comm, bbts::tensor_factory_t &_f
                                                                                     _input_tensors({nullptr, nullptr}),
                                                                                     _output_tensor({nullptr}),
                                                                                     _input_meta({nullptr, nullptr}),
-                                                                                    _output_meta({&_out_meta}) {
+                                                                                    _output_meta({&_out_meta}),
+                                                                                    _profiler(_profiler) {
 
   // get the impl_id of the output
   _id = _factory.get_tensor_ftm(_reduce_op.outputTypes.front());
@@ -77,6 +81,9 @@ void reduce_op_t::apply() {
           std::cout << "Failed to recieve the tensors size for a REDUCE operation\n";
         }
         
+        // we have a storage op here
+        _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_START, _thread_id);
+
         // do the recieving and calculate the output tensor size
         size_t output_size;
         _storage.remote_transaction_p2p(_tag, rnk, {lhs}, {{TID_NONE, rhs_size}}, 
@@ -110,6 +117,12 @@ void reduce_op_t::apply() {
           rhs = res.create[0].get().id;
         });
 
+        // we have a storage op here
+        _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_END, _thread_id);
+
+        // we have a storage op here
+        _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_START, _thread_id);
+
         tid_t out_tid;
         _storage.local_transaction({lhs, rhs}, {{TID_NONE, output_size}}, [&](const storage_t::reservation_result_t &res) {
         
@@ -132,8 +145,13 @@ void reduce_op_t::apply() {
           _output_tensor.set<0>(*out);
 
           // run the function
+          _profiler.command_event(_command_id, command_profiler_t::event_t::KERNEL_START, _thread_id);
           _reduce_op.call_ud(_params, _input_tensors, _output_tensor);
+          _profiler.command_event(_command_id, command_profiler_t::event_t::KERNEL_END, _thread_id);
         });
+
+        // we have a storage op here
+        _profiler.command_event(_command_id, command_profiler_t::event_t::STORAGE_OP_END, _thread_id);
 
         // manage the memory
         if(lhs != _in) {
