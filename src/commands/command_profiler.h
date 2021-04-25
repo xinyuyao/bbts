@@ -28,30 +28,26 @@ public:
 
   struct log_entry_t {
 
+    // the command id
+    command_id_t cmd_id;
+
     // the event type
     event_t event;
 
     // the start entry 
-    std::size_t ts;
+    long ts;
 
     // the id of the thread
     int32_t thread_id;
   };
 
-  struct command_log_t {
-
-    // the events that happened related to this command
-    std::vector<log_entry_t> events;
-
-    // the mutex 
-    std::mutex m;
-  };
-
-
   struct batch_t {
 
+    // the timestamp
+    long ts;
+
     // the commans in the batch
-    std::vector<command_log_t> commands;
+    std::vector<log_entry_t> commands;
   };
 
   command_profiler_t(const node_config_ptr_t &config) : _config(config) {}
@@ -60,27 +56,51 @@ public:
   void set_enabled(bool val) { _config->profile = val; }
 
   // a batch of commans has started
-  void batch_started(size_t num_cmds) {
-    batch = batch_t{.commands = std::vector<command_log_t>(num_cmds)};
+  void batch_started() {
+
+    // check if the profiling is even enabled
+    if(!_config->profile) {
+      return;
+    }
+ 
+    auto ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+
+    // lock the command in the batch
+    std::unique_lock<std::mutex> lck{m};
+
+    // create a new batch
+    batch = batch_t{.ts = ts, .commands = {}};
   }
 
   // the batch ended
   void batch_ended() {
-    command_batches.push_back(std::move(batch));
+
+    // lock the command in the batch
+    std::unique_lock<std::mutex> lck{m};
+
+    // store the previous batch
+    previous_batches.push_back(std::move(batch));
   }
 
-  //
+  // log the command
   void command_event(command_id_t cmd_id, event_t event, int32_t thread_id) {
     
+    auto ts = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+
     // lock the command in the batch
-    std::unique_lock<std::mutex> lck{batch.commands[cmd_id].m};
+    std::unique_lock<std::mutex> lck{m};
+
+    // push the command
+    batch.commands.push_back(log_entry_t{.cmd_id = cmd_id, .event = event, .ts = ts, .thread_id = thread_id});
   }
 
-  // 
+  std::mutex m;
+
+  // the current batch
   batch_t batch;
 
-  // 
-  std::vector<batch_t> command_batches;
+  // the previous batches
+  std::vector<batch_t> previous_batches;
 
   // the config of the node
   node_config_ptr_t _config;

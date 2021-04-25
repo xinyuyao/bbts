@@ -455,7 +455,7 @@ void profile(std::ostream &out, bbts::node_t &node, bool val) {
 
   // kick of a loading message
   std::atomic_bool b; b = false;
-  auto t = loading_message(out, "Set profile", b);
+  auto t = loading_message(out, "Enabling profiling", b);
 
   // run all the commands
   auto [did_load, message] = node.set_profile(val);
@@ -465,7 +465,7 @@ void profile(std::ostream &out, bbts::node_t &node, bool val) {
 
   // did we fail
   if(!did_load) {
-    out << bbts::red << "Set to fail profile : \"" << message << "\"\n" << bbts::reset;
+    out << bbts::red << "Set to enable profiling : \"" << message << "\"\n" << bbts::reset;
   }
   else {
     out << bbts::green << message << bbts::reset;

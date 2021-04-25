@@ -18,7 +18,7 @@ public:
                    reservation_station_ptr_t rs,
                    communicator_ptr_t comm,
                    logger_ptr_t logger,
-                   command_profiler_ptr_t &_command_profiler);
+                   command_profiler_ptr_t _command_profiler);
 
   // runs local command
   void local_command_runner(int32_t thread_id);

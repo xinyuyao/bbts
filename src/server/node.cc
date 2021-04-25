@@ -105,7 +105,7 @@ void bbts::node_t::run() {
     }
 
     // create the notifier thread
-    remote_notification_sender.push_back(remote_tensor_notification_sender(_config->num_threads + node));
+    remote_notification_sender.push_back(remote_tensor_notification_sender(node));
   }
 
   /// 2.0 Wait for stuff to finish

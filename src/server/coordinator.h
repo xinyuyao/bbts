@@ -172,9 +172,6 @@ private:
   // the logger
   bbts::logger_ptr_t _logger;
 
-  // the profiler
-  bbts::command_profiler_ptr_t _profiler;
-
   // shutdown
   std::atomic<bool> _is_down{};
 

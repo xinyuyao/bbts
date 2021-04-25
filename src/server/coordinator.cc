@@ -212,14 +212,14 @@ std::tuple<bool, std::string> bbts::coordinator_t::set_profile(bool val) {
 
   if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PROFILE,
       ._val = static_cast<size_t>(val)})) {
-    return {false, "Failed to set the verbose flag!\n"};
+    return {false, "Failed to enable profiling flag!\n"};
   }
 
   // run everything
-  _set_profile(val);
+  _set_profile(val);  
 
   // collect the responses from all the nodes
-  std::tuple<bool, std::string> out = {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
+  std::tuple<bool, std::string> out = {true, "Set the profiling flag to " + std::to_string(val) + "\n"};
   _collect(out);
 
   return out;
@@ -437,6 +437,9 @@ void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds,
 
 void bbts::coordinator_t::_run() {
 
+  // the batch started
+  _command_profiler->batch_started();
+
   // async execute the scheduled commands
   _rs->execute_scheduled_async();
 
@@ -445,6 +448,9 @@ void bbts::coordinator_t::_run() {
 
   // stop executing all the commands
   _rs->stop_executing();
+
+  // the batch ended
+  _command_profiler->batch_ended();
 }
 
 void bbts::coordinator_t::_clear() {
@@ -460,7 +466,7 @@ void bbts::coordinator_t::_set_verbose(bool val) {
 
 
 void bbts::coordinator_t::_set_profile(bool val) {
-  _profiler->set_enabled(val);
+  _command_profiler->set_enabled(val);
 }
 
 void bbts::coordinator_t::_print_storage(std::stringstream &ss) {
