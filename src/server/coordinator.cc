@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <sstream>
 #include <stdexcept>
@@ -91,12 +92,68 @@ void bbts::coordinator_t::accept() {
         _set_profile(static_cast<bool>(op._val));
         break;
       }
+      case coordinator_op_types_t::GET_PROFILING_NFO_FOR : {
+        _get_profiling_nfo_for(op._val, ss);
+        break;
+      }
     }
 
     // sync all nodes
     _comm->send_response_string(ss.str());
   }
 }
+
+// returns a list of available batch
+std::vector<bbts::command_profiler_t::batch_nfo_t> bbts::coordinator_t::get_all_profiling_nfo() {
+  return std::move(_command_profiler->get_all_profiling_nfo());
+}
+
+// get profiling info for a particular batch
+std::vector<std::vector<bbts::command_profiler_t::log_entry_t>>bbts::coordinator_t::get_profiling_nfo_for(size_t id) {
+
+  // send the command to every node
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::GET_PROFILING_NFO_FOR, ._val = id})) {
+    return {};
+  }
+
+  // allocated where to fetch
+  std::vector<std::vector<bbts::command_profiler_t::log_entry_t>> out; out.reserve(_comm->get_num_nodes());
+  out.push_back(_command_profiler->get_profile_batch(id).commands);
+
+  // recive all the meta from other nodes
+  bool success = true;
+  std::vector<bbts::command_profiler_t::log_entry_t> rec;
+  for(node_id_t node = 1; node < _comm->get_num_nodes(); ++node) {
+    
+    // fetch the info
+    if(!_comm->recv_profile_nfo(node, rec)) {
+      success = false;
+      continue;
+    }
+
+    // make sure we acually got something
+    if(rec.empty()) {
+      success = false;
+      continue;
+    }
+
+    // store the fetched profile info
+    out.push_back(rec);
+  }
+
+  // sync everything
+  std::tuple<bool, std::string> msg = {success, "Failed fetching profiling info. \n"};
+  _collect(msg);
+
+  // check if we had an error here
+  if(!std::get<0>(msg)) {
+    return {};
+  }
+
+  // return the recived profiler info
+  return std::move(out);
+}
+
 
 std::tuple<bool, std::string> bbts::coordinator_t::schedule_commands(const std::vector<command_ptr_t> &cmds) {
 
@@ -361,6 +418,20 @@ std::tuple<bool, std::string> bbts::coordinator_t::_fetch_tensor_info(std::unord
   _collect(out);
 
   return out;
+}
+
+void bbts::coordinator_t::_get_profiling_nfo_for(size_t id, std::stringstream &ss) {
+  
+  // try to find the batch
+  auto batch = _command_profiler->get_profile_batch(id);
+  if(batch.commands.empty()) {
+    ss << "Could not find the batch " << id << ".\n";
+  }
+
+  // send the profile info
+  if(!_comm->send_profile_nfo(0, batch.commands)) {
+    ss << "Failed send the profiling info.\n";
+  }
 }
 
 void bbts::coordinator_t::_fail() {

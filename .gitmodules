@@ -4,3 +4,6 @@
 [submodule "third_party/einkorn"]
 	path = third_party/einkorn
 	url = https://github.com/dcbdan/einkorn
+[submodule "third_party/http-server"]
+	path = third_party/http-server
+	url = https://github.com/yhirose/cpp-httplib.git

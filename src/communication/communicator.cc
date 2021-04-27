@@ -71,6 +71,26 @@ bool mpi_communicator_t::send_sync(const void *_bytes, size_t num_bytes, node_id
   return MPI_Ssend(_bytes, num_bytes, MPI_CHAR, _node, _tag + FREE_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
 }
 
+bool mpi_communicator_t::recv_profile_nfo(node_id_t _node, std::vector<bbts::command_profiler_t::log_entry_t> &entries) {
+
+  // wait for a request
+  sync_request_t _req;
+  auto mpi_errno = MPI_Mprobe(_node, FETCH_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+
+  // get the size
+  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
+
+  // resize the entries
+  entries.resize(_req.num_bytes / sizeof(bbts::command_profiler_t::log_entry_t)) ;
+
+  // recieve the message
+  return MPI_Mrecv (entries.data(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) == MPI_SUCCESS;
+}
+
+bool mpi_communicator_t::send_profile_nfo(node_id_t node, std::vector<bbts::command_profiler_t::log_entry_t> &entries) {
+  return MPI_Ssend(entries.data(), entries.size() * sizeof(bbts::command_profiler_t::log_entry_t), MPI_CHAR, node, FETCH_TAG, MPI_COMM_WORLD) == MPI_SUCCESS;
+}
+
 bool mpi_communicator_t::wait_async(mpi_communicator_t::async_request_t &_request) {
   return MPI_Wait(&_request.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS;
 }

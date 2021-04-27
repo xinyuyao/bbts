@@ -191,7 +191,7 @@ TEST(TestCommandCompiler, Test1) {
                        .params = {}},
 
     abstract_command_t{.ud_id = -1,
-                       .type = abstract_command_type_t::DELETE,
+                       .type = abstract_command_type_t::DELETE_TENSOR,
                        .input_tids = {8, 9}, // A(1, 1), B(1, 1)
                        .output_tids = {},
                        .params = {}},
@@ -203,7 +203,7 @@ TEST(TestCommandCompiler, Test1) {
                        .params = {}},
 
     abstract_command_t{.ud_id = -1,
-                       .type = abstract_command_type_t::DELETE,
+                       .type = abstract_command_type_t::DELETE_TENSOR,
                        .input_tids = {10, 11}, // A(0, 1) B(1, 1)
                        .output_tids = {},
                        .params = {}},
@@ -215,7 +215,7 @@ TEST(TestCommandCompiler, Test1) {
                        .params = {}},
 
     abstract_command_t{.ud_id = -1,
-                       .type = abstract_command_type_t::DELETE,
+                       .type = abstract_command_type_t::DELETE_TENSOR,
                        .input_tids = {12, 13}, // A(1, 0) B(0, 1)
                        .output_tids = {},
                        .params = {}},
@@ -227,7 +227,7 @@ TEST(TestCommandCompiler, Test1) {
                        .params = {}},
       
     abstract_command_t{.ud_id = -1,
-                       .type = abstract_command_type_t::DELETE,
+                       .type = abstract_command_type_t::DELETE_TENSOR,
                        .input_tids = {14, 15}, // A(1, 1) B(1, 1)
                        .output_tids = {},
                        .params = {}}
@@ -379,7 +379,7 @@ TEST(TestCommandCompiler, Test2) {
 
     // add the delete to remove the intermediate
     commands.push_back(abstract_command_t{.ud_id = -1,
-                                          .type = abstract_command_type_t::DELETE,
+                                          .type = abstract_command_type_t::DELETE_TENSOR,
                                           .input_tids =  c.second,
                                           .output_tids = {},
                                           .params = {}});

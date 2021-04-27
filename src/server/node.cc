@@ -55,6 +55,13 @@ void bbts::node_t::init() {
   // the scheduler
   _coordinator = std::make_shared<coordinator_t>(_comm, _gpu_scheduler, _res_station, _logger, _command_profiler,
                                                  _storage, _command_runner, _tensor_notifier, _udf_manager, _factory);
+
+  if(_comm->get_rank() == 0) {
+
+    // init the web server
+    _web_server = std::make_shared<web_server_t>(_coordinator);
+
+  }
 }
 
 
@@ -108,6 +115,11 @@ void bbts::node_t::run() {
     remote_notification_sender.push_back(remote_tensor_notification_sender(node));
   }
 
+  // run the web server
+  std::thread web_server = std::thread ([&]() { 
+    if(_comm->get_rank() == 0) { _web_server->run(); }
+  });
+
   /// 2.0 Wait for stuff to finish
 
   // wait for the notification sender threads to finish
@@ -141,6 +153,9 @@ void bbts::node_t::run() {
   for(auto &srt : storage_req_threads) {
     srt.join();
   }
+
+  // wait for the web server to finish
+  web_server.join();
 }
 
 size_t bbts::node_t::get_num_nodes() const {
@@ -151,7 +166,6 @@ size_t bbts::node_t::get_rank() const {
   return _comm->get_rank();
 }
 
-
 void bbts::node_t::print_cluster_info(std::ostream& out) {
 
   out << "Cluster Information : \n";
@@ -159,7 +173,6 @@ void bbts::node_t::print_cluster_info(std::ostream& out) {
   out << "\tNumber of physical cores : " << _config->num_threads << " \n";
   out << "\tTotal RAM : " << _config->total_ram / (1024 * 1024) << " MB \n";
 }
-
 
 std::tuple<bool, std::string> bbts::node_t::load_commands(const std::vector<command_ptr_t> &cmds) {
 
@@ -263,6 +276,11 @@ std::tuple<bool, std::string> bbts::node_t::clear() {
 }
 
 std::tuple<bool, std::string> bbts::node_t::shutdown_cluster() {
+
+  // shutdown the web server
+  if(_comm->get_rank() == 0) { _web_server->shutdown(); }
+
+  // shutdown the coordinator
   return _coordinator->shutdown_cluster();
 }
 

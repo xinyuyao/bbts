@@ -16,7 +16,7 @@ namespace bbts {
 enum class abstract_command_type_t : int {
   APPLY,
   REDUCE,
-  DELETE
+  DELETE_TENSOR
 };
 
 using abstract_ud_spec_id_t = int32_t;
@@ -392,7 +392,7 @@ struct abstract_command_t {
     switch (type) {
       case abstract_command_type_t::APPLY  : type_string = "APPLY"; break;
       case abstract_command_type_t::REDUCE : type_string = "REDUCE"; break;
-      case abstract_command_type_t::DELETE : type_string = "DELETE"; break;
+      case abstract_command_type_t::DELETE_TENSOR : type_string = "DELETE"; break;
     }
 
     // write the stuff
@@ -430,7 +430,7 @@ struct abstract_command_t {
       type = abstract_command_type_t::REDUCE;
     }
     else if(type_string == "DELETE") {
-      type = abstract_command_type_t::DELETE;
+      type = abstract_command_type_t::DELETE_TENSOR;
     }
     else {
       throw std::runtime_error("Unknown type!");

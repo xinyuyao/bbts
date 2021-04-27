@@ -12,6 +12,7 @@
 #include "../tensor/tensor.h"
 #include "../commands/command.h"
 #include "../server/coordinator_ops.h"
+#include "../commands/command_profiler.h"
 
 namespace bbts {
 
@@ -33,10 +34,11 @@ const com_tags NOTIFY_TENSOR_TAG = 5;
 const com_tags RESPONSE_STRING_TAG = 6;
 const com_tags COORDINATOR_BCAST_BYTES = 7;
 const com_tags TENSOR_META_TAG = 8;
+const com_tags FETCH_TAG = 9;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 9;
+const com_tags FREE_TAG = 10;
 
 // the mpi communicator
 class mpi_communicator_t {
@@ -85,6 +87,12 @@ public:
 
   // does the send, method is blocking
   bool send_sync(const void *_bytes, size_t num_bytes, node_id_t _node, com_tags _tag);
+
+  // the recieve the profile information
+  bool recv_profile_nfo(node_id_t node, std::vector<bbts::command_profiler_t::log_entry_t> &entries);
+
+  // send the profile information
+  bool send_profile_nfo(node_id_t node, std::vector<bbts::command_profiler_t::log_entry_t> &entries);
 
   // wait for async request
   bool wait_async(async_request_t &_request);

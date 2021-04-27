@@ -96,7 +96,7 @@ TEST(TestCommandParsing, Test1) {
 
     /// 3. check the third command
 
-    EXPECT_EQ(cmd_list[2].type, parsed_command_t::op_type_t::DELETE);
+    EXPECT_EQ(cmd_list[2].type, parsed_command_t::op_type_t::DELETE_TENSOR);
     EXPECT_EQ(cmd_list[2].def.ud_name, "");
     EXPECT_EQ(cmd_list[2].def.output_types.size(), 0);
     EXPECT_EQ(cmd_list[2].def.input_types.size(), 0);

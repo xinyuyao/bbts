@@ -234,7 +234,7 @@ std::thread create_command_processing_thread(
           // all applies are local
           throw std::runtime_error("How did this happen!");
         }
-      } else if (cmd->type == command_t::DELETE) {
+      } else if (cmd->type == command_t::DELETE_TENSOR) {
 
         // this should never happen
         throw std::runtime_error(

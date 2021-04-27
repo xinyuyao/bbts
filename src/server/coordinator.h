@@ -44,6 +44,12 @@ public:
   // accept a request
   void accept();
 
+  // returns a list of available batch
+  std::vector<bbts::command_profiler_t::batch_nfo_t> get_all_profiling_nfo();
+
+  // get profiling info for a particular batch
+  std::vector<std::vector<bbts::command_profiler_t::log_entry_t>> get_profiling_nfo_for(size_t id);
+
   // schedules all the provided commands
   std::tuple<bool, std::string> schedule_commands(const std::vector<command_ptr_t>& cmds);
 
@@ -88,10 +94,10 @@ public:
 
 private:
 
-
-  
   std::tuple<bool, std::string> _fetch_tensor_info(std::unordered_map<bbts::tid_t, bbts::tensor_meta_t> &meta, 
                                                    std::vector<std::unordered_set<bbts::tid_t>> &locations);
+
+  void _get_profiling_nfo_for(size_t id, std::stringstream &ss);
 
   void _fail();
 

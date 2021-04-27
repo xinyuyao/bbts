@@ -15,6 +15,7 @@
 #include "../commands/tensor_notifier.h"
 #include "../commands/parsed_command.h"
 #include "../ud_functions/gpu_scheduler.h"
+#include "../web/web_server.h"
 
 
 namespace bbts {
@@ -177,6 +178,9 @@ public:
 
   // the gpu scheduler
   gpu_scheduler_ptr_t _gpu_scheduler;
+
+  // the server
+  web_server_ptr_t _web_server;
 };
 
 

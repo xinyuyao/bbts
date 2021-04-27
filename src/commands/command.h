@@ -28,7 +28,7 @@ struct command_t {
     APPLY = 0,
     REDUCE = 1,
     MOVE = 2,
-    DELETE = 3,
+    DELETE_TENSOR = 3,
     SHUTDOWN = 4 // special command to shutdown the server
   };
 
@@ -81,7 +81,7 @@ struct command_t {
   [[nodiscard]] size_t get_num_outputs() const { return _num_outputs; }
 
   // is this a delete
-  [[nodiscard]] bool is_delete() const { return type == op_type_t::DELETE; }
+  [[nodiscard]] bool is_delete() const { return type == op_type_t::DELETE_TENSOR; }
 
   // return the number of bytes
   [[nodiscard]] size_t num_bytes() const { return _num_bytes(_num_parameters, _num_nodes, _num_inputs, _num_outputs); }
@@ -170,7 +170,7 @@ struct command_t {
     switch (type) {
       case MOVE : ss << (_num_outputs == 1 ? "MOVE " : "BROADCAST ") ; break;
       case APPLY : ss << "APPLY "; break;
-      case DELETE : ss << "DELETE "; break;
+      case DELETE_TENSOR : ss << "DELETE "; break;
       case REDUCE : ss << "REDUCE "; break;
       case SHUTDOWN :ss << "SHUTDOWN ";  break;
     }
@@ -409,7 +409,7 @@ struct command_t {
 
     // set the id type and function
     tmp->id = id;
-    tmp->type = DELETE;
+    tmp->type = DELETE_TENSOR;
     tmp->fun_id = {-1, -1};
     tmp->_num_parameters = 0;
     tmp->_num_inputs = in.size();

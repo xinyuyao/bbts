@@ -508,7 +508,7 @@ bool bbts::reservation_station_t::_queue_local(bbts::command_ptr_t _command) {
 bool bbts::reservation_station_t::_retire_command(bbts::command_ptr_t _command) {
 
   // if this is a delete we remove the tensor
-  if (_command->type == command_t::op_type_t::DELETE) {
+  if (_command->type == command_t::op_type_t::DELETE_TENSOR) {
 
     // remove the tensors
     for(int32_t i = 0; i < _command->get_num_inputs(); i++) {
@@ -632,7 +632,7 @@ bool bbts::reservation_station_t::_retire_command(bbts::command_ptr_t _command) 
 bool bbts::reservation_station_t::_retire_remote_command(bbts::command_ptr_t _command) {
 
   // if this is a delete we remove the tensor
-  if (_command->type == command_t::op_type_t::DELETE) {
+  if (_command->type == command_t::op_type_t::DELETE_TENSOR) {
     throw std::runtime_error("There are no remote delete instructions...");
   }
 

@@ -197,7 +197,7 @@ void bbts::command_runner_t::local_command_runner(int32_t thread_id) {
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));
 
-    } else if (cmd->type == command_t::DELETE) {
+    } else if (cmd->type == command_t::DELETE_TENSOR) {
 
       // this should never happen
       throw std::runtime_error("We should never get a delete to execute, delete is implicit...");

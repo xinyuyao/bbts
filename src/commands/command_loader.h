@@ -75,7 +75,7 @@ class command_loader_t {
                                                                   .node = std::get<1>(cmd.outputs[0])});
         }
       }
-      case parsed_command_t::op_type_t::DELETE : {
+      case parsed_command_t::op_type_t::DELETE_TENSOR : {
 
         // make sure there are not outputs
         if(cmd.outputs.size() != 0) {

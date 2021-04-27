@@ -34,7 +34,7 @@ struct parsed_command_t {
     APPLY = 0,
     REDUCE = 1,
     MOVE = 2,
-    DELETE = 3
+    DELETE_TENSOR = 3
   };
 
   // the type of ethe command
@@ -123,7 +123,7 @@ struct parsed_command_t {
         out << ")\n";
         break;
       }
-      case op_type_t::DELETE : {
+      case op_type_t::DELETE_TENSOR : {
         out << "DELETE (";
         print_tensor_list(inputs, out);
         out << ")\n";
@@ -185,7 +185,7 @@ struct parsed_command_list_t {
 
   void add_delete(const std::vector<std::tuple<tid_t, node_id_t>> &in) {
 
-    _commands.push_back(parsed_command_t{.type = parsed_command_t::op_type_t::DELETE,
+    _commands.push_back(parsed_command_t{.type = parsed_command_t::op_type_t::DELETE_TENSOR,
                                          .def = {},
                                          .inputs = in,
                                          .outputs = {}});
