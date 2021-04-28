@@ -76,9 +76,11 @@ void broadcast_op_t::apply() {
       _in = res.create[0].get().tensor;
 
       // recieve the request and check if there is an error
+      _profiler.command_event(_command_id, command_profiler_t::event_t::RECV, _thread_id);
       if (!_comm.receive_request_sync(get_global_rank(peer), _tag, _in, _num_bytes)) {
         std::cout << "Failed to recieve the tensor for node " << _comm.get_rank() << " \n";
       }
+      _profiler.command_event(_command_id, command_profiler_t::event_t::RECV_END, _thread_id);
     }
     else {
 
@@ -91,6 +93,7 @@ void broadcast_op_t::apply() {
     requests.reserve(size);
 
     // send the tensor to the right nodes
+    _profiler.command_event(_command_id, command_profiler_t::event_t::SEND, _thread_id);
     for (int i = hibit + 1, mask = 1 << i; i <= dim; ++i, mask <<= 1) {
       int peer = vrank | mask;
       if (peer < size) {
@@ -120,6 +123,7 @@ void broadcast_op_t::apply() {
         }
       }
     }
+    _profiler.command_event(_command_id, command_profiler_t::event_t::SEND_END, _thread_id);
   });
 
   // we have a storage op here

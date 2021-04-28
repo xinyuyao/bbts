@@ -96,9 +96,11 @@ void reduce_op_t::apply() {
           auto r = res.create[0].get().tensor;
 
           // recieve the request and check if there is an error
+          _profiler.command_event(_command_id, command_profiler_t::event_t::RECV, _thread_id);
           if (!_comm.receive_request_sync(rnk, _tag, r, rhs_size)) {
             std::cout << "Failed to recieve the tensors for a REDUCE operation\n";
           }
+          _profiler.command_event(_command_id, command_profiler_t::event_t::RECV_END, _thread_id);
 
           // how much do we need to allocated
           _input_meta.set<0>(l->_meta);
@@ -186,9 +188,13 @@ void reduce_op_t::apply() {
 
         // send the tensor synchronously
         auto l  = res.get[0].get().tensor;
+
+        // log the send
+        _profiler.command_event(_command_id, command_profiler_t::event_t::SEND, _thread_id);
         if (!_comm.send_sync(l, num_bytes, rnk, _tag)) {        
             std::cout << "Communication failure, could not send the tensor size while REDUCING.\n";
         }
+        _profiler.command_event(_command_id, command_profiler_t::event_t::SEND_END, _thread_id);
 
       });
 

@@ -33,10 +33,12 @@ namespace bbts {
       [&](const storage_t::reservation_result_t &res) {
         
         auto out = res.get[0].get().tensor;
+        _profiler.command_event(_cmd_id, command_profiler_t::event_t::SEND, _thread_id);
         if(!_comm.send_sync(out, _num_bytes, _node, _cmd_id)) {
           std::cout << "Failed to send the tensor, in a MOVE operation.\n";
           exit(-1);
         }
+        _profiler.command_event(_cmd_id, command_profiler_t::event_t::SEND_END, _thread_id);
       });
 
     } else {
@@ -49,10 +51,12 @@ namespace bbts {
         auto out = res.create.front().get().tensor;
 
         // recieve the request and check if there is an error
+        _profiler.command_event(_cmd_id, command_profiler_t::event_t::RECV, _thread_id);
         if (!_comm.receive_request_sync(_node, _cmd_id, out, _num_bytes)) {
           std::cout << "Failed to recieve the tensor, in a MOVE operation.\n";
           exit(-1);
         }
+        _profiler.command_event(_cmd_id, command_profiler_t::event_t::RECV_END, _thread_id);
       });
     }
 

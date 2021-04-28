@@ -279,10 +279,10 @@ void bbts::command_runner_t::local_command_runner(int32_t thread_id) {
         _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
       }
 
-      // the command execution ended
-     _command_profiler->command_event(cmd_id, command_profiler_t::event_t::END, thread_id);
-
     }
+
+    // the command execution ended
+    _command_profiler->command_event(cmd_id, command_profiler_t::event_t::END, thread_id);
   }
 }
 

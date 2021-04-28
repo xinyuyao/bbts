@@ -1,0 +1,78 @@
+<html>
+
+<head>
+
+  <!-- get the jquery and bootstrap -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  <script src="https://unpkg.com/bootstrap-table@1.16.0/dist/bootstrap-table.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.16.0/dist/bootstrap-table.min.css">
+
+  <!-- get the graph library -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <script>
+
+    $(document).ready(function () {
+
+      let searchParams = new URLSearchParams(window.location.search);
+      let id = searchParams.get('id');
+
+      $.getJSON("/api/profile/" + id, function(graph_data) {
+
+        var options = {
+
+          series: graph_data,
+          chart: {
+            height: 5000,
+            type: 'rangeBar'
+          },
+          plotOptions: {
+            bar: {
+              horizontal: true,
+              barHeight: '80%'
+            }
+          },
+          xaxis: {
+            type: 'datetime'
+          },
+          stroke: {
+            width: 3
+          },
+          fill: {
+            type: 'solid',
+            opacity: 0.6
+          },
+          legend: {
+            position: 'top',
+            horizontalAlign: 'left'
+          }
+        };
+        
+        var chart = new ApexCharts(document.querySelector("#chart"), options);
+        chart.render();
+      });
+      
+    });
+
+  </script>
+
+  <title>BarbatTOS Web Interface</title>
+
+</head>
+
+<body>
+
+  <div align="center">
+    <a href="/">
+      <img width="500" src="https://imagizer.imageshack.com/img923/8503/JJbjqm.png">
+    </a>
+  </div>
+
+  <div id="chart">
+  </div>
+
+</body>
+
+</html>
