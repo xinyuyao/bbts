@@ -14,9 +14,9 @@ bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
   outputTypes = {"dense"};
 
   // both inputs zero and one can be used as the inplace output
-  inputInplace = {0, 0};
+  inputInplace = {};
 
-  // this is a CPU dense add
+  // this is a CPU dense mult
   is_gpu = false;
 
   // set the function that actually performs the add
