@@ -3,6 +3,7 @@ cmake-build-release
 .idea
 .build
 .vscode
+*.sbbts
 build
 bin/*
 bin/out.bbts

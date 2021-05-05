@@ -152,9 +152,10 @@ public:
     input_meta.reinit(_input_meta_vec);
     for(size_t idx = 0; idx < input_tids.size(); ++idx) {
 
+      
       auto it = meta.find(input_tids[idx]);
       if(it == meta.end()) {
-        throw std::runtime_error("Failed to find the meta.");
+        throw std::runtime_error("Failed to find the meta for tid " + std::to_string(input_tids[idx]) + ".");
       }
 
       input_meta.set(idx, it->second);
@@ -194,7 +195,8 @@ public:
   // to figure out the optinal aggregation order for non-uniform reduce kernel inputs
   ud_choice_t get_reduce_cost(abstract_ud_spec_id_t fn, 
                               const bbts::ud_impl_t::tensor_params_t &params,
-                              const std::vector<tid_t> input_tids) {
+                              const std::vector<tid_t> input_tids,
+                              const std::vector<tid_t> output_tids) {
     
     // find the implementations for this kernel
     auto impls = matched_functions[fn];
@@ -269,6 +271,11 @@ public:
     // we apply the ud n - 1 times
     average_cpu_cost /= input_tids.size() - 1;
     average_gpu_cost /= input_tids.size() - 1;
+
+    // store the meta
+    for(auto idx = 0; idx < output_tids.size(); ++idx) {
+      meta[output_tids[idx]] = out_meta.get_by_idx(idx);
+    }
 
     // check if we have only the cpu or it is better than the gpu
     if(impls.gpu == nullptr || average_cpu_cost < average_gpu_cost) {
@@ -594,7 +601,8 @@ private:
     command_param_list_t raw_param = {._data = c.params.data(), ._num_elements = c.params.size()};
     auto ud_info = cost_model->get_reduce_cost(c.ud_id, 
                                                bbts::ud_impl_t::tensor_params_t{._params = raw_param}, 
-                                               c.input_tids);
+                                               c.input_tids,
+                                               c.output_tids);
 
     // check if the reduce can be local
     node_id_t local_node = _get_can_be_local(c, tensor_locations);

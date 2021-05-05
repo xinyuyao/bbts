@@ -25,7 +25,7 @@ extern "C" {
 
     udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
           bbts::ud_func_t {
-            .ud_name = "ffnn_activation_mult",
+            .ud_name = "ffnn_act_mult",
             .is_ass = false,
             .is_com = false,
             .num_in = 2,
