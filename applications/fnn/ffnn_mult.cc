@@ -1,17 +1,17 @@
-#include "dense_matrix_mult.h"
-#include "../../tensor/builtin_formats.h"
+#include "ffnn_mult.h"
+#include "ffnn_dense.h"
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
-bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
+bbts::ffnn_mult::ffnn_mult() {
 
   // set the names
   impl_name = "dense_matrix_mult";
   ud_name = "matrix_mult";
 
   // set the input and output types
-  inputTypes = {"dense", "dense"};
-  outputTypes = {"dense"};
+  inputTypes = {"ffnn_dense", "ffnn_dense"};
+  outputTypes = {"ffnn_dense"};
 
   // both inputs zero and one can be used as the inplace output
   inputInplace = {};
@@ -20,41 +20,41 @@ bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
   is_gpu = false;
 
   // set the function that actually performs the add
-  fn = &dense_matrix_mult_t::mult;
+  fn = &ffnn_mult::mult;
 }
 
-size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+size_t bbts::ffnn_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
                                                       const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
-  const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
-  const auto &m_b = _in.get<1>().as<dense_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_b = _in.get<1>().as<ffnn_tensor_meta_t>().m();
   return m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
-void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+void bbts::ffnn_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
                                              const bbts::ud_impl_t::meta_args_t &_in,
                                              bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
-  const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
-  const auto &m_b = _in.get<1>().as<dense_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_b = _in.get<1>().as<ffnn_tensor_meta_t>().m();
 
   // get the output argeters
-  auto &m_out = _out.get<0>().as<dense_tensor_meta_t>().m();
+  auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
 
   // set the output
   m_out = {m_a.num_rows, m_b.num_cols};
 }
 
-void bbts::dense_matrix_mult_t::mult(const bbts::ud_impl_t::tensor_params_t &params,
+void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
                                      const bbts::ud_impl_t::tensor_args_t &_in,
                                      bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
-  auto &a = _in.get<0>().as<dense_tensor_t>();
-  auto &b = _in.get<1>().as<dense_tensor_t>();
-  auto &out = _out.get<0>().as<dense_tensor_t>();
+  auto &a = _in.get<0>().as<ffnn_dense_t>();
+  auto &b = _in.get<1>().as<ffnn_dense_t>();
+  auto &out = _out.get<0>().as<ffnn_dense_t>();
 
   // get the meta for the tensors
   auto &m_a = a.meta().m();

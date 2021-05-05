@@ -117,6 +117,9 @@ struct ud_impl_t {
     uint32_t get_uint() const { return _params[n].u; }
 
     template<size_t n>
+    uint32_t get_bool() const { return _params[n].b; }
+
+    template<size_t n>
     float get_float_or_default(float val) const {
       if(n < _params.size()) { return _params[n].f; }
       else { return val; }
@@ -131,6 +134,12 @@ struct ud_impl_t {
     template<size_t n>
     uint32_t get_uint_or_default(uint32_t val) const {
       if(n < _params.size()) { return _params[n].u; }
+      else { return val; }
+    }
+
+    template<size_t n>
+    uint32_t get_bool_or_default(bool val) const {
+      if(n < _params.size()) { return _params[n].b; }
       else { return val; }
     }
 

@@ -1,28 +1,19 @@
 # get the current directory
-get_filename_component(integration-test-path ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
+get_filename_component(app_path ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
+
+# add the applications target
+add_custom_target(applications)
+
+# this function is used to add an aplication
+function(add_aplication folder_path)
 
 # compile all the objects
-file(GLOB files "${integration-test-path}/*.cc")
+include("${app_path}/${folder_path}/CMakeLists.txt")
 
-# sorts files alphabetically because some tests require
-# files created in previous tests
-list(SORT files)
-add_custom_target(applications)
-foreach(file ${files})
+endfunction()
 
-    # grab the name of the test without the extension
-    get_filename_component(fileName "${file}" NAME_WE)
-
-    # create the test executable
-    add_executable(${fileName} ${file})
-    set_target_properties(${fileName} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
-    # link the stuff we need
-    target_link_libraries(${fileName} ${CMAKE_THREAD_LIBS_INIT})
-    target_link_libraries(${fileName} ${MPI_LIBRARIES})
-    target_link_libraries(${fileName} bbts-common)
-
-    # add the dependencies
-    add_dependencies(applications ${fileName})
-
-endforeach()
+# add the applications
+add_aplication("bmm")
+add_aplication("cpmm")
+add_aplication("fnn")
+add_aplication("node")

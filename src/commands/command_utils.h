@@ -9,6 +9,7 @@ namespace bbts {
     float f;
     int32_t i;
     uint32_t u;
+    bool b;
   };
 
   // the list of parameters
