@@ -73,13 +73,13 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
     }
   }
 
+  // set the new meta data
+  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
+
   // sum their biases if they exists
   if(m_a.has_bias) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
       out.bias()[col] = a.bias()[col] + b.bias()[col];
     }
   }
-
-  // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
 }

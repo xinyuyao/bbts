@@ -22,7 +22,8 @@ add_library(ffnn_lib SHARED ${app_dir}/ffn_lib_init.cc
                             ${app_dir}/ffnn_relu_dif.cc  
                             ${app_dir}/ffnn_weighted_sum.cc
                             ${app_dir}/ffnn_matrix_hadamard.cc  
-                            ${app_dir}/ffnn_sigmoid.cc)
+                            ${app_dir}/ffnn_sigmoid.cc  
+                            ${app_dir}/ffnn_back_mult.cc)
 
 
 # add the dependencies

@@ -44,7 +44,9 @@ void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_para
   auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
 
   // set the output
-  m_out = {m_a.num_rows, m_b.num_cols, false};
+  uint32_t I = m_a.num_rows;
+  uint32_t J = m_b.num_cols;
+  m_out = {I, J, false};
 }
 
 void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
@@ -63,11 +65,11 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
 
   // get the sizes
   uint32_t I = m_a.num_rows;
-  uint32_t J = m_b.num_rows;
+  uint32_t J = m_b.num_cols;
   uint32_t K = m_a.num_cols;
 
   // make sure the matrix size matches, this is only present during the debug build
-  assert(m_a.num_cols == m_b.num_cols);
+  assert(m_a.num_cols == m_b.num_rows);
   assert(m_b.has_bias);
 
   // get the ptrs
@@ -76,7 +78,7 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
   float *in2Data = b.data();
 
   // do the multiply
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, I, J, K, 1.0f, in1Data, K, in2Data, J, 0.0f, outData, J);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, K, in2Data, J, 0.0f, outData, J);
 
   // add the bias
   for (auto row = 0; row < m_a.num_rows; ++row) {
@@ -86,5 +88,5 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
   }
 
   // set the new meta data
-  m_out = {m_a.num_rows, m_b.num_cols, false};
+  m_out = {I, J, false};
 }

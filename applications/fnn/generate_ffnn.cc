@@ -19,6 +19,7 @@ const int32_t FFNN_SIGMOID = 5;
 const int32_t FFNN_UNIFORM_DATA = 6;
 const int32_t FFNN_UNIFORM_WEIGHTS = 7;
 const int32_t FFNN_WEIGHTED_SUM = 8;
+const int32_t FFNN_MULT_BACK = 9;
 
 using namespace bbts;
 
@@ -114,11 +115,12 @@ matrix_index apply_binary(abstract_ud_spec_id_t ud, std::vector<abstract_command
   return std::move(out);
 }
 
-matrix_index generate_multiply(std::vector<abstract_command_t> &commands, 
-                                      matrix_index &lhs, 
-                                      matrix_index &rhs, 
-                                      bool lhs_trans, bool rhs_trans,
-                                      int32_t n, int32_t m, int32_t k) {
+matrix_index generate_multiply(abstract_ud_spec_id_t ud,
+                               std::vector<abstract_command_t> &commands, 
+                               matrix_index &lhs, 
+                               matrix_index &rhs, 
+                               bool lhs_trans, bool rhs_trans,
+                               int32_t n, int32_t m, int32_t k) {
   
   // the parameter data
   std::vector<command_param_t> param_data = {command_param_t{.b = lhs_trans},
@@ -142,7 +144,7 @@ matrix_index generate_multiply(std::vector<abstract_command_t> &commands,
         ridx[{ni, mi}].push_back(tid);
 
         // make the command
-        commands.push_back(abstract_command_t{.ud_id = FFNN_MULT,
+        commands.push_back(abstract_command_t{.ud_id = ud,
                                               .type = abstract_command_type_t::APPLY,
                                               .input_tids = {lhs[{l_row, l_col}], rhs[{r_row, r_col}]}, 
                                               .output_tids = {tid}, 
@@ -226,7 +228,7 @@ int main(int argc, char **argv) {
                                     .output_types = {"ffnn_dense"}});
 
   funs.push_back(abstract_ud_spec_t{.id = FFNN_MULT,
-                                    .ud_name = "matrix_mult",
+                                    .ud_name = "ffnn_mult",
                                     .input_types = {"ffnn_dense", "ffnn_dense"},
                                     .output_types = {"ffnn_dense"}});
 
@@ -260,12 +262,17 @@ int main(int argc, char **argv) {
                                     .input_types = {"ffnn_dense", "ffnn_dense"},
                                     .output_types = {"ffnn_dense"}});
 
+  funs.push_back(abstract_ud_spec_t{.id = FFNN_MULT_BACK,
+                                    .ud_name = "ffnn_back_mult",
+                                    .input_types = {"ffnn_dense", "ffnn_dense"},
+                                    .output_types = {"ffnn_dense"}});
+
   // generate the matrices
   std::vector<abstract_command_t> generate_matrices;
   
   // generate the input batch
   auto x = generate_random(FFNN_UNIFORM_DATA, generate_matrices, num_batch, num_features, num_batch / batch_block, num_features / features_block);
-  auto y = generate_random(FFNN_UNIFORM_DATA, generate_matrices, num_batch, num_features, num_batch / batch_block, num_labels / labels_block);
+  auto y = generate_random(FFNN_UNIFORM_DATA, generate_matrices, num_batch, num_labels, num_batch / batch_block, num_labels / labels_block);
 
   // init the weights
   auto w1 = generate_random(FFNN_UNIFORM_WEIGHTS, generate_matrices, num_features,   embedding_size, num_features / features_block,    embedding_size / embedding_block);
@@ -280,14 +287,14 @@ int main(int argc, char **argv) {
   std::vector<abstract_command_t> ffnn_commands;
   
   // X * W1 + b
-  auto ws_1 = generate_multiply(ffnn_commands, x, w1, false, false,
+  auto ws_1 = generate_multiply(FFNN_ACT_MULT, ffnn_commands, x, w1, false, false,
                                 num_batch / batch_block, embedding_size / embedding_block, num_features / features_block);
 
   // a_1 = relu(X * W1)
   auto a_1 = apply_unary(FFNN_RELU, ffnn_commands, ws_1, {});
 
   // a_1 * W2 + b
-  auto ws_2 = generate_multiply(ffnn_commands, a_1, w2, false, false,
+  auto ws_2 = generate_multiply(FFNN_ACT_MULT, ffnn_commands, a_1, w2, false, false,
                                 num_batch / batch_block, num_labels / labels_block, embedding_size / embedding_block);
 
   // a_2 = sigmoid(a_1 * W2)
@@ -298,12 +305,12 @@ int main(int argc, char **argv) {
   auto delta_a_2 = apply_binary(FFNN_WEIGHTED_SUM, ffnn_commands, a_2, y, {});
 
   // ∇w_2 = a_1^𝑇 * ∇a_2
-  auto delta_w_2 = generate_multiply(ffnn_commands, a_1, delta_a_2, true, false,
-                                            embedding_size / embedding_block, num_labels / labels_block, num_batch / batch_block); 
+  auto delta_w_2 = generate_multiply(FFNN_MULT_BACK, ffnn_commands, a_1, delta_a_2, true, false,
+                                     embedding_size / embedding_block, num_labels / labels_block, num_batch / batch_block); 
   
   // ∇a_2 * W_2^𝑇
-  auto delta_a_1_tmp = generate_multiply(ffnn_commands, delta_a_2, w2, false, true,
-                                                num_batch / batch_block, embedding_size / embedding_block, num_labels / labels_block); 
+  auto delta_a_1_tmp = generate_multiply(FFNN_MULT, ffnn_commands, delta_a_2, w2, false, true,
+                                         num_batch / batch_block, embedding_size / embedding_block, num_labels / labels_block); 
 
   // relu'(a1)
   auto div_a_1 = apply_unary(FFNN_RELU_DIF, ffnn_commands, a_1, {});
@@ -312,7 +319,7 @@ int main(int argc, char **argv) {
   auto delta_a_1 = apply_binary(FFNN_MATRIX_HADAMARD, ffnn_commands, delta_a_1_tmp, div_a_1, {});
 
   // ∇w_1 = x^𝑇 * ∇a_1
-  auto delta_w_1 = generate_multiply(ffnn_commands, x, delta_a_1, true, false,
+  auto delta_w_1 = generate_multiply(FFNN_MULT_BACK, ffnn_commands, x, delta_a_1, true, false,
                                      num_features / features_block, embedding_size / embedding_block, num_batch / batch_block); 
 
   // update the weights

@@ -64,9 +64,10 @@ void bbts::ffnn_weighted_sum::add(const bbts::ud_impl_t::tensor_params_t &params
   // make sure the matrix size matches, this is only
   // present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
+
+  std::cout << m_a.num_cols << " " << m_b.num_cols << '\n';
   assert(m_a.num_cols == m_b.num_cols);
-  assert(m_a.num_rows == m_out.num_rows);
-  assert(m_a.num_cols == m_out.num_cols);
+  assert(m_a.has_bias == m_b.has_bias);
 
   // add a and b
   for (auto row = 0; row < m_a.num_rows; ++row) {
@@ -76,13 +77,13 @@ void bbts::ffnn_weighted_sum::add(const bbts::ud_impl_t::tensor_params_t &params
     }
   }
 
-  // sum their biases if they exists
-  if(m_a.has_bias) {
-    for (auto col = 0; col < m_a.num_cols; ++col) {
-      out.bias()[col] =ca * a.bias()[col] + cb * b.bias()[col];
-    }
-  }
-
   // set the new meta data
   m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
+
+  // sum their biases if they exists
+  if(m_a.has_bias && m_b.has_bias) {
+    for (auto col = 0; col < m_a.num_cols; ++col) {
+      out.bias()[col] = ca * a.bias()[col] + cb * b.bias()[col];
+    }
+  }
 }

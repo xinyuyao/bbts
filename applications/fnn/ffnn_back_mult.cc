@@ -1,13 +1,13 @@
-#include "ffnn_mult.h"
+#include "ffnn_back_mult.h"
 #include "ffnn_dense.h"
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
-bbts::ffnn_mult::ffnn_mult() {
+bbts::ffnn_back_mult::ffnn_back_mult() {
 
   // set the names
-  impl_name = "ffnn_mult_cpu";
-  ud_name = "ffnn_mult";
+  impl_name = "ffnn_back_mult_cpu";
+  ud_name = "ffnn_back_mult";
 
   // set the input and output types
   inputTypes = {"ffnn_dense", "ffnn_dense"};
@@ -20,10 +20,10 @@ bbts::ffnn_mult::ffnn_mult() {
   is_gpu = false;
 
   // set the function that actually performs the add
-  fn = &ffnn_mult::mult;
+  fn = &ffnn_back_mult::mult;
 }
 
-size_t bbts::ffnn_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
+size_t bbts::ffnn_back_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
                                                       const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
@@ -32,7 +32,7 @@ size_t bbts::ffnn_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_params
   return m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
-void bbts::ffnn_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
+void bbts::ffnn_back_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
                                              const bbts::ud_impl_t::meta_args_t &_in,
                                              bbts::ud_impl_t::meta_args_t &_out) const {
 
@@ -43,15 +43,13 @@ void bbts::ffnn_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &param
   // get the output argeters
   auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
 
-  // get the sizes
-  uint32_t I = !params.get_bool_or_default<0>(false) ? m_a.num_rows : m_a.num_cols;
-  uint32_t J = !params.get_bool_or_default<1>(false) ? m_b.num_cols : m_b.num_rows;
-
   // set the output
-  m_out = {I, J, false};
+  uint32_t I = m_a.num_cols;
+  uint32_t J = m_b.num_cols;
+  m_out = {I, J, true};
 }
 
-void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
+void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
                                      const bbts::ud_impl_t::tensor_args_t &_in,
                                      bbts::ud_impl_t::tensor_args_t &_out) {
 
@@ -66,28 +64,28 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   auto &m_out = out.meta().m();
 
   // get the sizes
-  uint32_t I = !params.get_bool_or_default<0>(false) ? m_a.num_rows : m_a.num_cols;
-  uint32_t J = !params.get_bool_or_default<1>(false) ? m_b.num_cols : m_b.num_rows;
-
-  // get the inner dimensions
-  uint32_t K1 = !params.get_bool_or_default<0>(false) ? m_a.num_cols : m_a.num_rows;
-  uint32_t K2 = !params.get_bool_or_default<1>(false) ? m_a.num_rows : m_a.num_cols;
+  uint32_t I = m_a.num_cols;
+  uint32_t J = m_b.num_cols;
+  uint32_t K = m_a.num_rows;
 
   // make sure the matrix size matches, this is only present during the debug build
-  assert(K1 == K2);
+  assert(m_a.num_rows == m_b.num_rows);
 
   // get the ptrs
   float *outData = out.data();
   float *in1Data = a.data();
   float *in2Data = b.data();
 
-  // figure out if we need to transpose
-  CBLAS_TRANSPOSE l_trans = params.get_bool_or_default<0>(false) ? CblasTrans : CblasNoTrans;
-  CBLAS_TRANSPOSE r_trans = params.get_bool_or_default<1>(false) ? CblasTrans : CblasNoTrans;
-
   // do the multiply
-  cblas_sgemm(CblasRowMajor, l_trans, r_trans, I, J, K1, 1.0f, in1Data, K1, in2Data, J, 0.0f, outData, J);
+  cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, K, in2Data, J, 0.0f, outData, J);
 
   // set the new meta data
-  m_out = {I, J, false};
+  m_out = {I, J, true};
+
+  // add the bias
+  for (auto row = 0; row < m_a.num_rows; ++row) {
+    for (auto col = 0; col < m_a.num_cols; ++col) {
+      out.bias()[col] += b.data()[row * m_a.num_cols + col];
+    }
+  }
 }

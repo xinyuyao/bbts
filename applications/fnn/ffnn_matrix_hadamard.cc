@@ -62,8 +62,9 @@ void bbts::ffnn_matrix_hadamard::mult(const bbts::ud_impl_t::tensor_params_t &pa
   assert(m_a.num_rows == m_b.num_rows);
   assert(m_a.num_cols == m_b.num_cols);
   assert(m_a.has_bias == m_b.has_bias);
-  assert(m_a.num_rows == m_out.num_rows);
-  assert(m_a.num_cols == m_out.num_cols);
+
+  // set the new meta data
+  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
 
   // multiply a and b
   for (auto row = 0; row < m_a.num_rows; ++row) {
@@ -79,7 +80,4 @@ void bbts::ffnn_matrix_hadamard::mult(const bbts::ud_impl_t::tensor_params_t &pa
       out.bias()[col] = a.bias()[col] * b.bias()[col];
     }
   }
-
-  // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
 }
