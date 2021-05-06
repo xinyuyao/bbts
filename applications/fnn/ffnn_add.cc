@@ -57,29 +57,33 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
   auto &m_b = b.meta().m();
   auto &m_out = out.meta().m();
 
+  // set the new meta data
+  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
+
   // make sure the matrix size matches, this is only
   // present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
   assert(m_a.num_cols == m_b.num_cols);
   assert(m_a.has_bias == m_b.has_bias);
-  assert(m_a.num_rows == m_out.num_rows);
-  assert(m_a.num_cols == m_out.num_cols);
 
   // add a and b
   for (auto row = 0; row < m_a.num_rows; ++row) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
-      out.data()[row * m_a.num_cols + col] = a.data()[row * m_a.num_cols + col] +
-          b.data()[row * m_a.num_cols + col];
+      // std::cout << row * m_a.num_cols + col << "\n" << std::flush;
+      auto tmp_a = a.data()[row * m_a.num_cols + col];
+      auto tmp_b = b.data()[row * m_b.num_cols + col];
+
+      out.data()[row * m_a.num_cols + col] = tmp_a + tmp_b;
     }
   }
 
-  // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
-
-  // sum their biases if they exists
-  if(m_a.has_bias) {
+  if(m_a.has_bias && m_b.has_bias) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
-      out.bias()[col] = a.bias()[col] + b.bias()[col];
+
+      float ta = a.bias()[col];
+      float tb = b.bias()[col];
+
+      out.bias()[col] = ta + tb;
     }
   }
 }

@@ -5,21 +5,22 @@
 #include <map>
 #include <ostream>
 #include <utility>
+#include <vector>
 
 #include "../../src/tensor/tensor.h"
 #include "../../src/commands/command_compiler.h"
 
 const int32_t FFNN_ACT_MULT = 0;
 const int32_t FFNN_ADD = 1;
-const int32_t FFNN_MATRIX_HADAMARD = 1;
-const int32_t FFNN_MULT = 2;
-const int32_t FFNN_RELU_DIF = 3;
-const int32_t FFNN_RELU = 4;
-const int32_t FFNN_SIGMOID = 5;
-const int32_t FFNN_UNIFORM_DATA = 6;
-const int32_t FFNN_UNIFORM_WEIGHTS = 7;
-const int32_t FFNN_WEIGHTED_SUM = 8;
-const int32_t FFNN_MULT_BACK = 9;
+const int32_t FFNN_MATRIX_HADAMARD = 2;
+const int32_t FFNN_MULT = 3;
+const int32_t FFNN_RELU_DIF = 4;
+const int32_t FFNN_RELU = 5;
+const int32_t FFNN_SIGMOID = 6;
+const int32_t FFNN_UNIFORM_DATA = 7;
+const int32_t FFNN_UNIFORM_WEIGHTS = 8;
+const int32_t FFNN_WEIGHTED_SUM = 9;
+const int32_t FFNN_MULT_BACK = 10;
 
 using namespace bbts;
 
@@ -44,6 +45,22 @@ bbts::tid_t currentTID = 0;
 using matrix_index = std::map<std::tuple<int32_t, int32_t>, bbts::tid_t>;
 using matrix_reduce_index = std::map<std::tuple<int32_t, int32_t>, std::vector<bbts::tid_t>>;
 
+
+void remove_matrix(const matrix_index &idx, std::vector<abstract_command_t> &commands) {
+
+  // make all the removes
+  std::vector<tid_t> to_remove;
+  for(auto it : idx ) {
+    to_remove.push_back(it.second);
+  }
+
+  // add the delete to remove the intermediate
+  commands.push_back(abstract_command_t{.ud_id = -1,
+                                        .type = abstract_command_type_t::DELETE,
+                                        .input_tids =  std::move(to_remove),
+                                        .output_tids = {},
+                                        .params = {}});
+}
 
 matrix_index generate_random(abstract_ud_spec_id_t ud, std::vector<abstract_command_t> &commands, 
                              size_t num_rows, size_t num_cols, 
@@ -326,6 +343,20 @@ int main(int argc, char **argv) {
   param_data = {command_param_t{.f = 1.0f}, command_param_t{.f = -learning_rate}};
   auto updated_w1 = apply_binary(FFNN_WEIGHTED_SUM, ffnn_commands, w1, delta_w_1, {});
   auto updated_w2 = apply_binary(FFNN_WEIGHTED_SUM, ffnn_commands, w2, delta_w_2, {});
+
+  // do a ton of removes
+  remove_matrix(w1, ffnn_commands);
+  remove_matrix(w2, ffnn_commands);
+  remove_matrix(ws_1, ffnn_commands);
+  remove_matrix(ws_2, ffnn_commands);
+  remove_matrix(a_1, ffnn_commands);
+  remove_matrix(a_2, ffnn_commands);
+  remove_matrix(delta_a_2, ffnn_commands);
+  remove_matrix(delta_w_2, ffnn_commands);
+  remove_matrix(delta_a_1_tmp, ffnn_commands);
+  remove_matrix(div_a_1, ffnn_commands);
+  remove_matrix(delta_a_1, ffnn_commands);
+  remove_matrix(delta_w_1, ffnn_commands);
 
   // write the generated
   std::ofstream gen2("run.sbbts");

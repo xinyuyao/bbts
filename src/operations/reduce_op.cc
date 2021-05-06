@@ -223,6 +223,10 @@ bbts::tid_t reduce_op_t::apply_preagg() {
       // get the meta data
       _reduce_op.get_out_meta(_params, _input_meta, _output_meta);
 
+      // set the output meta
+      auto &type = _reduce_op.outputTypes[0];
+      _output_meta.get_by_idx(0).fmt_id = _factory.get_tensor_ftm(type);
+
       // return the size of the tensor
       output_size = _factory.get_tensor_size(_output_meta.get<0>());
     });

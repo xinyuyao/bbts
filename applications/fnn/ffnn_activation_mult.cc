@@ -1,5 +1,6 @@
 #include "ffnn_activation_mult.h"
 #include "ffnn_dense.h"
+#include <cassert>
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
@@ -33,8 +34,8 @@ size_t bbts::ffnn_activation_mult::get_complexity_hint(const bbts::ud_impl_t::te
 }
 
 void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
-                                             const bbts::ud_impl_t::meta_args_t &_in,
-                                             bbts::ud_impl_t::meta_args_t &_out) const {
+                                              const bbts::ud_impl_t::meta_args_t &_in,
+                                              bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
   const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
@@ -47,6 +48,9 @@ void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_para
   uint32_t I = m_a.num_rows;
   uint32_t J = m_b.num_cols;
   m_out = {I, J, false};
+
+  auto num_elements = m_out.num_cols * m_out.num_rows;
+  num_elements += m_out.has_bias ? m_out.num_cols : 0;
 }
 
 void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
@@ -77,16 +81,16 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
   float *in1Data = a.data();
   float *in2Data = b.data();
 
-  // do the multiply
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, K, in2Data, J, 0.0f, outData, J);
-
-  // add the bias
-  for (auto row = 0; row < m_a.num_rows; ++row) {
-    for (auto col = 0; col < m_a.num_cols; ++col) {
-      out.data()[row * m_a.num_cols + col] += b.bias()[col];
-    }
-  }
-
   // set the new meta data
   m_out = {I, J, false};
+
+  // do the multiply
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
+
+  // add the bias
+  for (auto row = 0; row < I; ++row) {
+    for (auto col = 0; col < J; ++col) {
+      outData[row * J + col] += b.bias()[col];
+    }
+  }
 }

@@ -86,7 +86,7 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   CBLAS_TRANSPOSE r_trans = params.get_bool_or_default<1>(false) ? CblasTrans : CblasNoTrans;
 
   // do the multiply
-  cblas_sgemm(CblasRowMajor, l_trans, r_trans, I, J, K1, 1.0f, in1Data, K1, in2Data, J, 0.0f, outData, J);
+  cblas_sgemm(CblasRowMajor, l_trans, r_trans, I, J, K1, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
 
   // set the new meta data
   m_out = {I, J, false};

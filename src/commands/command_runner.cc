@@ -104,7 +104,7 @@ void bbts::command_runner_t::local_command_runner() {
         for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
 
           // store it
-          auto t = res.get[0].get().tensor;
+          auto t = res.get[idx].get().tensor;
           assert(t != nullptr);
           input_meta_args.set(idx, t->_meta);
         }

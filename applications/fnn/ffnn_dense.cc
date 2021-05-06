@@ -18,8 +18,11 @@ tensor_creation_fs_t bbts::ffnn_dense_t::get_creation_fs() {
   auto size = [](const tensor_meta_t &_meta) {
     auto &m = *(ffnn_tensor_meta_t *) &_meta;
 
+    auto num_elements = m.m().num_cols * m.m().num_rows;
+    num_elements += m.m().has_bias ? m.m().num_cols : 0;
+
     // we add the bias if we have it to the size
-    return sizeof(tensor_meta_t) + (m.m().num_cols * m.m().num_rows + (m.m().has_bias ? m.m().num_cols : 0)) * sizeof(float);
+    return sizeof(tensor_meta_t) + num_elements * sizeof(float);
   };
 
   auto pnt = [](const void *here, std::stringstream &ss) {
