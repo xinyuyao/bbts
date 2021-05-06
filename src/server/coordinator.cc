@@ -487,7 +487,7 @@ bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_siz
 
   // make the temporary file name
   int rank = _comm->get_rank();
-  std::string filename = std::string("/tmp/bbts_lib_") + std::to_string(shared_library_item_t::last_so) + ".so";
+  std::string filename = std::string("/tmp/bbts_lib_") + std::to_string(_comm->get_rank())  + "_" + std::to_string(shared_library_item_t::last_so) + ".so";
 
   // this will modify filename
   int filedes = open(filename.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
