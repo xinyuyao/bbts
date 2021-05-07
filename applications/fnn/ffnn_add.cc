@@ -30,8 +30,8 @@ size_t bbts::ffnn_add::get_complexity_hint(const bbts::ud_impl_t::tensor_params_
 }
 
 void bbts::ffnn_add::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
-                                            const bbts::ud_impl_t::meta_args_t &_in,
-                                            bbts::ud_impl_t::meta_args_t &_out) const {
+                                  const bbts::ud_impl_t::meta_args_t &_in,
+                                  bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
   const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();

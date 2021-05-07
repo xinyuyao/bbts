@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -442,6 +443,10 @@ struct abstract_command_t {
     else {
       throw std::runtime_error("Unknown type!");
     }
+  
+    if(type == abstract_command_type_t::REDUCE) {
+      assert(num_input_tids != 0);
+    }
 
     input_tids.resize(num_input_tids);
     for(auto &tid : input_tids) {
@@ -590,12 +595,12 @@ private:
   }
 
   void generate_reduce(command_id_t &cur_cmd,
-                                std::vector<bbts::command_ptr_t> &out_commands,
-                                const abstract_command_t &c, 
-                                std::vector<node_cost_t> &costs,
-                                std::vector<std::unordered_set<tid_t>> &tensor_locations,
-                                float &max_compute_cost,
-                                float &max_transfer_cost) {
+                       std::vector<bbts::command_ptr_t> &out_commands,
+                       const abstract_command_t &c, 
+                       std::vector<node_cost_t> &costs,
+                       std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                       float &max_compute_cost,
+                       float &max_transfer_cost) {
 
     // get the compute cost of running this
     command_param_list_t raw_param = {._data = c.params.data(), ._num_elements = c.params.size()};
@@ -649,6 +654,11 @@ private:
 
     // go through all the nodes and figure out the compute overhead
     for(node_id_t node = 0; node < num_nodes; ++node) {
+
+      // if this node is not one of the inputs nodes skip it... TODO make this faster 
+      if(std::find(assigned_nodes.begin(), assigned_nodes.end(), node) == assigned_nodes.end()) {
+        continue;
+      }
 
       // the transfer overhead
       auto compute_overhead = std::max<float>(costs[node].compute_cost + ud_info.cost - max_compute_cost, 0);

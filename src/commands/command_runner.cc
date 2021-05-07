@@ -3,6 +3,7 @@
 #include "../operations/reduce_op.h"
 #include "../operations/broadcast_op.h"
 #include "../operations/local_reduce_op.h"
+#include <cassert>
 #include <thread>
 
 bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
@@ -238,6 +239,9 @@ void bbts::command_runner_t::local_command_runner() {
             inputs.push_back(in.tid);
           }
         }
+        
+        // make sure this does not happen
+        assert(inputs.size() != 0);
 
         // create the move operation
         reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
@@ -328,6 +332,7 @@ void bbts::command_runner_t::remote_command_handler() {
         inputs.reserve(cmd_inputs.size());
 
         // get all the tensors we need
+        assert(!cmd_inputs.empty());
         for(const auto& in : cmd_inputs) {
 
           // check if the node
@@ -337,6 +342,9 @@ void bbts::command_runner_t::remote_command_handler() {
             inputs.push_back(in.tid);
           }
         }
+
+        // make sure this does not happen
+        assert(inputs.size() != 0);
 
         // create the move operation
         reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud);

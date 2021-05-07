@@ -1,4 +1,5 @@
 #include "reduce_op.h"
+#include <cassert>
 #include <cstddef>
 
 namespace bbts {
@@ -195,6 +196,7 @@ void reduce_op_t::apply() {
 bbts::tid_t reduce_op_t::apply_preagg() {
 
   // check if there is only one input
+  assert(_inputs.size() != 0);
   if(_inputs.size() == 1) {
     return _inputs.front();
   }
