@@ -1,5 +1,5 @@
 #include "ffnn_uniform_weights.h"
-#include "ffnn_dense.h"
+#include "ffnn_types.h"
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
@@ -40,7 +40,7 @@ void bbts::ffnn_uniform_weights::get_out_meta(const bbts::ud_impl_t::tensor_para
                                          bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the output argeters
-  auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
+  auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
   m_out = { params.get_uint<0>() + 1,  params.get_uint<1>(), true };

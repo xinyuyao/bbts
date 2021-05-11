@@ -21,6 +21,8 @@ const int32_t FFNN_UNIFORM_DATA = 7;
 const int32_t FFNN_UNIFORM_WEIGHTS = 8;
 const int32_t FFNN_WEIGHTED_SUM = 9;
 const int32_t FFNN_MULT_BACK = 10;
+const int32_t FFNN_UNIFORM_SPARSE = 11;
+const int32_t FFNN_WEIGHTED_SUM_SPARSE_DENSE = 12;
 
 using namespace bbts;
 
@@ -284,12 +286,22 @@ int main(int argc, char **argv) {
                                     .input_types = {"ffnn_dense", "ffnn_dense"},
                                     .output_types = {"ffnn_dense"}});
 
+  funs.push_back(abstract_ud_spec_t{.id = FFNN_UNIFORM_SPARSE,
+                                    .ud_name = "ffnn_uniform_sparse_data",
+                                    .input_types = {},
+                                    .output_types = {"ffnn_sparse"}});
+
+  funs.push_back(abstract_ud_spec_t{.id = FFNN_WEIGHTED_SUM_SPARSE_DENSE,
+                                    .ud_name = "ffnn_weighted_sum_sparse_dense",
+                                    .input_types = {"ffnn_sparse", "ffnn_dense"},
+                                    .output_types = {"ffnn_dense"}});
+
   // generate the matrices
   std::vector<abstract_command_t> generate_matrices;
   
   // generate the input batch
   auto x = generate_random(FFNN_UNIFORM_DATA, generate_matrices, num_batch, num_features, num_batch / batch_block, num_features / features_block);
-  auto y = generate_random(FFNN_UNIFORM_DATA, generate_matrices, num_batch, num_labels, num_batch / batch_block, num_labels / labels_block);
+  auto y = generate_random(FFNN_UNIFORM_SPARSE, generate_matrices, num_batch, num_labels, num_batch / batch_block, num_labels / labels_block);
 
   // init the weights
   auto w1 = generate_random(FFNN_UNIFORM_WEIGHTS, generate_matrices, num_features,   embedding_size, num_features / features_block,    embedding_size / embedding_block);
@@ -318,8 +330,8 @@ int main(int argc, char **argv) {
   auto a_2 = apply_unary(FFNN_SIGMOID, ffnn_commands, ws_2, {});
 
   // ∇a_2 = a2 − Y
-  std::vector<command_param_t> param_data = {command_param_t{.f = 1.0f}, command_param_t{.f = -1.0f}};
-  auto delta_a_2 = apply_binary(FFNN_WEIGHTED_SUM, ffnn_commands, a_2, y, {});
+  std::vector<command_param_t> param_data = {command_param_t{.f = -1.0f}, command_param_t{.f = 1.0f}};
+  auto delta_a_2 = apply_binary(FFNN_WEIGHTED_SUM_SPARSE_DENSE, ffnn_commands, y, a_2, {});
 
   // ∇w_2 = a_1^𝑇 * ∇a_2
   auto delta_w_2 = generate_multiply(FFNN_MULT_BACK, ffnn_commands, a_1, delta_a_2, true, false,
@@ -367,13 +379,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-
-// remove all the macros just in case
-#undef FFNN_ADD
-#undef FFNN_MULT
-#undef UNIFORM
-#undef MATRIX_MATRIX_HADAMARD
-#undef MATRIX_SIGMOID
-#undef MATRIX_RELU_DIF
-#undef MATRIX_WEIGHTED_SUM
-#undef MATRIX_RELU

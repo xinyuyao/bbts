@@ -1,4 +1,4 @@
-#include "ffnn_dense.h"
+#include "ffnn_types.h"
 #include "ffnn_add.h"
 
 bbts::ffnn_add::ffnn_add() {
@@ -25,7 +25,7 @@ size_t bbts::ffnn_add::get_complexity_hint(const bbts::ud_impl_t::tensor_params_
                                                      const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m)
-  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
   return m_a.num_rows * m_a.num_cols;
 }
 
@@ -34,10 +34,10 @@ void bbts::ffnn_add::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params
                                   bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
-  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
 
   // get the output argeters
-  auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
+  auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
   m_out = { m_a.num_rows, m_a.num_cols, m_a.has_bias};

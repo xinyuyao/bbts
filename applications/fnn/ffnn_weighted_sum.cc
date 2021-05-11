@@ -1,5 +1,6 @@
-#include "ffnn_dense.h"
+#include "ffnn_types.h"
 #include "ffnn_weighted_sum.h"
+#include <cassert>
 
 bbts::ffnn_weighted_sum::ffnn_weighted_sum() {
 
@@ -25,7 +26,7 @@ size_t bbts::ffnn_weighted_sum::get_complexity_hint(const bbts::ud_impl_t::tenso
                                                      const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m)
-  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
   return m_a.num_rows * m_a.num_cols;
 }
 
@@ -34,10 +35,10 @@ void bbts::ffnn_weighted_sum::get_out_meta(const bbts::ud_impl_t::tensor_params_
                                             bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
-  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
 
   // get the output argeters
-  auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
+  auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
   m_out = { m_a.num_rows, m_a.num_cols, m_a.has_bias};
@@ -64,7 +65,6 @@ void bbts::ffnn_weighted_sum::add(const bbts::ud_impl_t::tensor_params_t &params
   // make sure the matrix size matches, this is only
   // present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
-
   assert(m_a.num_cols == m_b.num_cols);
   assert(m_a.has_bias == m_b.has_bias);
 

@@ -11,19 +11,21 @@ target_link_libraries(generate_ffnn bbts-common)
 
 
 
-add_library(ffnn_lib SHARED ${app_dir}/ffn_lib_init.cc  
+add_library(ffnn_lib SHARED ${app_dir}/ffnn_lib_init.cc  
                             ${app_dir}/ffnn_activation_mult.cc  
                             ${app_dir}/ffnn_mult.cc      
                             ${app_dir}/ffnn_uniform_data.cc
                             ${app_dir}/ffnn_add.cc              
                             ${app_dir}/ffnn_relu.cc      
                             ${app_dir}/ffnn_uniform_weights.cc
-                            ${app_dir}/ffnn_dense.cc            
+                            ${app_dir}/ffnn_types.cc            
                             ${app_dir}/ffnn_relu_dif.cc  
                             ${app_dir}/ffnn_weighted_sum.cc
                             ${app_dir}/ffnn_matrix_hadamard.cc  
                             ${app_dir}/ffnn_sigmoid.cc  
-                            ${app_dir}/ffnn_back_mult.cc)
+                            ${app_dir}/ffnn_back_mult.cc  
+                            ${app_dir}/ffnn_uniform_sparse_data.cc  
+                            ${app_dir}/ffnn_weighted_sum_sparse_dense.cc)
 
 
 # add the dependencies

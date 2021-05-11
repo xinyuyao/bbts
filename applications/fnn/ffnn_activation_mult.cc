@@ -1,5 +1,5 @@
 #include "ffnn_activation_mult.h"
-#include "ffnn_dense.h"
+#include "ffnn_types.h"
 #include <cassert>
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
@@ -28,8 +28,8 @@ size_t bbts::ffnn_activation_mult::get_complexity_hint(const bbts::ud_impl_t::te
                                                       const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
-  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
-  const auto &m_b = _in.get<1>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
+  const auto &m_b = _in.get<1>().as<ffnn_dense_meta_t>().m();
   return m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
@@ -38,11 +38,11 @@ void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_para
                                               bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
-  const auto &m_a = _in.get<0>().as<ffnn_tensor_meta_t>().m();
-  const auto &m_b = _in.get<1>().as<ffnn_tensor_meta_t>().m();
+  const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
+  const auto &m_b = _in.get<1>().as<ffnn_dense_meta_t>().m();
 
   // get the output argeters
-  auto &m_out = _out.get<0>().as<ffnn_tensor_meta_t>().m();
+  auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the output
   uint32_t I = m_a.num_rows;
