@@ -1,5 +1,6 @@
 #include "dense_uniform.h"
 #include "../../tensor/builtin_formats.h"
+#include <cstdint>
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
@@ -60,8 +61,8 @@ void bbts::dense_uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t 
   auto &m_out = out.meta().m();
 
   // the number of rows and columns
-  auto numRows = params.get_uint<0>();
-  auto numCols = params.get_uint<1>();
+  auto numRows = (uint32_t) params.get_int<0>();
+  auto numCols = (uint32_t) params.get_int<1>();
 
   // the left and right boundary
   auto left = params.get_float_or_default<2>(0.0f);
@@ -72,8 +73,6 @@ void bbts::dense_uniform_t::uniform_rand(const bbts::ud_impl_t::tensor_params_t 
 
   // create a bunch of random numbers
   vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, (int32_t) (numRows * numCols), out.data(), left, right);
-
-  //for(int i = 0; i < numRows * numCols; ++i) { out.data()[i] = 1.0f; }
 
   // delete the stream
   vslDeleteStream(&stream);

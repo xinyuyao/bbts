@@ -1,5 +1,6 @@
 #include "reservation_station.h"
 #include "../server/static_config.h"
+#include <cassert>
 
 bbts::reservation_station_t::reservation_station_t(bbts::node_id_t _node_id, int32_t num_nodes) : _my_rank(_node_id),
                                                                                                   _num_nodes(num_nodes),
@@ -406,6 +407,7 @@ bool bbts::reservation_station_t::_queue_local(bbts::command_ptr_t _command) {
       else {
 
         // ok the tensor is not ready for deletion schedule it
+        assert(s.scheduled_for_delition == false);
         s.scheduled_for_delition = true;
       }
 

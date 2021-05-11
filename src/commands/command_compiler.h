@@ -554,7 +554,7 @@ command_compiler_t(cost_model_ptr_t cost_model, size_t num_nodes) : cost_model(c
     }
 
     // insert the postprocess deletions
-    _insert_deletions(out_commands, cur_cmd);
+    _insert_deletions(out_commands, cur_cmd, tensor_locations);
 
     // return the commands
     return std::move(out_commands);
@@ -924,7 +924,9 @@ private:
     out_commands[cmd_id] = command_t::create_broadcast(cmd_id, cmd->get_input(0), out);
   }
 
-  void _insert_deletions(std::vector<bbts::command_ptr_t> &out_commands, command_id_t cur_cmd) {
+  void _insert_deletions(std::vector<bbts::command_ptr_t> &out_commands, 
+                         command_id_t cur_cmd,
+                         std::vector<std::unordered_set<tid_t>> &tensor_locations) {
     
     // 
     std::vector<command_t::tid_node_id_t> in(1);
@@ -935,8 +937,16 @@ private:
 
       // make a delete for each of them
       for(size_t idx = 0; idx < cmd->get_num_outputs(); idx++) {
+
+        // make sure the tensor is acutally located there
         in[0] = cmd->get_output(idx);
-        out_commands.push_back(command_t::create_delete(cur_cmd++, in));
+        auto jt = tensor_locations[in[0].node].find(in[0].tid);
+        if(jt != tensor_locations[in[0].node].end()) {
+
+          // delete it
+          tensor_locations[in[0].node].erase(jt);
+          out_commands.push_back(command_t::create_delete(cur_cmd++, in));
+        }
       }
     }
   }
