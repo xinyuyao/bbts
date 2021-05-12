@@ -442,27 +442,10 @@ bool mpi_communicator_t::expect_coord_cmds(size_t num_cmds, std::vector<command_
 }
 
 bool mpi_communicator_t::expect_bytes(size_t num_bytes, std::vector<char> &out) {
-  out.reserve(num_bytes);
-
-  // wait for a request
-  sync_request_t _req;
-  auto mpi_errno = MPI_Mprobe(ANY_NODE, COORDINATOR_BCAST_BYTES, MPI_COMM_WORLD, &_req.message, &_req.status);
-
-  // check for errors
-  if(mpi_errno != MPI_SUCCESS) {
-    return false;
-  }
-
-  // get the size  and set the tag for the request
-  MPI_Get_count(&_req.status, MPI_CHAR, &_req.num_bytes);
-  _req.message_tag = (com_tags) _req.status.MPI_TAG;
-
-  // receive the command
-  if(MPI_Mrecv (out.data(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
-    return false;
-  }
-
-  return true;
+  
+  // recive the stuff
+  out.resize(num_bytes);
+  return MPI_Recv(out.data(), num_bytes, MPI_CHAR, ANY_NODE, COORDINATOR_BCAST_BYTES, MPI_COMM_WORLD, MPI_STATUS_IGNORE) == MPI_SUCCESS;
 }
 
 // return the rank
