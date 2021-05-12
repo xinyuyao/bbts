@@ -32,11 +32,12 @@ const com_tags COORDINATOR_BCAST_CMD_TAG = 4;
 const com_tags NOTIFY_TENSOR_TAG = 5;
 const com_tags RESPONSE_STRING_TAG = 6;
 const com_tags COORDINATOR_BCAST_BYTES = 7;
-const com_tags TENSOR_META_TAG = 8;
+const com_tags TENSOR_META_TAG_SIZE = 8;
+const com_tags TENSOR_META_TAG = 9;
 
 // this is a special tag that is the first free tag
 // it is appended to every and receive send call
-const com_tags FREE_TAG = 9;
+const com_tags FREE_TAG = 10;
 
 // the mpi communicator
 class mpi_communicator_t {
