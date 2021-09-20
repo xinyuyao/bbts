@@ -16,8 +16,8 @@
 #include "../src/tensor/tensor_factory.h"
 #include "../src/ud_functions/ud_function.h"
 #include "../src/ud_functions/udf_manager.h"
-#include "../src/commands/command_compiler.h"
 #include "../src/commands/two_layer_compiler.h"
+#include "../src/commands/compile_source_file.h"
 
 
 namespace bbts {
@@ -329,7 +329,7 @@ TEST(TestCommandCompiler, Test2) {
                                                    1.0f);
 
   // init the compiler
-  auto compiler = std::make_shared<command_compiler_t>(cost_model, num_nodes);
+  auto compiler = std::make_shared<two_layer_compiler>(cost_model, num_nodes);
   
   std::ofstream f("a");
   compile_source_file_t tmp1 {.function_specs = funs, .commands = commands };

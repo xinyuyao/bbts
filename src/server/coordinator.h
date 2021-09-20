@@ -19,7 +19,7 @@
 #include "../ud_functions/gpu_scheduler.h"
 #include "../tensor/tensor_factory.h"
 #include "../ud_functions/udf_manager.h"
-#include "../commands/command_compiler.h"
+#include "../commands/two_layer_compiler.h"
 #include "coordinator.h"
 #include "static_config.h"
 

@@ -142,7 +142,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_tr
                                                           send_cost_per_byte);
 
     // init the compiler
-    command_compiler_t compiler(cost, _comm->get_num_nodes());
+    two_layer_compiler compiler(cost, _comm->get_num_nodes());
 
     // the compiled commands
     auto compiled_cmds = compiler.compile(cmds, locations);

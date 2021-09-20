@@ -93,6 +93,11 @@ struct ud_impl_t {
       }
     }
 
+    // resize the ud function
+    void resize(size_t size) { 
+      arguments.resize(size);
+    }
+
    private:
 
     // holds the input arguments

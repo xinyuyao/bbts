@@ -4,6 +4,7 @@
 #include <string>
 #include <thread>
 #include "node.h"
+#include "../commands/compile_source_file.h"
 #include "../commands/command_loader.h"
 
 void bbts::node_t::init() {
