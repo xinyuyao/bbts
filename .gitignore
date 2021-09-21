@@ -19,6 +19,6 @@ tmp.*
 *.nvprof
 *.nvvp
 libraries
-commands*
-kernels*
+generated/commands*
+generated/kernels*
 generated
