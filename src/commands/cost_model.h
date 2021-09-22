@@ -23,9 +23,8 @@ private:
   };
 
 public:
-
   struct transfer_cost_t {
-    
+
     // the cost to transfer this tensor to the GPU
     float gpu_transfer_cost;
 
@@ -42,14 +41,10 @@ public:
     float cpu = -1;
 
     // check if this kernel is runnining on the gpu
-    bool is_gpu() const {
-      return gpu > 0.0f;
-    }
+    bool is_gpu() const { return gpu > 0.0f; }
 
     // check if this kernel is running on the cpu
-    bool is_cpu() const {
-      return cpu > 0.0f;
-    }
+    bool is_cpu() const { return cpu > 0.0f; }
   };
 
   // the choice we made
@@ -64,7 +59,6 @@ public:
     // the pointer
     ud_impl_t *ud;
   };
-
 
   cost_model_t(std::unordered_map<tid_t, tensor_meta_t> meta,
                const std::vector<abstract_ud_spec_t> &funs,
@@ -106,9 +100,13 @@ public:
     // go through all the commands
     kernel_costs.resize(cmds.size());
     for (auto idx = 0; idx < cmds.size(); ++idx) {
-      
+
       // get the command and the functions
       auto &cmd = cmds[idx];
+      if (cmd.type == abstract_command_type_t::DELETE) {
+        continue;
+      }
+
       auto &ud = matched_functions[cmd.ud_id];
 
       // prepare the inputs
@@ -130,7 +128,9 @@ public:
 
       // check if there is any kernel
       if (ud.cpu == nullptr && ud.gpu == nullptr) {
-        throw std::runtime_error("Could not find an appropriate kernel.");
+        throw std::runtime_error("Could not find an appropriate kernel." +
+                                 std::string("The UD function is ") +
+                                 std::to_string(cmd.ud_id) + "\n");
       }
 
       // check if there is an CPU kernel
@@ -148,9 +148,7 @@ public:
           meta[cmd.output_tids[i]] = output_meta.get_by_idx(i);
         }
       }
-
-      // check if there is a GPU kernel
-      if (ud.gpu != nullptr) {
+      else if (ud.gpu != nullptr) {
 
         // get the output meta for the gpu
         ud.gpu->get_out_meta(_params, input_meta, output_meta);
@@ -170,27 +168,34 @@ public:
 
     // try to find the meta for the tensor
     auto it = meta.find(id);
-    if(it != meta.end()) { throw std::runtime_error("Could not find the tensor with tid " + std::to_string(id) + "\n"); }
+    if (it == meta.end()) {
+      throw std::runtime_error("Could not find the tensor with tid " +
+                               std::to_string(id) + "\n");
+    }
 
     // calculate the costs
     auto size = tf->get_tensor_size(it->second);
-    return transfer_cost_t{ .gpu_transfer_cost = size * gpu_transfer_cost_per_byte, 
-                            .network_transfer_cost = size * send_cost_per_byte };
+    return transfer_cost_t{.gpu_transfer_cost =
+                               size * gpu_transfer_cost_per_byte,
+                           .network_transfer_cost = size * send_cost_per_byte};
   }
 
   function_match_t get_ud_choice(abstract_ud_spec_id_t id) {
     auto it = matched_functions.find(id);
-    if(it == matched_functions.end()) { throw std::runtime_error("Could not find matched function."); }
+    if (it == matched_functions.end()) {
+      throw std::runtime_error("Could not find matched function.");
+    }
     return it->second;
   }
 
   kernel_cost_t get_execution_cost(uint32_t cmd_id) const {
-    if(cmd_id >= kernel_costs.size()) { throw std::runtime_error("Could not find the id."); }
+    if (cmd_id >= kernel_costs.size()) {
+      throw std::runtime_error("Could not find the id.");
+    }
     return kernel_costs[cmd_id];
   }
 
 private:
-
   // all the matched functions
   std::unordered_map<abstract_ud_spec_id_t, function_match_t> matched_functions;
 

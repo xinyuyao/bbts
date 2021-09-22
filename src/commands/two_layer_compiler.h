@@ -50,13 +50,19 @@ public:
 
     // init the input counts
     _inputs_left.resize(commands.size());
+    _tensor_consumers.clear();
     auto it = _inputs_left.begin();
     for (auto idx = 0; idx < commands.size(); ++idx) {
       const auto &c = commands[idx];
+      if (c.type == abstract_command_type_t::DELETE) {
+        continue;
+      }
+
       *it = c.input_tids.size();
       for (auto tid : c.input_tids) {
         _tensor_consumers[tid].push_back(idx);
       }
+      it++;
     }
 
     // flatten the tensor locations to avoid duplicates
@@ -99,6 +105,7 @@ public:
       }
 
       // update present tids
+      present_tids.clear();
       _update_present_tids(present_tids, first_layer, commands);
 
       // get the second layer
@@ -107,6 +114,10 @@ public:
       // run the optimier to find the optimal placment for the commmands
       optimize(commands, generated_cmds, first_layer, second_layer,
                tensor_locations);
+
+      // update present tids
+      present_tids.clear();
+      _update_present_tids(present_tids, first_layer, commands);
     }
 
     // return the generated commands
@@ -126,7 +137,6 @@ public:
 
     // if have to only plan for the first layer
     if (second_layer.empty()) {
-
 
       // go through all the commands
       node_cost_t added_cost;
@@ -164,7 +174,7 @@ public:
             best_node = node;
             best_overhead = transfer_overhead + cpu_overhead + gpu_overhead +
                             gpu_transfer_overhead;
-            
+
             added_cost.transfer_cost = transfer_cost;
             added_cost.compute_cost = cpu_cost;
             added_cost.gpu_cost = gpu_cost;
@@ -182,7 +192,8 @@ public:
         _node_costs[best_node].transfer_cost += added_cost.transfer_cost;
         _node_costs[best_node].compute_cost += added_cost.compute_cost;
         _node_costs[best_node].gpu_cost += added_cost.gpu_cost;
-        _node_costs[best_node].gpu_transfer_cost += added_cost.gpu_transfer_cost;
+        _node_costs[best_node].gpu_transfer_cost +=
+            added_cost.gpu_transfer_cost;
       }
       return;
     }
@@ -309,7 +320,7 @@ public:
   }
 
   // put everything at one node
-  std::tuple<float, node_id_t>
+  std::tuple<node_id_t, float>
   rule_1(const std::vector<abstract_command_t> &commands,
          const std::list<uint32_t> &consumer,
          const std::vector<std::list<uint32_t>> &producers,
@@ -391,7 +402,7 @@ public:
       _node_costs[node].gpu_transfer_cost -= gpu_transfer;
     }
 
-    return {best_node, best_overhead};
+    return {best_overhead, best_node};
   }
 
   // put the producers where they have the smallest
@@ -598,7 +609,7 @@ public:
 
           // do we have an existing command to do the move
           auto it = _move_cmds.find(in);
-          if (it != _move_cmds.end()) {
+          if (it == _move_cmds.end()) {
 
             // find the node to fetch from
             auto from_node = _find_node_to_fetch(in, tensor_locations);
@@ -965,6 +976,7 @@ public:
         _inputs_left[cmd_id]--;
         if (_inputs_left[cmd_id] == 0) {
           N--;
+          idx--;
           std::swap(cmd_id, cmds_waiting[N]);
           cmds_waiting.resize(N);
 
@@ -992,7 +1004,12 @@ public:
 
       // make sure the produced output has only one consumer and get it
       auto &p = commands[producer];
-      if (_tensor_consumers[p.output_tids.front()].size() != 1) {
+      if (p.type == abstract_command_type_t::DELETE) {
+        break;
+      }
+
+      auto it = _tensor_consumers.find(p.output_tids.front());
+      if (it == _tensor_consumers.end() || it->second.size() != 1) {
         break;
       }
       auto consumer = _tensor_consumers[p.output_tids.front()][0];
@@ -1014,11 +1031,6 @@ public:
     // get the produce and consumer references
     auto &p = commands[producer];
     auto &c = commands[consumer];
-
-    // make sure the consumer is not a delete
-    if (c.type == abstract_command_type_t::DELETE) {
-      return false;
-    }
 
     // make sure that the producer produces exactly one output
     // exactly one input and no other command is consuming this input
