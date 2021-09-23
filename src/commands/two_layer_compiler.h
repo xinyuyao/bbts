@@ -54,15 +54,16 @@ public:
     auto it = _inputs_left.begin();
     for (auto idx = 0; idx < commands.size(); ++idx) {
       const auto &c = commands[idx];
+      *it = c.input_tids.size();
+      it++;
+
       if (c.type == abstract_command_type_t::DELETE) {
         continue;
       }
 
-      *it = c.input_tids.size();
       for (auto tid : c.input_tids) {
         _tensor_consumers[tid].push_back(idx);
       }
-      it++;
     }
 
     // flatten the tensor locations to avoid duplicates
@@ -955,7 +956,6 @@ public:
   std::vector<std::list<uint32_t>>
   _get_layer(const std::vector<abstract_command_t> &commands,
              const std::unordered_set<tid_t> present_tids) {
-
     // get the first layer
     std::vector<std::list<uint32_t>> first_layer;
     for (auto tid : present_tids) {
@@ -972,7 +972,7 @@ public:
       for (uint32_t idx = 0; idx < N; ++idx) {
 
         // mark the input for this command as available
-        auto &cmd_id = cmds_waiting[idx];
+        auto cmd_id = cmds_waiting[idx];
         _inputs_left[cmd_id]--;
         if (_inputs_left[cmd_id] == 0) {
           N--;
