@@ -27,16 +27,16 @@ public:
   struct node_cost_t {
 
     // we use this as an estimate of how much data was transfered by the node
-    double transfer_cost;
+    double transfer_cost = 0;
 
     // we use this as an estimate of how much was computed
-    double compute_cost;
+    double compute_cost = 0;
 
     // we use this to
-    double gpu_cost;
+    double gpu_cost = 0;
 
     // we want to use this
-    double gpu_transfer_cost;
+    double gpu_transfer_cost = 0;
   };
 
   std::vector<bbts::command_ptr_t>
@@ -219,25 +219,9 @@ public:
         producers.emplace_back(first_layer[idx]);
       }
 
-      std::cout << "BEFORE RULE 1 : \n";
-      for(node_id_t node = 0; node < 2; node++) {
-        std::cout << "Node : " << node << '\n';
-        for(auto ts : tensor_locations[node]) {
-          std::cout << "tid : " << ts << '\n';
-        }
-      }
-
       // run rule 1
       auto [r1_cost, r1_node] =
           rule_1(commands, consumer, producers, tensor_locations);
-      std::cout << "AFTER RULE 1 : \n";
-      for(node_id_t node = 0; node < 2; node++) {
-        std::cout << "Node : " << node << '\n';
-        for(auto ts : tensor_locations[node]) {
-          std::cout << "tid : " << ts << '\n';
-        }
-      }
-      std::cout << "-------------------------------------------\n";
 
       // run rule 2
       auto [r2_cost, r2_consumer, r2_producers] =
@@ -350,7 +334,7 @@ public:
     for (node_id_t node = 0; node < num_nodes; ++node) {
 
       tmp_history.clear();
-      node_cost_t cost_history;
+      node_cost_t cost_history{};
 
       float assigment_overhead = 0;
       for (auto &p : producers) {
@@ -413,10 +397,10 @@ public:
       }
 
       // revert the costs
-      _node_costs[node].transfer_cost -= transfer_cost;
-      _node_costs[node].compute_cost -= cpu_cost;
-      _node_costs[node].gpu_cost -= gpu_cost;
-      _node_costs[node].gpu_transfer_cost -= gpu_transfer;
+      _node_costs[node].transfer_cost -= cost_history.transfer_cost;
+      _node_costs[node].compute_cost -= cost_history.compute_cost;
+      _node_costs[node].gpu_cost -= cost_history.gpu_cost;
+      _node_costs[node].gpu_transfer_cost -= cost_history.gpu_transfer_cost;
     }
 
     return {best_overhead, best_node};
@@ -431,6 +415,10 @@ public:
          std::vector<std::unordered_set<tid_t>> &tensor_locations) {
 
     std::vector<node_cost_t> cost_history(num_nodes);
+    for (node_id_t node = 0; node < num_nodes; ++node) {
+      cost_history[node] = _node_costs[node];
+    }
+
     std::vector<std::tuple<tid_t, node_id_t>> assigment_history;
 
     float planning_overhead = 0.0f;
@@ -481,12 +469,6 @@ public:
       _node_costs[best_node].compute_cost += cpu_cost;
       _node_costs[best_node].gpu_cost += gpu_cost;
       _node_costs[best_node].gpu_transfer_cost += gpu_transfer;
-
-      // the cost history
-      cost_history[best_node].transfer_cost += transfer_cost;
-      cost_history[best_node].compute_cost += cpu_cost;
-      cost_history[best_node].gpu_cost += gpu_cost;
-      cost_history[best_node].gpu_transfer_cost += gpu_transfer;
     }
 
     node_id_t best_node = 0;
@@ -523,13 +505,11 @@ public:
 
     // revert the costs as we still have not commited to this rule
     for (node_id_t node = 0; node < num_nodes; ++node) {
-      _node_costs[best_node].transfer_cost -=
-          cost_history[best_node].transfer_cost;
-      _node_costs[best_node].compute_cost -=
-          cost_history[best_node].compute_cost;
-      _node_costs[best_node].gpu_cost -= cost_history[best_node].gpu_cost;
-      _node_costs[best_node].gpu_transfer_cost -=
-          cost_history[best_node].gpu_transfer_cost;
+      _node_costs[node].transfer_cost = cost_history[node].transfer_cost;
+      _node_costs[node].compute_cost = cost_history[node].compute_cost;
+      _node_costs[node].gpu_cost = cost_history[node].gpu_cost;
+      _node_costs[node].gpu_transfer_cost =
+          cost_history[node].gpu_transfer_cost;
     }
     revert(assigment_history, tensor_locations);
 
