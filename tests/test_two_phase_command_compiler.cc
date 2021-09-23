@@ -237,6 +237,12 @@ TEST(TestCommandCompiler, Test1) {
 
   cmds = compiler->compile(commands, tensor_locations);
 
+  std::stringstream ss;
+  for(auto &c : cmds) {
+    c->print(ss);
+  }
+  std::cout << ss.str() << '\n'; 
+
   // print out all the location
   for(node_id_t node = 0; node < 2; node++) {
     std::cout << "Node : " << node << '\n';

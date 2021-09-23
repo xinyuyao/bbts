@@ -219,9 +219,25 @@ public:
         producers.emplace_back(first_layer[idx]);
       }
 
+      std::cout << "BEFORE RULE 1 : \n";
+      for(node_id_t node = 0; node < 2; node++) {
+        std::cout << "Node : " << node << '\n';
+        for(auto ts : tensor_locations[node]) {
+          std::cout << "tid : " << ts << '\n';
+        }
+      }
+
       // run rule 1
       auto [r1_cost, r1_node] =
           rule_1(commands, consumer, producers, tensor_locations);
+      std::cout << "AFTER RULE 1 : \n";
+      for(node_id_t node = 0; node < 2; node++) {
+        std::cout << "Node : " << node << '\n';
+        for(auto ts : tensor_locations[node]) {
+          std::cout << "tid : " << ts << '\n';
+        }
+      }
+      std::cout << "-------------------------------------------\n";
 
       // run rule 2
       auto [r2_cost, r2_consumer, r2_producers] =
@@ -853,7 +869,7 @@ public:
   try_assign(node_id_t node, const std::list<uint32_t> &cmd,
              const std::vector<abstract_command_t> &commands,
              std::vector<std::unordered_set<tid_t>> &tensor_locations,
-             std::vector<std::tuple<tid_t, node_id_t>> history) {
+             std::vector<std::tuple<tid_t, node_id_t>> &history) {
 
     float transfer_cost = 0.0f;
     // the tensors present on the node
@@ -969,19 +985,19 @@ public:
 
       // go through all the commands waiting for this input
       auto N = cmds_waiting.size();
-      for (uint32_t idx = 0; idx < N; ++idx) {
+      for (int32_t idx = 0; idx < N; ++idx) {
 
         // mark the input for this command as available
         auto cmd_id = cmds_waiting[idx];
         _inputs_left[cmd_id]--;
         if (_inputs_left[cmd_id] == 0) {
           N--;
-          idx--;
-          std::swap(cmd_id, cmds_waiting[N]);
+          std::swap(cmds_waiting[idx], cmds_waiting[N]);
           cmds_waiting.resize(N);
 
           // this command
           first_layer.push_back({cmd_id});
+          idx--;
         }
       }
     }
