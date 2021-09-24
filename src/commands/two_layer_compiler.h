@@ -22,7 +22,8 @@ namespace bbts {
 class two_layer_compiler {
 public:
   two_layer_compiler(cost_model_ptr_t cost_model, size_t num_nodes)
-      : cost_model(cost_model), num_nodes(num_nodes), _node_costs(num_nodes) {}
+      : cost_model(cost_model), num_nodes(num_nodes), _node_costs(num_nodes),
+        _moved_tensors(num_nodes) {}
 
   struct node_cost_t {
 
@@ -121,8 +122,74 @@ public:
       _update_present_tids(present_tids, first_layer, commands);
     }
 
+    // add the deleted commands
+    _create_delete_commands(commands, tensor_locations, generated_cmds);
+
+    // generate the commands to remove the moved tensors
+    _create_moved_commands(generated_cmds);
+
     // return the generated commands
     return std::move(generated_cmds);
+  }
+
+  void _create_delete_commands(const std::vector<abstract_command_t> &commands,
+                               std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                               std::vector<bbts::command_ptr_t> &generated_cmds) {
+
+    for(auto &c : commands) {
+      
+      // skip if not delete
+      if(c.type != abstract_command_type_t::DELETE) {
+        continue;
+      }
+
+      // find the tids on each node
+      for(node_id_t node = 0; node < num_nodes; ++node) {
+
+        // check if there is something
+        std::vector<command_t::tid_node_id_t> inputs;
+        for(auto &in : c.input_tids) {
+
+          // create the command and remove
+          auto it = tensor_locations[node].find(in);
+          if(it != tensor_locations[node].end()) {
+            inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
+            tensor_locations[node].erase(it);
+          }
+        }
+
+        if(!inputs.empty()) {
+
+          // make the apply
+          auto cmd_id = generated_cmds.size();
+          auto cmd = command_t::create_delete(cmd_id, inputs);
+
+          // store the command
+          generated_cmds.push_back(std::move(cmd));
+        }
+      }
+    }
+  }
+
+  void _create_moved_commands(std::vector<bbts::command_ptr_t> &generated_cmds) {
+
+    for(node_id_t node = 0; node < num_nodes; ++node) {
+      std::vector<command_t::tid_node_id_t> inputs;
+      for(auto &in : this->_moved_tensors[node]) {
+        inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
+      }
+
+      // check if there is something
+      if(!inputs.empty()) {
+
+        // make the apply
+        auto cmd_id = generated_cmds.size();
+        auto cmd = command_t::create_delete(cmd_id, inputs);
+
+        // store the command
+        generated_cmds.push_back(std::move(cmd));
+      }
+    }
   }
 
   void optimize(const std::vector<abstract_command_t> &commands,
@@ -604,6 +671,9 @@ public:
       for (auto in : root_cmd.input_tids) {
         if (present_tensors.find(in) == present_tensors.end()) {
 
+          // ok we are moving this one
+          _moved_tensors[node].push_back(in);
+
           // do we have an existing command to do the move
           auto it = _move_cmds.find(in);
           if (it == _move_cmds.end()) {
@@ -1049,6 +1119,10 @@ private:
 
   // keeps track of all the move commands
   std::unordered_map<tid_t, uint64_t> _move_cmds;
+
+  // all the tensors we eventually need to delete as they were duplicated by a
+  // move
+  std::vector<std::vector<tid_t>> _moved_tensors;
 
   // the max costs across all nodes
   node_cost_t max_cost;
