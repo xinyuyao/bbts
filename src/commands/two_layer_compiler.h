@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -123,24 +124,29 @@ public:
     }
 
     // add the deleted commands
-    _create_delete_commands(commands, tensor_locations, generated_cmds);
+    auto deleted = _create_delete_commands(commands, tensor_locations, generated_cmds);
 
     // generate the commands to remove the moved tensors
-    _create_moved_commands(generated_cmds);
+    _create_moved_commands(generated_cmds, deleted);
 
     // return the generated commands
     return std::move(generated_cmds);
   }
 
-  void _create_delete_commands(const std::vector<abstract_command_t> &commands,
-                               std::vector<std::unordered_set<tid_t>> &tensor_locations,
-                               std::vector<bbts::command_ptr_t> &generated_cmds) {
-
+  std::unordered_set<tid_t> _create_delete_commands(const std::vector<abstract_command_t> &commands,
+                                                    std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                                                    std::vector<bbts::command_ptr_t> &generated_cmds) {
+    std::unordered_set<tid_t> ret;
     for(auto &c : commands) {
       
       // skip if not delete
       if(c.type != abstract_command_type_t::DELETE) {
         continue;
+      }
+
+      // keep track of what we have deleted
+      for(auto &in : c.input_tids) {
+        ret.insert(in);
       }
 
       // find the tids on each node
@@ -169,13 +175,18 @@ public:
         }
       }
     }
+
+    return std::move(ret);
   }
 
-  void _create_moved_commands(std::vector<bbts::command_ptr_t> &generated_cmds) {
+  void _create_moved_commands(std::vector<bbts::command_ptr_t> &generated_cmds, const std::unordered_set<tid_t> &delted) {
 
     for(node_id_t node = 0; node < num_nodes; ++node) {
       std::vector<command_t::tid_node_id_t> inputs;
       for(auto &in : _moved_tensors[node]) {
+        if(delted.find(in) != delted.end()) {
+          continue;
+        }
         inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
       }
 
