@@ -124,7 +124,8 @@ public:
     }
 
     // add the deleted commands
-    auto deleted = _create_delete_commands(commands, tensor_locations, generated_cmds);
+    auto deleted =
+        _create_delete_commands(commands, tensor_locations, generated_cmds);
 
     // generate the commands to remove the moved tensors
     _create_moved_commands(generated_cmds, deleted);
@@ -133,38 +134,39 @@ public:
     return std::move(generated_cmds);
   }
 
-  std::unordered_set<tid_t> _create_delete_commands(const std::vector<abstract_command_t> &commands,
-                                                    std::vector<std::unordered_set<tid_t>> &tensor_locations,
-                                                    std::vector<bbts::command_ptr_t> &generated_cmds) {
+  std::unordered_set<tid_t> _create_delete_commands(
+      const std::vector<abstract_command_t> &commands,
+      std::vector<std::unordered_set<tid_t>> &tensor_locations,
+      std::vector<bbts::command_ptr_t> &generated_cmds) {
     std::unordered_set<tid_t> ret;
-    for(auto &c : commands) {
-      
+    for (auto &c : commands) {
+
       // skip if not delete
-      if(c.type != abstract_command_type_t::DELETE) {
+      if (c.type != abstract_command_type_t::DELETE) {
         continue;
       }
 
       // keep track of what we have deleted
-      for(auto &in : c.input_tids) {
+      for (auto &in : c.input_tids) {
         ret.insert(in);
       }
 
       // find the tids on each node
-      for(node_id_t node = 0; node < num_nodes; ++node) {
+      for (node_id_t node = 0; node < num_nodes; ++node) {
 
         // check if there is something
         std::vector<command_t::tid_node_id_t> inputs;
-        for(auto &in : c.input_tids) {
+        for (auto &in : c.input_tids) {
 
           // create the command and remove
           auto it = tensor_locations[node].find(in);
-          if(it != tensor_locations[node].end()) {
+          if (it != tensor_locations[node].end()) {
             inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
             tensor_locations[node].erase(it);
           }
         }
 
-        if(!inputs.empty()) {
+        if (!inputs.empty()) {
 
           // make the apply
           auto cmd_id = generated_cmds.size();
@@ -179,19 +181,20 @@ public:
     return std::move(ret);
   }
 
-  void _create_moved_commands(std::vector<bbts::command_ptr_t> &generated_cmds, const std::unordered_set<tid_t> &delted) {
+  void _create_moved_commands(std::vector<bbts::command_ptr_t> &generated_cmds,
+                              const std::unordered_set<tid_t> &delted) {
 
-    for(node_id_t node = 0; node < num_nodes; ++node) {
+    for (node_id_t node = 0; node < num_nodes; ++node) {
       std::vector<command_t::tid_node_id_t> inputs;
-      for(auto &in : _moved_tensors[node]) {
-        if(delted.find(in) != delted.end()) {
+      for (auto &in : _moved_tensors[node]) {
+        if (delted.find(in) != delted.end()) {
           continue;
         }
         inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
       }
 
       // check if there is something
-      if(!inputs.empty()) {
+      if (!inputs.empty()) {
 
         // make the apply
         auto cmd_id = generated_cmds.size();
@@ -768,8 +771,8 @@ public:
               tensor_locations[node].end()) {
             tid_node = _find_node_to_fetch(c.input_tids[idx], tensor_locations);
           }
-          inputs[idx] =
-              command_t::tid_node_id_t{.tid = c.input_tids[idx], .node = node};
+          inputs[idx] = command_t::tid_node_id_t{.tid = c.input_tids[idx],
+                                                 .node = tid_node};
         }
 
         // init the outputs
