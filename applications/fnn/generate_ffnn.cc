@@ -8,7 +8,8 @@
 #include <vector>
 
 #include "../../src/tensor/tensor.h"
-#include "../../src/commands/command_compiler.h"
+#include "../../src/commands/two_layer_compiler.h"
+#include "../../src/commands/compile_source_file.h"
 
 const int32_t FFNN_ACT_MULT = 0;
 const int32_t FFNN_ADD = 1;
