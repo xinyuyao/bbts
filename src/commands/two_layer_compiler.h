@@ -175,7 +175,7 @@ public:
 
     for(node_id_t node = 0; node < num_nodes; ++node) {
       std::vector<command_t::tid_node_id_t> inputs;
-      for(auto &in : this->_moved_tensors[node]) {
+      for(auto &in : _moved_tensors[node]) {
         inputs.push_back(command_t::tid_node_id_t{.tid = in, .node = node});
       }
 
@@ -189,6 +189,7 @@ public:
         // store the command
         generated_cmds.push_back(std::move(cmd));
       }
+      _moved_tensors[node].clear();
     }
   }
 

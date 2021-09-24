@@ -254,157 +254,157 @@ TEST(TestCommandCompiler, Test1) {
 }
 
 
-// TEST(TestCommandCompiler, Test2) {
+TEST(TestCommandCompiler, Test2) {
 
-//   const int32_t num_nodes = 4; 
+  const int32_t num_nodes = 4; 
 
-//   // create the tensor factory
-//   auto factory = std::make_shared<tensor_factory_t>();
+  // create the tensor factory
+  auto factory = std::make_shared<tensor_factory_t>();
 
-//   // crate the udf manager
-//   auto manager = std::make_shared<udf_manager_t>(factory, nullptr);
+  // crate the udf manager
+  auto manager = std::make_shared<udf_manager_t>(factory, nullptr);
 
-//   // the parameters
-//   std::vector<command_param_t> param_data = {command_param_t{.u = 100},
-//                                              command_param_t{.u = 100},
-//                                              command_param_t{.f = 0.0f},
-//                                              command_param_t{.f = 1.0f}};
+  // the parameters
+  std::vector<command_param_t> param_data = {command_param_t{.u = 100},
+                                             command_param_t{.u = 100},
+                                             command_param_t{.f = 0.0f},
+                                             command_param_t{.f = 1.0f}};
 
-//   // the initial indices
-//   tid_t curID = 0;
-//   std::vector<abstract_command_t> commands;
-//   std::map<std::tuple<int32_t, int32_t>, tid_t> a_idx;
-//   for(int32_t idx = 0; idx < num_nodes; ++idx) {
-//     for(int32_t jdx = 0; jdx < num_nodes; ++jdx) {
+  // the initial indices
+  tid_t curID = 0;
+  std::vector<abstract_command_t> commands;
+  std::map<std::tuple<int32_t, int32_t>, tid_t> a_idx;
+  for(int32_t idx = 0; idx < num_nodes; ++idx) {
+    for(int32_t jdx = 0; jdx < num_nodes; ++jdx) {
       
-//       commands.push_back(abstract_command_t{.ud_id = 2,
-//                                             .type = abstract_command_type_t::APPLY,
-//                                             .input_tids = {}, 
-//                                             .output_tids = {curID}, // A(idx, jdx)
-//                                             .params = param_data});
+      commands.push_back(abstract_command_t{.ud_id = 2,
+                                            .type = abstract_command_type_t::APPLY,
+                                            .input_tids = {}, 
+                                            .output_tids = {curID}, // A(idx, jdx)
+                                            .params = param_data});
 
-//       a_idx[{idx, jdx}] = curID++;
-//     }
-//   }
+      a_idx[{idx, jdx}] = curID++;
+    }
+  }
 
-//   // the initial indices
-//   std::map<std::tuple<int32_t, int32_t>, tid_t> b_idx;
-//   for(int32_t idx = 0; idx < num_nodes; ++idx) {
-//     for(int32_t jdx = 0; jdx < num_nodes; ++jdx) {
+  // the initial indices
+  std::map<std::tuple<int32_t, int32_t>, tid_t> b_idx;
+  for(int32_t idx = 0; idx < num_nodes; ++idx) {
+    for(int32_t jdx = 0; jdx < num_nodes; ++jdx) {
 
-//       commands.push_back(abstract_command_t{.ud_id = 2,
-//                                             .type = abstract_command_type_t::APPLY,
-//                                             .input_tids = {}, 
-//                                             .output_tids = {curID}, // B(idx, jdx)
-//                                             .params = param_data});
+      commands.push_back(abstract_command_t{.ud_id = 2,
+                                            .type = abstract_command_type_t::APPLY,
+                                            .input_tids = {}, 
+                                            .output_tids = {curID}, // B(idx, jdx)
+                                            .params = param_data});
 
-//       b_idx[{idx, jdx}] = curID++;
-//     }
-//   }
+      b_idx[{idx, jdx}] = curID++;
+    }
+  }
 
-//   // the meta data
-//   std::unordered_map<tid_t, tensor_meta_t> meta;
+  // the meta data
+  std::unordered_map<tid_t, tensor_meta_t> meta;
 
-//   // the functions
-//   std::vector<abstract_ud_spec_t> funs;
+  // the functions
+  std::vector<abstract_ud_spec_t> funs;
 
-//   // matrix addition
-//   funs.push_back(abstract_ud_spec_t{.id = 0,
-//                                     .ud_name = "matrix_add",
-//                                     .input_types = {"dense", "dense"},
-//                                     .output_types = {"dense"}});
+  // matrix addition
+  funs.push_back(abstract_ud_spec_t{.id = 0,
+                                    .ud_name = "matrix_add",
+                                    .input_types = {"dense", "dense"},
+                                    .output_types = {"dense"}});
 
-//   // matrix multiplication
-//   funs.push_back(abstract_ud_spec_t{.id = 1,
-//                                     .ud_name = "matrix_mult",
-//                                     .input_types = {"dense", "dense"},
-//                                     .output_types = {"dense"}});
+  // matrix multiplication
+  funs.push_back(abstract_ud_spec_t{.id = 1,
+                                    .ud_name = "matrix_mult",
+                                    .input_types = {"dense", "dense"},
+                                    .output_types = {"dense"}});
   
-//   // the uniform distribution
-//   funs.push_back(abstract_ud_spec_t{.id = 2,
-//                                     .ud_name = "uniform",
-//                                     .input_types = {},
-//                                     .output_types = {"dense"}});
+  // the uniform distribution
+  funs.push_back(abstract_ud_spec_t{.id = 2,
+                                    .ud_name = "uniform",
+                                    .input_types = {},
+                                    .output_types = {"dense"}});
 
-//   // init the cost model
-//   auto cost_model = std::make_shared<cost_model_t>(meta,
-//                                                    funs,
-//                                                    factory, 
-//                                                    manager, 
-//                                                    1.0f,
-//                                                    1.0f);
+  // init the cost model
+  auto cost_model = std::make_shared<cost_model_t>(meta,
+                                                   funs,
+                                                   factory, 
+                                                   manager, 
+                                                   1.0f,
+                                                   1.0f);
 
-//   // init the compiler
-//   auto compiler = std::make_shared<two_layer_compiler>(cost_model, num_nodes);
+  // init the compiler
+  auto compiler = std::make_shared<two_layer_compiler>(cost_model, num_nodes);
   
-//   std::ofstream f("a");
-//   compile_source_file_t tmp1 {.function_specs = funs, .commands = commands };
-//   tmp1.write_to_file(f);
-//   f.close();
+  std::ofstream f("a");
+  compile_source_file_t tmp1 {.function_specs = funs, .commands = commands };
+  tmp1.write_to_file(f);
+  f.close();
 
-//   // compile them
-//   std::vector<std::unordered_set<tid_t>> tensor_locations(num_nodes); 
-//   auto cmds = compiler->compile(commands, tensor_locations);
+  // compile them
+  std::vector<std::unordered_set<tid_t>> tensor_locations(num_nodes); 
+  auto cmds = compiler->compile(commands, tensor_locations);
 
-//   std::stringstream ss;
-//   for(auto &c : cmds) {
-//     c->print(ss);
-//   }
-//   std::cout << ss.str() << '\n';
+  std::stringstream ss;
+  for(auto &c : cmds) {
+    c->print(ss);
+  }
+  std::cout << ss.str() << '\n';
 
-//   // make the next batch of commands
-//   commands.clear();
+  // make the next batch of commands
+  commands.clear();
 
-//   // make the multiples
-//   std::map<std::tuple<int32_t, int32_t>, std::vector<tid_t>> c_idx;
-//   for(int32_t idx = 0; idx < num_nodes; ++idx) {
-//     for(int32_t jdx = 0; jdx < num_nodes; ++jdx) {
-//       for(int32_t kdx = 0; kdx < num_nodes; ++kdx) {
+  // make the multiples
+  std::map<std::tuple<int32_t, int32_t>, std::vector<tid_t>> c_idx;
+  for(int32_t idx = 0; idx < num_nodes; ++idx) {
+    for(int32_t jdx = 0; jdx < num_nodes; ++jdx) {
+      for(int32_t kdx = 0; kdx < num_nodes; ++kdx) {
 
-//         // 
-//         commands.push_back(abstract_command_t{.ud_id = 1,
-//                                               .type = abstract_command_type_t::APPLY,
-//                                               .input_tids = {a_idx[{idx, kdx}], b_idx[{kdx, jdx}]}, // A(idx, kdx) B(kdx, jdx)
-//                                               .output_tids = {curID}, // C(idx, jdx)
-//                                               .params = {}});
+        // 
+        commands.push_back(abstract_command_t{.ud_id = 1,
+                                              .type = abstract_command_type_t::APPLY,
+                                              .input_tids = {a_idx[{idx, kdx}], b_idx[{kdx, jdx}]}, // A(idx, kdx) B(kdx, jdx)
+                                              .output_tids = {curID}, // C(idx, jdx)
+                                              .params = {}});
 
-//         // 
-//         c_idx[{idx, jdx}].push_back(curID++);
-//       }
-//     }
-//   }
+        // 
+        c_idx[{idx, jdx}].push_back(curID++);
+      }
+    }
+  }
 
-//   // make the reduce ops
-//   for(auto &c : c_idx) {
+  // make the reduce ops
+  for(auto &c : c_idx) {
 
-//     // add the new reduce commands
-//     commands.push_back(abstract_command_t{.ud_id = 0,
-//                                           .type = abstract_command_type_t::REDUCE,
-//                                           .input_tids = c.second, 
-//                                           .output_tids = {curID++},
-//                                           .params = {}});
+    // add the new reduce commands
+    commands.push_back(abstract_command_t{.ud_id = 0,
+                                          .type = abstract_command_type_t::REDUCE,
+                                          .input_tids = c.second, 
+                                          .output_tids = {curID++},
+                                          .params = {}});
 
-//     // add the delete to remove the intermediate
-//     commands.push_back(abstract_command_t{.ud_id = -1,
-//                                           .type = abstract_command_type_t::DELETE,
-//                                           .input_tids =  c.second,
-//                                           .output_tids = {},
-//                                           .params = {}});
-//   }
+    // add the delete to remove the intermediate
+    commands.push_back(abstract_command_t{.ud_id = -1,
+                                          .type = abstract_command_type_t::DELETE,
+                                          .input_tids =  c.second,
+                                          .output_tids = {},
+                                          .params = {}});
+  }
 
-//   cmds = compiler->compile(commands, tensor_locations);
+  cmds = compiler->compile(commands, tensor_locations);
 
-//   std::ofstream f1("b");
-//   compile_source_file_t tmp2 {.function_specs = funs, .commands = commands };
-//   tmp2.write_to_file(f1);
-//   f1.close();
+  std::ofstream f1("b");
+  compile_source_file_t tmp2 {.function_specs = funs, .commands = commands };
+  tmp2.write_to_file(f1);
+  f1.close();
 
-//   std::stringstream ss2;
-//   for(auto &c : cmds) {
-//     c->print(ss2);
-//   }
-//   std::cout << ss2.str() << '\n';
+  std::stringstream ss2;
+  for(auto &c : cmds) {
+    c->print(ss2);
+  }
+  std::cout << ss2.str() << '\n';
 
-// }
+}
 
 }
