@@ -61,8 +61,6 @@ void bbts::dense_matrix_add_t::add(const bbts::ud_impl_t::tensor_params_t &param
   // present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
   assert(m_a.num_cols == m_b.num_cols);
-  assert(m_a.num_rows == m_out.num_rows);
-  assert(m_a.num_cols == m_out.num_cols);
 
   // add a and b
   for (auto row = 0; row < m_a.num_rows; ++row) {
