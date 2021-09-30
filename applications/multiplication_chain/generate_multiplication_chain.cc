@@ -109,39 +109,28 @@ int main() {
   int32_t n, m, k, l, p;
   int32_t n_split, m_split, k_split, l_split, p_split;
 
-  n = 100;
-  n_split = 10;
-  m = 200;
-  m_split = 5;
-  k = 400;
-  k_split = 20;
-  l = 600;
-  l_split = 10;
-  p = 800;
-  p_split = 10;
-
   // ([n, m] x [m, k]) * ([k, l] x [l, p])
-  // std::cout << "([n, m] x [m, k]) * ([k, l] x [l, p])\n";
-  // std::cout << "n :";
-  // std::cin >> n;
-  // std::cout << "n_split :";
-  // std::cin >> n_split;
-  // std::cout << "m :";
-  // std::cin >> m;
-  // std::cout << "m_split :";
-  // std::cin >> m_split;
-  // std::cout << "k :";
-  // std::cin >> k;
-  // std::cout << "k_split :";
-  // std::cin >> k_split;
-  // std::cout << "l :";
-  // std::cin >> l;
-  // std::cout << "l_split :";
-  // std::cin >> l_split;
-  // std::cout << "p :";
-  // std::cin >> p;
-  // std::cout << "p_split :";
-  // std::cin >> p_split;
+  std::cout << "([n, m] x [m, k]) * ([k, l] x [l, p])\n";
+  std::cout << "n :";
+  std::cin >> n;
+  std::cout << "n_split :";
+  std::cin >> n_split;
+  std::cout << "m :";
+  std::cin >> m;
+  std::cout << "m_split :";
+  std::cin >> m_split;
+  std::cout << "k :";
+  std::cin >> k;
+  std::cout << "k_split :";
+  std::cin >> k_split;
+  std::cout << "l :";
+  std::cin >> l;
+  std::cout << "l_split :";
+  std::cin >> l_split;
+  std::cout << "p :";
+  std::cin >> p;
+  std::cout << "p_split :";
+  std::cin >> p_split;
 
   // the functions
   std::vector<abstract_ud_spec_t> funs;
