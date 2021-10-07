@@ -120,7 +120,7 @@ public:
 
       // update present tids
       present_tids.clear();
-      _update_present_tids(present_tids, first_layer, commands);
+      _update_present_tids(present_tids, second_layer, commands);
     }
 
     // add the deleted commands
@@ -293,11 +293,18 @@ public:
     // and rule 2 then calculate the cost and pcik the one with the smallest
     // cost
     std::vector<std::list<uint32_t>> producers;
+    std::unordered_set<int32_t> ids;
     for (const auto &consumer : second_layer) {
 
+      ids.clear();
       producers.clear();
       for (auto in : commands[consumer.front()].input_tids) {
         auto idx = first_layer_idx[in];
+        ids.insert(idx);
+      }
+
+      // get the actual commands
+      for(auto idx : ids) {
         producers.emplace_back(first_layer[idx]);
       }
 
