@@ -22,3 +22,4 @@ libraries
 generated/commands*
 generated/kernels*
 generated
+external

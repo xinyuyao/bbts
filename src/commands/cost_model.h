@@ -41,10 +41,10 @@ public:
     float cpu = -1;
 
     // check if this kernel is runnining on the gpu
-    bool is_gpu() const { return gpu > 0.0f; }
+    bool is_gpu() const { return gpu >= 0.0f; }
 
     // check if this kernel is running on the cpu
-    bool is_cpu() const { return cpu > 0.0f; }
+    bool is_cpu() const { return cpu >= 0.0f; }
   };
 
   // the choice we made
@@ -142,6 +142,7 @@ public:
 
         // get the cost of running the kernel
         ker_cost.cpu = ud.cpu->get_complexity_hint(_params, input_meta);
+        std::cout << "Kernel cost : " <<ker_cost.cpu << '\n';
 
         // store the meta
         for (auto i = 0; i < cmd.output_tids.size(); i++) {
