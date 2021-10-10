@@ -120,6 +120,7 @@ matrix_index apply_binary(abstract_ud_spec_id_t ud, std::vector<abstract_command
   matrix_index out;
   for(auto l : lhs) {
     
+    assert(rhs.find(l.first) != rhs.end());
     auto r = rhs[l.first];
 
     auto tid = currentTID++;
@@ -156,12 +157,15 @@ matrix_index generate_multiply(abstract_ud_spec_id_t ud,
         auto l_col = lhs_trans ? ni : ki;
 
         // get the right row and column id from the right matrix
-        auto r_row = lhs_trans ? ki : mi;
-        auto r_col = lhs_trans ? mi : ki;
+        auto r_row = rhs_trans ? mi : ki;
+        auto r_col = rhs_trans ? ki : mi;
 
         // store it
         auto tid = currentTID++;
         ridx[{ni, mi}].push_back(tid);
+        
+        assert(lhs.find({l_row, l_col}) != lhs.end());
+        assert(rhs.find({r_row, r_col}) != rhs.end());
 
         // make the command
         commands.push_back(abstract_command_t{.ud_id = ud,
