@@ -218,66 +218,9 @@ public:
       return;
     }
 
-    // if have to only plan for the first layer
+    // if have to only plan for the first layer apply rule 0 and exit
     if (second_layer.empty()) {
-
-      // go through all the commands
-      node_cost_t added_cost;
-      std::vector<bool>
-          gpu_assigment_tmp; // true if the command is on the kernel
-      std::vector<bool> gpu_assigment_best; // false if it is not
-      for (auto &cmd : first_layer) {
-
-        node_id_t best_node = 0;
-        float best_overhead = std::numeric_limits<float>::max();
-
-        // calculate the cost of running the command on each node
-        for (auto node = 0; node < num_nodes; node++) {
-
-          // cost calculation
-          auto [transfer_cost, cpu_cost, gpu_cost, gpu_transfer] =
-              calculate_cost(node, cmd, commands, tensor_locations,
-                             gpu_assigment_tmp);
-
-          // get the actual overhead (we want these to be balanced)
-          auto transfer_overhead =
-              std::max(_node_costs[node].transfer_cost + transfer_cost,
-                       max_cost.transfer_cost);
-          auto cpu_overhead = std::max(
-              _node_costs[node].compute_cost + cpu_cost, max_cost.compute_cost);
-          auto gpu_overhead = std::max(_node_costs[node].gpu_cost + gpu_cost,
-                                       max_cost.gpu_cost);
-          auto gpu_transfer_overhead =
-              std::max(_node_costs[node].gpu_transfer_cost + gpu_transfer,
-                       max_cost.gpu_transfer_cost);
-
-          // check if this is the best node we can assign this to
-          if (best_overhead > (transfer_overhead + cpu_overhead + gpu_overhead +
-                               gpu_transfer_overhead)) {
-            best_node = node;
-            best_overhead = transfer_overhead + cpu_overhead + gpu_overhead +
-                            gpu_transfer_overhead;
-
-            added_cost.transfer_cost = transfer_cost;
-            added_cost.compute_cost = cpu_cost;
-            added_cost.gpu_cost = gpu_cost;
-            added_cost.gpu_transfer_cost = gpu_transfer;
-
-            std::swap(gpu_assigment_best, gpu_assigment_tmp);
-          }
-        }
-
-        // pick the one with the smallest cost, and generate the commands
-        generate_for_node(cmd, commands, best_node, tensor_locations,
-                          gpu_assigment_best, generated_cmds);
-
-        // update the costs
-        _node_costs[best_node].transfer_cost += added_cost.transfer_cost;
-        _node_costs[best_node].compute_cost += added_cost.compute_cost;
-        _node_costs[best_node].gpu_cost += added_cost.gpu_cost;
-        _node_costs[best_node].gpu_transfer_cost +=
-            added_cost.gpu_transfer_cost;
-      }
+      apply_rule_0(commands, first_layer, tensor_locations, generated_cmds);
       return;
     }
 
@@ -290,22 +233,19 @@ public:
     }
 
     // go through the second layer and apply for each command list the rule 1
-    // and rule 2 then calculate the cost and pcik the one with the smallest
+    // and rule 2 then calculate the cost and pick the one with the smallest
     // cost
     std::vector<std::list<uint32_t>> producers;
-    std::unordered_set<int32_t> ids;
+    std::unordered_set<int32_t> processed_producer;
     for (const auto &consumer : second_layer) {
 
-      ids.clear();
       producers.clear();
       for (auto in : commands[consumer.front()].input_tids) {
         auto idx = first_layer_idx[in];
-        ids.insert(idx);
-      }
-
-      // get the actual commands
-      for(auto idx : ids) {
-        producers.emplace_back(first_layer[idx]);
+        if (processed_producer.find(idx) == processed_producer.end()) {
+          processed_producer.insert(idx);
+          producers.emplace_back(first_layer[idx]);
+        }
       }
 
       // run rule 1
@@ -324,6 +264,80 @@ public:
         apply_rule_2(r2_consumer, r2_producers, commands, consumer, producers,
                      tensor_locations, generated_cmds);
       }
+    }
+
+    // do we have producers we have not assigned
+    producers.clear();
+    for (auto idx = 0; idx < first_layer.size(); idx++) {
+      if (processed_producer.find(idx) == processed_producer.end()) {
+        producers.emplace_back(first_layer[idx]);
+      }
+    }
+
+    // if we do apply rule 0
+    if (!producers.empty()) {
+      apply_rule_0(commands, producers, tensor_locations, generated_cmds);
+    }
+  }
+
+  void apply_rule_0(const std::vector<abstract_command_t> &commands,
+                    const std::vector<std::list<uint32_t>> &producers,
+                    std::vector<std::unordered_set<tid_t>> &tensor_locations,
+                    std::vector<bbts::command_ptr_t> &generated_cmds) {
+
+    // go through all the commands
+    node_cost_t added_cost;
+    std::vector<bool> gpu_assigment_tmp; // true if the command is on the kernel
+    std::vector<bool> gpu_assigment_best; // false if it is not
+    for (auto &cmd : producers) {
+
+      node_id_t best_node = 0;
+      float best_overhead = std::numeric_limits<float>::max();
+
+      // calculate the cost of running the command on each node
+      for (auto node = 0; node < num_nodes; node++) {
+
+        // cost calculation
+        auto [transfer_cost, cpu_cost, gpu_cost, gpu_transfer] = calculate_cost(
+            node, cmd, commands, tensor_locations, gpu_assigment_tmp);
+
+        // get the actual overhead (we want these to be balanced)
+        auto transfer_overhead =
+            std::max(_node_costs[node].transfer_cost + transfer_cost,
+                     max_cost.transfer_cost);
+        auto cpu_overhead = std::max(_node_costs[node].compute_cost + cpu_cost,
+                                     max_cost.compute_cost);
+        auto gpu_overhead =
+            std::max(_node_costs[node].gpu_cost + gpu_cost, max_cost.gpu_cost);
+        auto gpu_transfer_overhead =
+            std::max(_node_costs[node].gpu_transfer_cost + gpu_transfer,
+                     max_cost.gpu_transfer_cost);
+
+        // check if this is the best node we can assign this to
+        if (best_overhead > (transfer_overhead + cpu_overhead + gpu_overhead +
+                             gpu_transfer_overhead)) {
+          best_node = node;
+          best_overhead = transfer_overhead + cpu_overhead + gpu_overhead +
+                          gpu_transfer_overhead;
+
+          added_cost.transfer_cost = transfer_cost;
+          added_cost.compute_cost = cpu_cost;
+          added_cost.gpu_cost = gpu_cost;
+          added_cost.gpu_transfer_cost = gpu_transfer;
+
+          std::swap(gpu_assigment_best, gpu_assigment_tmp);
+        }
+      }
+
+      // pick the one with the smallest cost, and generate the commands
+      generate_for_node(cmd, commands, best_node, tensor_locations,
+                        gpu_assigment_best, generated_cmds);
+
+      // update the costs
+      _node_costs[best_node].transfer_cost += added_cost.transfer_cost;
+      _node_costs[best_node].compute_cost += added_cost.compute_cost;
+      _node_costs[best_node].gpu_cost += added_cost.gpu_cost;
+      _node_costs[best_node].gpu_transfer_cost += added_cost.gpu_transfer_cost;
     }
   }
 
@@ -692,37 +706,7 @@ public:
       auto &present_tensors = tensor_locations[node];
       for (auto in : root_cmd.input_tids) {
         if (present_tensors.find(in) == present_tensors.end()) {
-
-          // ok we are moving this one
-          _moved_tensors[node].push_back(in);
-
-          // do we have an existing command to do the move
-          auto it = _move_cmds.find(in);
-          if (it == _move_cmds.end()) {
-
-            // find the node to fetch from
-            auto from_node = _find_node_to_fetch(in, tensor_locations);
-
-            // create the move command to this node
-            auto cur_cmd = generated_cmds.size();
-            _move_cmds[in] = cur_cmd;
-            auto cmd = command_t::create_move(
-                cur_cmd, command_t::tid_node_id_t{.tid = in, .node = from_node},
-                command_t::tid_node_id_t{.tid = in, .node = node});
-            generated_cmds.push_back(std::move(cmd));
-
-            // mark the location
-            tensor_locations[node].insert(in);
-
-          } else {
-
-            // update the move command
-            auto cmd_id = it->second;
-            _update_move(generated_cmds, cmd_id, node);
-
-            // mark the location
-            tensor_locations[node].insert(in);
-          }
+          generate_or_update_move(in, node, tensor_locations, generated_cmds);
         }
       }
     }
@@ -731,9 +715,10 @@ public:
     for (auto cmd_idx : cmd) {
 
       auto &c = commands[cmd_idx];
-      auto cmd_id = generated_cmds.size();
       command_ptr_t gen;
       if (c.type == abstract_command_type_t::APPLY) {
+
+        auto cmd_id = generated_cmds.size();
 
         // init the inputs
         std::vector<command_t::tid_node_id_t> inputs(c.input_tids.size());
@@ -772,14 +757,25 @@ public:
 
         // init the inputs
         std::vector<command_t::tid_node_id_t> inputs(c.input_tids.size());
+        int32_t num_to_fetch = 0;
         for (int32_t idx = 0; idx < c.input_tids.size(); ++idx) {
           node_id_t tid_node = node;
           if (tensor_locations[node].find(c.input_tids[idx]) ==
               tensor_locations[node].end()) {
             tid_node = _find_node_to_fetch(c.input_tids[idx], tensor_locations);
+            num_to_fetch++;
           }
           inputs[idx] = command_t::tid_node_id_t{.tid = c.input_tids[idx],
                                                  .node = tid_node};
+        }
+
+        // check if each tensor is not on this node
+        // if it is we need to insert at least one move so that REDUCE will work
+        assert(!inputs.empty());
+        if (num_to_fetch == inputs.size()) {
+          inputs.begin()->node = node;
+          generate_or_update_move(inputs.begin()->tid, node, tensor_locations,
+                                  generated_cmds);
         }
 
         // init the outputs
@@ -799,6 +795,7 @@ public:
         auto ud_info = cost_model->get_ud_choice(c.ud_id);
 
         // create the redice
+        auto cmd_id = generated_cmds.size();
         gen = command_t::create_reduce(
             cmd_id, *is_gpu ? ud_info.gpu->impl_id : ud_info.cpu->impl_id,
             *is_gpu, params, inputs, output);
@@ -806,6 +803,43 @@ public:
 
       is_gpu++;
       generated_cmds.push_back(std::move(gen));
+    }
+  }
+
+  void generate_or_update_move(
+      tid_t tid, node_id_t node,
+      std::vector<std::unordered_set<tid_t>> &tensor_locations,
+      std::vector<bbts::command_ptr_t> &generated_cmds) {
+
+    // ok we are moving this one
+    _moved_tensors[node].push_back(tid);
+
+    // do we have an existing command to do the move
+    auto it = _move_cmds.find(tid);
+    if (it == _move_cmds.end()) {
+
+      // find the node to fetch from
+      auto from_node = _find_node_to_fetch(tid, tensor_locations);
+
+      // create the move command to this node
+      auto cur_cmd = generated_cmds.size();
+      _move_cmds[tid] = cur_cmd;
+      auto cmd = command_t::create_move(
+          cur_cmd, command_t::tid_node_id_t{.tid = tid, .node = from_node},
+          command_t::tid_node_id_t{.tid = tid, .node = node});
+      generated_cmds.push_back(std::move(cmd));
+
+      // mark the location
+      tensor_locations[node].insert(tid);
+
+    } else {
+
+      // update the move command
+      auto cmd_id = it->second;
+      _update_move(generated_cmds, cmd_id, node);
+
+      // mark the location
+      tensor_locations[node].insert(tid);
     }
   }
 
@@ -1108,6 +1142,7 @@ public:
       }
 
       // store the consumer
+      _inputs_left[consumer] = 0;
       op_list.push_back(consumer);
       producer = consumer;
     }
@@ -1125,7 +1160,7 @@ public:
     if (p.output_tids.size() != 1) {
       return false;
     }
-    if (p.input_tids.size() != 1) {
+    if (c.input_tids.size() != 1) {
       return false;
     }
 
