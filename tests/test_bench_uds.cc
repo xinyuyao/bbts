@@ -101,8 +101,8 @@ int main() {
     auto mult_stop = high_resolution_clock::now();
     auto mult_duration = duration_cast<microseconds>(mult_stop - mult_start);
 
-    auto add_time = 1000000.0f * (float) add_duration.count() / (float) (size * size * num_iter);
-    auto matrix_time = 1000000.0f *(float) mult_duration.count() / (float) (size * size * size * num_iter);
+    auto add_time = (float) add_duration.count() / (float) (size * size * num_iter * 1000000.0f);
+    auto matrix_time = (float) mult_duration.count() / (float) (size * size * size * num_iter * 1000000.0f);
 
     std::cout << "add_const : " << add_time << ", " << "mult_const : " << matrix_time << '\n';
   }
