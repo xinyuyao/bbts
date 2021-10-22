@@ -26,7 +26,7 @@ size_t bbts::dense_matrix_add_t::get_complexity_hint(const bbts::ud_impl_t::tens
 
   // O(n * m)
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
-  return m_a.num_rows * m_a.num_cols;
+  return 0.000579375 * m_a.num_rows * m_a.num_cols;
 }
 
 void bbts::dense_matrix_add_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,

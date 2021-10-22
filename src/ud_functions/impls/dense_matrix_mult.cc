@@ -25,11 +25,10 @@ bbts::dense_matrix_mult_t::dense_matrix_mult_t() {
 
 size_t bbts::dense_matrix_mult_t::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
                                                       const bbts::ud_impl_t::meta_args_t &_in) {
-
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<dense_tensor_meta_t>().m();
   const auto &m_b = _in.get<1>().as<dense_tensor_meta_t>().m();
-  return m_a.num_rows * m_a.num_cols * m_b.num_cols;
+  return 0.000718234 * m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
 void bbts::dense_matrix_mult_t::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,

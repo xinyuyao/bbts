@@ -30,7 +30,7 @@ struct node_config_t {
   float gpu_transfer_cost_per_byte = 1.0f;
 
   // the cost to send bytes per byte
-  float send_cost_per_byte = 1.0f;
+  float send_cost_per_byte = 1.16415322E-9;
   
 };
 

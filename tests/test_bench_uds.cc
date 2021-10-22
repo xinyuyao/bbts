@@ -1,6 +1,7 @@
 #include "../src/tensor/builtin_formats.h"
 #include "../src/ud_functions/builtin_functions.h"
 #include "../src/ud_functions/udf_manager.h"
+#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <chrono>
@@ -27,7 +28,8 @@ int main() {
   matcher = manager.get_matcher_for("matrix_mult");
   auto mult = matcher->findMatch({"dense", "dense"}, {"dense"}, false);
 
-  float network_speed_GBps = 1.25;
+  float network_speed_Bps = 1.25 / (1024 * 1024 * 1024);
+  const size_t num_iter = 10;
 
   for (auto size : std::vector<uint32_t>{400, 800, 1600, 3200}) {
 
@@ -80,7 +82,7 @@ int main() {
 
     // call the addition
     auto add_start = high_resolution_clock::now();
-    for (int32_t num_iters = 0; num_iters < 10; ++num_iters) {
+    for (int32_t num_iters = 0; num_iters < num_iter; ++num_iters) {
       add->call_ud({._params = bbts::command_param_list_t{._data = nullptr,
                                                           ._num_elements = 0}},
                    input_args, output_args);
@@ -91,7 +93,7 @@ int main() {
 
     // call the mult
     auto mult_start = high_resolution_clock::now();
-    for (int32_t num_iters = 0; num_iters < 10; ++num_iters) {
+    for (int32_t num_iters = 0; num_iters < num_iter; ++num_iters) {
       mult->call_ud({._params = bbts::command_param_list_t{._data = nullptr,
                                                           ._num_elements = 0}},
                    input_args, output_args);
@@ -99,8 +101,8 @@ int main() {
     auto mult_stop = high_resolution_clock::now();
     auto mult_duration = duration_cast<microseconds>(mult_stop - mult_start);
 
-    auto add_time = (float) add_duration.count() / (float) (size * size);
-    auto matrix_time = (float) mult_duration.count() / (float) (size * size * size);
+    auto add_time = (float) add_duration.count() / (float) (size * size * num_iter);
+    auto matrix_time = (float) mult_duration.count() / (float) (size * size * size * num_iter);
 
     std::cout << "add_const : " << add_time << ", " << "mult_const : " << matrix_time << '\n';
   }
