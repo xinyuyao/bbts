@@ -1,5 +1,6 @@
 #include "reservation_station.h"
 #include "../server/static_config.h"
+#include "command.h"
 #include <cassert>
 
 bbts::reservation_station_t::reservation_station_t(bbts::node_id_t _node_id, int32_t num_nodes) : _my_rank(_node_id),
@@ -198,11 +199,11 @@ void bbts::reservation_station_t::register_tensor(bbts::tid_t _tid) {
   }
 }
 
-bbts::command_ptr_t bbts::reservation_station_t::get_next_command() {
+bbts::command_ptr_t bbts::reservation_station_t::get_next_move_command() {
 
   // wait until we have something here
   std::unique_lock<std::mutex> lk(_m);
-  _cv.wait(lk, [&]{ return (!_execute.empty() && _is_executing)  || _shutdown ; });
+  _cv.wait(lk, [&]{ return (!_execute_move.empty() && _is_executing)  || _shutdown ; });
 
   // if we have shutdown return null as we have no command left...
   if(_shutdown) {
@@ -210,8 +211,60 @@ bbts::command_ptr_t bbts::reservation_station_t::get_next_command() {
   }
 
   // pop the unique pointer of the vector
-  auto tmp = std::move(_execute.back());
-  _execute.pop_back();
+  auto tmp = std::move(_execute_move.back());
+  _execute_move.pop_back();
+
+  // call the hook if necessary
+  if constexpr (static_config::enable_hooks) {
+
+    // mark that we have scheduled this command
+    _command_scheduled_hook(tmp->id);
+  }
+
+  // return it
+  return std::move(tmp);
+}
+
+bbts::command_ptr_t bbts::reservation_station_t::get_next_apply_command() {
+
+  // wait until we have something here
+  std::unique_lock<std::mutex> lk(_m);
+  _cv.wait(lk, [&]{ return (!_execute_ud.empty() && _is_executing)  || _shutdown ; });
+
+  // if we have shutdown return null as we have no command left...
+  if(_shutdown) {
+    return nullptr;
+  }
+
+  // pop the unique pointer of the vector
+  auto tmp = std::move(_execute_ud.back());
+  _execute_ud.pop_back();
+
+  // call the hook if necessary
+  if constexpr (static_config::enable_hooks) {
+
+    // mark that we have scheduled this command
+    _command_scheduled_hook(tmp->id);
+  }
+
+  // return it
+  return std::move(tmp);
+}
+
+bbts::command_ptr_t bbts::reservation_station_t::get_next_reduce_command() {
+
+  // wait until we have something here
+  std::unique_lock<std::mutex> lk(_m);
+  _cv.wait(lk, [&]{ return (!_execute_reduce.empty() && _is_executing)  || _shutdown ; });
+
+  // if we have shutdown return null as we have no command left...
+  if(_shutdown) {
+    return nullptr;
+  }
+
+  // pop the unique pointer of the vector
+  auto tmp = std::move(_execute_reduce.back());
+  _execute_reduce.pop_back();
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
@@ -269,7 +322,9 @@ void bbts::reservation_station_t::clear() {
   std::unique_lock<std::mutex> lk(_m);
 
   _last_cmd = -1;
-  _execute.clear();
+  _execute_move.clear();
+  _execute_reduce.clear();
+  _execute_ud.clear();
   _local_commands.clear();
 
   for(auto &ls : _commands_waiting_for) {
@@ -490,7 +545,13 @@ bool bbts::reservation_station_t::_queue_local(bbts::command_ptr_t _command) {
   // if we have all the required tensors we can kick off the command
   if(num_not_present == 0) {
 
-    _execute.emplace_back(std::move(_command));
+    switch (_command->type) {
+      case command_t::op_type_t::APPLY: _execute_ud.emplace_back(std::move(_command)); break;
+      case command_t::op_type_t::MOVE: _execute_move.emplace_back(std::move(_command)); break;
+      case command_t::op_type_t::REDUCE: _execute_reduce.emplace_back(std::move(_command)); break;
+      default: assert(false); // this is not supposed to happen
+    }
+
     _cv.notify_all();
   }
   else {
@@ -742,7 +803,13 @@ bool bbts::reservation_station_t::_retire_remote_command(bbts::command_ptr_t _co
 void bbts::reservation_station_t::_schedule_for_execution(bbts::command_ptr_t _cmd) {
 
   // schedule the command for execution
-  _execute.emplace_back(std::move(_cmd));
+  switch (_cmd->type) {
+    case command_t::op_type_t::APPLY: _execute_ud.emplace_back(std::move(_cmd)); break;
+    case command_t::op_type_t::MOVE: _execute_move.emplace_back(std::move(_cmd)); break;
+    case command_t::op_type_t::REDUCE: _execute_reduce.emplace_back(std::move(_cmd)); break;
+    default: assert(false); // this is not supposed to happen
+  }
+
   _cv.notify_all();
 }
 

@@ -19,7 +19,9 @@ public:
                    logger_ptr_t logger);
 
   // runs local command
-  void local_command_runner();
+  void local_move_command_runner();
+  void local_apply_command_runner();
+  void local_reduce_command_runner();
 
   // handles the incoming request for remote commands
   void remote_command_handler();

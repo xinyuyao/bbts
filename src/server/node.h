@@ -129,7 +129,9 @@ public:
   // the reservation station needs a deleter thread
   std::thread create_deleter_thread();
 
-  std::thread create_command_processing_thread();
+  std::thread create_move_processing_thread();
+  std::thread create_apply_processing_thread();
+  std::thread create_reduce_processing_thread();
 
   std::thread expect_remote_command();
 

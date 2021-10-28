@@ -15,245 +15,258 @@ bbts::command_runner_t::command_runner_t(bbts::storage_ptr_t ts,
     : _ts(std::move(ts)), _tf(std::move(tf)), _udm(std::move(udm)),
       _rs(std::move(rs)), _comm(std::move(comm)), _logger(std::move(logger)) {}
 
-void bbts::command_runner_t::local_command_runner() {
+
+void bbts::command_runner_t::local_move_command_runner() {
 
   while (true) {
 
     // get the command
-    auto cmd = _rs->get_next_command();
+    auto cmd = _rs->get_next_move_command();
     if (cmd == nullptr) {
       break;
     }
 
-    // if we have a move
-    if (cmd->type == command_t::MOVE) {
+    // move the
+    _logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
 
-      // move the
-      _logger->message("MOVE " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
+    // it is a point to point move
+    if(cmd->is_move()) {
 
-      // it is a point to point move
-      if(cmd->is_move()) {
+      // get the size of the tensor
+      auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
 
-        // get the size of the tensor
-        auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
+      // set it as a command extra info
+      cmd->nfo.num_bytes = num_bytes;
 
-        // set it as a command extra info
-        cmd->nfo.num_bytes = num_bytes;
-
-        // forward the command to the right nodes
-        if(!_comm->op_request(cmd)) {
-          throw std::runtime_error("Failed to forward the command.");
-        }
-
-        // create the move operation
-        move_op_t op(*_comm, cmd->id, num_bytes, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
-
-        // do the apply
-        op.apply();
-
-        // retire the command so it knows that we have processed the tensors
-        _rs->retire_command(std::move(cmd));
-      }
-      // it is a broadcast
-      else {
-
-        _logger->message("BROADCAST\n");
-
-        // get the size of the tensor
-        auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
-
-        // set it as a command extra info
-        cmd->nfo.num_bytes = num_bytes;
-
-        // forward the command to the right nodes
-        if(!_comm->op_request(cmd)) {
-          throw std::runtime_error("Failed to forward reduce command.");
-        }
-
-        // get the nodes involved
-        auto nodes = cmd->get_nodes();
-
-        // create the move operation
-        broadcast_op_t op(*_comm, *_ts, nodes, cmd->id, num_bytes, cmd->get_input(0).tid);
-
-        // do the apply
-        op.apply();
-
-        // retire the command so it knows that we have processed the tensors
-        _rs->retire_command(std::move(cmd));
+      // forward the command to the right nodes
+      if(!_comm->op_request(cmd)) {
+        throw std::runtime_error("Failed to forward the command.");
       }
 
-    } else if (cmd->type == command_t::APPLY) {
+      // create the move operation
+      move_op_t op(*_comm, cmd->id, num_bytes, cmd->get_input(0).tid, true, *_ts, cmd->get_output(0).node);
+
+      // do the apply
+      op.apply();
+
+      // retire the command so it knows that we have processed the tensors
+      _rs->retire_command(std::move(cmd));
+    }
+    // it is a broadcast
+    else {
+
+      _logger->message("BROADCAST\n");
+
+      // get the size of the tensor
+      auto num_bytes = _ts->get_tensor_size(cmd->get_input(0).tid);
+
+      // set it as a command extra info
+      cmd->nfo.num_bytes = num_bytes;
+
+      // forward the command to the right nodes
+      if(!_comm->op_request(cmd)) {
+        throw std::runtime_error("Failed to forward reduce command.");
+      }
+
+      // get the nodes involved
+      auto nodes = cmd->get_nodes();
+
+      // create the move operation
+      broadcast_op_t op(*_comm, *_ts, nodes, cmd->id, num_bytes, cmd->get_input(0).tid);
+
+      // do the apply
+      op.apply();
+
+      // retire the command so it knows that we have processed the tensors
+      _rs->retire_command(std::move(cmd));
+    }
+  }
+}
+
+void bbts::command_runner_t::local_apply_command_runner() {
+
+  while (true) {
+
+    // get the command
+    auto cmd = _rs->get_next_apply_command();
+    if (cmd == nullptr) {
+      break;
+    }
+
+    // return me that matcher for matrix addition
+    auto ud = _udm->get_fn_impl(cmd->fun_id);
+
+    // setup the inputs
+    std::vector<tid_t> inputs; inputs.reserve(cmd->get_num_inputs());
+    for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+      inputs.push_back(cmd->get_input(idx).tid);
+    }
+
+    // reserve the outputs
+    std::vector<std::tuple<tid_t, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
+
+    // calculate the output size
+    _ts->local_transaction(inputs, {}, [&](const storage_t::reservation_result_t &res) {
+
+      // make the input meta arguments
+      ud_impl_t::meta_args_t input_meta_args(cmd->get_num_inputs());
+      for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+
+        // store it
+        auto t = res.get[idx].get().tensor;
+        assert(t != nullptr);
+        input_meta_args.set(idx, t->_meta);
+      }
+
+      // figure out the output arguments
+      std::vector<tensor_meta_t> arguments(cmd->get_num_outputs());
+      ud_impl_t::meta_args_t output_meta_args(arguments);
+
+      // get the output meta
+      ud->get_out_meta({ ._params = cmd->get_parameters() }, input_meta_args, output_meta_args);
+
+      // setup the output arguments
+      ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
+      for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
+
+        // get the type of the output
+        auto &type = ud->outputTypes[idx];
+        output_meta_args.get_by_idx(idx).fmt_id = _tf->get_tensor_ftm(type);
+
+        // the size of the tensor, tid and whether it is on the GPU
+        auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
+        auto tid = cmd->get_output(idx).tid;
+
+        // store the outputs
+        outputs.push_back({tid, ts_size});
+      }
+
+    });
+
+    // log what is happening
+    _logger->message("APPLY " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
+
+    // create the outputs and run the ud 
+    _ts->local_transaction(inputs, outputs, [&](const storage_t::reservation_result_t &res) {
+
+      // make the input arguments
+      ud_impl_t::tensor_args_t input_args(cmd->get_num_inputs());
+      for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
+
+        // store it
+        auto t = res.get[idx].get().tensor;
+        input_args.set(idx, *t);
+      }
+
+      // setup the output arguments
+      ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
+      for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
+
+        auto t = res.create[idx].get().tensor;
+
+        // get the type of the output
+        auto &type = ud->outputTypes[idx];
+        t->_meta.fmt_id = _tf->get_tensor_ftm(type);
+
+        // set the output arg
+        output_args.set(idx, *t);
+      }
       
+      // apply the ud function
+      ud->call_ud(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
+    });
+
+    // retire the command so it knows that we have processed the tensors
+    _rs->retire_command(std::move(cmd));
+  }
+}
+
+
+void bbts::command_runner_t::local_reduce_command_runner() {
+
+  while (true) {
+
+    // get the command
+    auto cmd = _rs->get_next_reduce_command();
+    if (cmd == nullptr) {
+      break;
+    }
+
+    // check if the reduce is remote or local
+    if (cmd->is_local_reduce(_comm->get_rank())) {
+
       // return me that matcher for matrix addition
       auto ud = _udm->get_fn_impl(cmd->fun_id);
 
-      // setup the inputs
-      std::vector<tid_t> inputs; inputs.reserve(cmd->get_num_inputs());
-      for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
-        inputs.push_back(cmd->get_input(idx).tid);
+      // preallocate the input pointers
+      auto cmd_inputs = cmd->get_inputs();
+      std::vector<tid_t> inputs;
+      inputs.reserve(cmd_inputs.size());
+
+      // get all the tensors we need
+      for(const auto& in : cmd_inputs) {
+
+        // get the source tensor
+        inputs.push_back(in.tid);
       }
 
-      // reserve the outputs
-      std::vector<std::tuple<tid_t, size_t>> outputs; outputs.reserve(cmd->get_num_outputs());
+      // create the reduce op
+      local_reduce_op_t op(*_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
+                            cmd->get_output(0).tid, *ud);
 
-      // calculate the output size
-      _ts->local_transaction(inputs, {}, [&](const storage_t::reservation_result_t &res) {
+      // do the apply
+      op.apply();
 
-        // make the input meta arguments
-        ud_impl_t::meta_args_t input_meta_args(cmd->get_num_inputs());
-        for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
-
-          // store it
-          auto t = res.get[idx].get().tensor;
-          assert(t != nullptr);
-          input_meta_args.set(idx, t->_meta);
-        }
-
-        // figure out the output arguments
-        std::vector<tensor_meta_t> arguments(cmd->get_num_outputs());
-        ud_impl_t::meta_args_t output_meta_args(arguments);
-
-        // get the output meta
-        ud->get_out_meta({ ._params = cmd->get_parameters() }, input_meta_args, output_meta_args);
-
-        // setup the output arguments
-        ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
-        for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
-
-          // get the type of the output
-          auto &type = ud->outputTypes[idx];
-          output_meta_args.get_by_idx(idx).fmt_id = _tf->get_tensor_ftm(type);
-
-          // the size of the tensor, tid and whether it is on the GPU
-          auto ts_size = _tf->get_tensor_size(output_meta_args.get_by_idx(idx));
-          auto tid = cmd->get_output(idx).tid;
-
-          // store the outputs
-          outputs.push_back({tid, ts_size});
-        }
-
-      });
-
-      // log what is happening
-      _logger->message("APPLY " + std::to_string(cmd->id) + " on my_node : " + std::to_string(_comm->get_rank()) + " Executed...\n");
-
-      // create the outputs and run the ud 
-      _ts->local_transaction(inputs, outputs, [&](const storage_t::reservation_result_t &res) {
-
-        // make the input arguments
-        ud_impl_t::tensor_args_t input_args(cmd->get_num_inputs());
-        for (size_t idx = 0; idx < cmd->get_num_inputs(); ++idx) {
-
-          // store it
-          auto t = res.get[idx].get().tensor;
-          input_args.set(idx, *t);
-        }
-
-        // setup the output arguments
-        ud_impl_t::tensor_args_t output_args(cmd->get_num_outputs());
-        for (size_t idx = 0; idx < cmd->get_num_outputs(); ++idx) {
-
-          auto t = res.create[idx].get().tensor;
-
-          // get the type of the output
-          auto &type = ud->outputTypes[idx];
-          t->_meta.fmt_id = _tf->get_tensor_ftm(type);
-
-          // set the output arg
-          output_args.set(idx, *t);
-        }
-        
-        // apply the ud function
-        ud->call_ud(bbts::ud_impl_t::tensor_params_t{._params = cmd->get_parameters() }, input_args, output_args);
-      });
+      _logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
 
       // retire the command so it knows that we have processed the tensors
       _rs->retire_command(std::move(cmd));
 
-    } else if (cmd->type == command_t::DELETE) {
 
-      // this should never happen
-      throw std::runtime_error("We should never get a delete to execute, delete is implicit...");
+    } else {
 
-    } else if (cmd->type == command_t::REDUCE) {
+      _logger->message("REMOTE_REDUCE_SCHEDULED");
 
-      // check if the reduce is remote or local
-      if (cmd->is_local_reduce(_comm->get_rank())) {
+      // forward the command to the right nodes
+      if(!_comm->op_request(cmd)) {
+        throw std::runtime_error("Failed to forward reduce command.");
+      }
 
-        // return me that matcher for matrix addition
-        auto ud = _udm->get_fn_impl(cmd->fun_id);
+      // get the nodes involved
+      auto nodes = cmd->get_nodes();
 
-        // preallocate the input pointers
-        auto cmd_inputs = cmd->get_inputs();
-        std::vector<tid_t> inputs;
-        inputs.reserve(cmd_inputs.size());
+      // return me that matcher for matrix addition
+      auto ud = _udm->get_fn_impl(cmd->fun_id);
 
-        // get all the tensors we need
-        for(const auto& in : cmd_inputs) {
+      // preallocate the input pointers
+      auto cmd_inputs = cmd->get_inputs();
+      std::vector<tid_t> inputs;
+      inputs.reserve(cmd_inputs.size());
+
+      // get all the tensors we need
+      for(const auto& in : cmd_inputs) {
+
+        // check if the node
+        if(in.node == _comm->get_rank()) {
 
           // get the source tensor
           inputs.push_back(in.tid);
         }
-
-        // create the reduce op
-        local_reduce_op_t op(*_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
-                             cmd->get_output(0).tid, *ud);
-
-        // do the apply
-        op.apply();
-
-        _logger->message("LOCAL_REDUCE " + std::to_string(cmd->id) + " on node " + std::to_string(_comm->get_rank()) + '\n');
-
-        // retire the command so it knows that we have processed the tensors
-        _rs->retire_command(std::move(cmd));
-
-
-      } else {
-
-        _logger->message("REMOTE_REDUCE_SCHEDULED");
-
-        // forward the command to the right nodes
-        if(!_comm->op_request(cmd)) {
-          throw std::runtime_error("Failed to forward reduce command.");
-        }
-
-        // get the nodes involved
-        auto nodes = cmd->get_nodes();
-
-        // return me that matcher for matrix addition
-        auto ud = _udm->get_fn_impl(cmd->fun_id);
-
-        // preallocate the input pointers
-        auto cmd_inputs = cmd->get_inputs();
-        std::vector<tid_t> inputs;
-        inputs.reserve(cmd_inputs.size());
-
-        // get all the tensors we need
-        for(const auto& in : cmd_inputs) {
-
-          // check if the node
-          if(in.node == _comm->get_rank()) {
-
-            // get the source tensor
-            inputs.push_back(in.tid);
-          }
-        }
-        
-        // make sure this does not happen
-        assert(inputs.size() != 0);
-
-        // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
-
-        // do the apply
-        op.apply();
-
-        // retire the command so it knows that we have processed the tensors
-        _rs->retire_command(std::move(cmd));
-
-        _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
       }
+      
+      // make sure this does not happen
+      assert(inputs.size() != 0);
+
+      // create the move operation
+      reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
+
+      // do the apply
+      op.apply();
+
+      // retire the command so it knows that we have processed the tensors
+      _rs->retire_command(std::move(cmd));
+
+      _logger->message("REMOTE_REDUCE PROCESSED on node " + std::to_string(_comm->get_rank()) + '\n');
     }
   }
 }

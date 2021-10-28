@@ -167,40 +167,150 @@ std::thread tensor_notifier(
   return std::move(t);
 }
 
-std::thread create_command_processing_thread(
+std::tuple<std::thread, std::thread, std::thread> create_command_processing_thread(
     std::vector<reservation_station_ptr_t> &rss,
     std::vector<fake_storage_t> &sto,
     std::vector<bbts::concurent_queue<_remote_cmd_t>> &remote_cmds,
     int32_t node) {
 
   // create the thread to pull
-  std::thread t = std::thread([&rss, &remote_cmds, &sto, node]() {
+  std::thread t_move = std::thread([&rss, &remote_cmds, &sto, node]() {
     while (true) {
 
       // get the command
-      auto cmd = rss[node]->get_next_command();
+      auto cmd = rss[node]->get_next_move_command();
       if (cmd == nullptr) {
         break;
       }
 
-      // if we have a move
-      if (cmd->type == command_t::MOVE) {
+      // move the
+      std::cout << "MOVE " << cmd->id << " on my_node : " << node
+                << " Executed...\n"
+                << std::flush;
 
-        // move the
-        std::cout << "MOVE " << cmd->id << " on my_node : " << node
-                  << " Executed...\n"
+      // get the target node
+      auto target = cmd->get_output(0);
+
+      // we use this to busy wait
+      std::atomic<bool> done{};
+      done = false;
+
+      // push the command
+      _remote_cmd_t c = {cmd->clone(), &done};
+      remote_cmds[target.node].enqueue(c);
+
+      // add some waiting to simulate running the command
+      usleep(rand() % 100);
+
+      // retire the command
+      rss[node]->retire_command(std::move(cmd));
+
+      // wait for the remote command to be done
+      while (!done) {
+      }
+    }
+  });
+
+  std::thread t_apply = std::thread([&rss, &remote_cmds, &sto, node]() {
+    while (true) {
+
+      // get the command
+      auto cmd = rss[node]->get_next_apply_command();
+      if (cmd == nullptr) {
+        break;
+      }
+
+      std::cout << "APPLY " << cmd->id << " on my_node : " << node
+                << " Executed...\n"
+                << std::flush;
+
+      if (cmd->get_root_node() == node) {
+
+        // store the outputs so we can add it to the storage
+        auto outputs = cmd->get_outputs();
+
+        // update all the outputs in the storage
+        for (auto &o : outputs) {
+          sto[node].insert(o.tid);
+        }
+
+        // retire the command
+        rss[node]->retire_command(std::move(cmd));
+      } else {
+
+        // all applies are local
+        throw std::runtime_error("How did this happen!");
+      }
+    }
+  });
+
+  std::thread t_reduce = std::thread([&rss, &remote_cmds, &sto, node]() {
+    while (true) {
+
+      // get the command
+      auto cmd = rss[node]->get_next_reduce_command();
+      if (cmd == nullptr) {
+        break;
+      }
+
+      // check if the reduce is remote or local
+      if (cmd->is_local_reduce(node)) {
+
+        // std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node <<
+        // '\n' << std::flush;
+
+        // store the outputs so we can add it to the storage
+        auto outputs = cmd->get_outputs();
+
+        // update all the outputs in the storage
+        for (auto &o : outputs) {
+          sto[node].insert(o.tid);
+        }
+
+        // retire the command
+        rss[node]->retire_command(std::move(cmd));
+      } else {
+
+        std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << node
+                  << '\n'
                   << std::flush;
 
-        // get the target node
-        auto target = cmd->get_output(0);
+        // store the outputs so we can add it to the storage
+        auto outputs = cmd->get_outputs();
+
+        // update all the outputs in the storage
+        for (auto &o : outputs) {
+          sto[node].insert(o.tid);
+        }
+
+        // figure out the nodes we need to retire the command to
+        std::unordered_set<node_id_t> nodes_to_retire;
+        for (auto &in : cmd->get_inputs()) {
+          nodes_to_retire.insert(in.node);
+        }
+        for (auto &out : cmd->get_outputs()) {
+          nodes_to_retire.insert(out.node);
+        }
 
         // we use this to busy wait
-        std::atomic<bool> done{};
-        done = false;
+        std::vector<std::atomic<bool>> done(nodes_to_retire.size());
+        for (auto &d : done) {
+          d = false;
+        }
 
-        // push the command
-        _remote_cmd_t c = {cmd->clone(), &done};
-        remote_cmds[target.node].enqueue(c);
+        // retire the command for each node
+        int32_t i = 0;
+        for (auto n : nodes_to_retire) {
+
+          if (n == node) {
+            done[i++] = true;
+            continue;
+          }
+
+          // push the command
+          _remote_cmd_t c = {cmd->clone(), &done[i++]};
+          remote_cmds[n].enqueue(c);
+        }
 
         // add some waiting to simulate running the command
         usleep(rand() % 100);
@@ -208,115 +318,16 @@ std::thread create_command_processing_thread(
         // retire the command
         rss[node]->retire_command(std::move(cmd));
 
-        // wait for the remote command to be done
-        while (!done) {
-        }
-      } else if (cmd->type == command_t::APPLY) {
-
-        std::cout << "APPLY " << cmd->id << " on my_node : " << node
-                  << " Executed...\n"
-                  << std::flush;
-
-        if (cmd->get_root_node() == node) {
-
-          // store the outputs so we can add it to the storage
-          auto outputs = cmd->get_outputs();
-
-          // update all the outputs in the storage
-          for (auto &o : outputs) {
-            sto[node].insert(o.tid);
-          }
-
-          // retire the command
-          rss[node]->retire_command(std::move(cmd));
-        } else {
-
-          // all applies are local
-          throw std::runtime_error("How did this happen!");
-        }
-      } else if (cmd->type == command_t::DELETE) {
-
-        // this should never happen
-        throw std::runtime_error(
-            "We should never get a delete to execute, delete is implicit...");
-      } else if (cmd->type == command_t::REDUCE) {
-
-        // check if the reduce is remote or local
-        if (cmd->is_local_reduce(node)) {
-
-          // std::cout << "LOCAL_REDUCE " << cmd->id << " on node " << node <<
-          // '\n' << std::flush;
-
-          // store the outputs so we can add it to the storage
-          auto outputs = cmd->get_outputs();
-
-          // update all the outputs in the storage
-          for (auto &o : outputs) {
-            sto[node].insert(o.tid);
-          }
-
-          // retire the command
-          rss[node]->retire_command(std::move(cmd));
-        } else {
-
-          std::cout << "REMOTE_REDUCE " << cmd->id << " on node " << node
-                    << '\n'
-                    << std::flush;
-
-          // store the outputs so we can add it to the storage
-          auto outputs = cmd->get_outputs();
-
-          // update all the outputs in the storage
-          for (auto &o : outputs) {
-            sto[node].insert(o.tid);
-          }
-
-          // figure out the nodes we need to retire the command to
-          std::unordered_set<node_id_t> nodes_to_retire;
-          for (auto &in : cmd->get_inputs()) {
-            nodes_to_retire.insert(in.node);
-          }
-          for (auto &out : cmd->get_outputs()) {
-            nodes_to_retire.insert(out.node);
-          }
-
-          // we use this to busy wait
-          std::vector<std::atomic<bool>> done(nodes_to_retire.size());
-          for (auto &d : done) {
-            d = false;
-          }
-
-          // retire the command for each node
-          int32_t i = 0;
-          for (auto n : nodes_to_retire) {
-
-            if (n == node) {
-              done[i++] = true;
-              continue;
-            }
-
-            // push the command
-            _remote_cmd_t c = {cmd->clone(), &done[i++]};
-            remote_cmds[n].enqueue(c);
-          }
-
-          // add some waiting to simulate running the command
-          usleep(rand() % 100);
-
-          // retire the command
-          rss[node]->retire_command(std::move(cmd));
-
-          // wait till all done
-          for (auto &d : done) {
-            while (!d) {
-            }
+        // wait till all done
+        for (auto &d : done) {
+          while (!d) {
           }
         }
       }
     }
   });
 
-  return std::move(t);
+  return {std::move(t_move), std::move(t_apply), std::move(t_reduce)};
 }
 
 TEST(TestReservationStation, FewLocalCommands0) {
@@ -384,14 +395,14 @@ TEST(TestReservationStation, FewLocalCommands1) {
   rs->execute_scheduled_async();
 
   // get the first command to execute
-  auto c1 = rs->get_next_command();
+  auto c1 = rs->get_next_apply_command();
 
   // retire the command as we pretend we have executed it
   storage.insert(2);
   EXPECT_TRUE(rs->retire_command(std::move(c1)));
 
   // get the next command
-  auto c2 = rs->get_next_command();
+  auto c2 = rs->get_next_reduce_command();
   storage.insert(3);
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
@@ -448,14 +459,14 @@ TEST(TestReservationStation, FewLocalCommands2) {
   rs->execute_scheduled_async();
 
   // get the first command to execute
-  auto c1 = rs->get_next_command();
+  auto c1 = rs->get_next_apply_command();
 
   // retire the command as we pretend we have executed it
   storage.insert(2);
   EXPECT_TRUE(rs->retire_command(std::move(c1)));
 
   // get the next command
-  auto c2 = rs->get_next_command();
+  auto c2 = rs->get_next_reduce_command();
   storage.insert(3);
   EXPECT_TRUE(rs->retire_command(std::move(c2)));
 
@@ -731,8 +742,10 @@ TEST(TestReservationStation, TwoNodesBMM) {
   _executor_threads.reserve(2);
   for (node_id_t node = 0; node < 2; ++node) {
 
-    _executor_threads.push_back(std::move(
-        create_command_processing_thread(rss, sto, remote_cmds, node)));
+    auto [t_m, t_a, t_r] = create_command_processing_thread(rss, sto, remote_cmds, node);
+    _executor_threads.push_back(std::move(t_m));
+    _executor_threads.push_back(std::move(t_a));
+    _executor_threads.push_back(std::move(t_r));
   }
 
   // create the deleters
@@ -1019,8 +1032,10 @@ TEST(TestReservationStation, TwoNodesCMM) {
   _executor_threads.reserve(2);
   for (node_id_t node = 0; node < 2; ++node) {
 
-    _executor_threads.push_back(std::move(
-        create_command_processing_thread(rss, sto, remote_cmds, node)));
+    auto [t_m, t_a, t_r] = create_command_processing_thread(rss, sto, remote_cmds, node);
+    _executor_threads.push_back(std::move(t_m));
+    _executor_threads.push_back(std::move(t_a));
+    _executor_threads.push_back(std::move(t_r));
   }
 
   //
@@ -1307,8 +1322,11 @@ TEST(TestReservationStation, NNodesCMM) {
   std::vector<std::thread> _executor_threads;
   _executor_threads.reserve(num_nodes);
   for (node_id_t node = 0; node < num_nodes; ++node) {
-    _executor_threads.push_back(std::move(
-        create_command_processing_thread(rss, sto, remote_cmds, node)));
+
+    auto [t_m, t_a, t_r] = create_command_processing_thread(rss, sto, remote_cmds, node);
+    _executor_threads.push_back(std::move(t_m));
+    _executor_threads.push_back(std::move(t_a));
+    _executor_threads.push_back(std::move(t_r));
   }
 
   //

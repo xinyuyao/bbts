@@ -66,7 +66,9 @@ void bbts::node_t::run() {
   std::vector<std::thread> command_processing_threads;
   command_processing_threads.reserve(_comm->get_num_nodes());
   for (node_id_t t = 0; t < _config->num_threads; ++t) {
-    command_processing_threads.push_back(std::move(create_command_processing_thread()));
+    command_processing_threads.push_back(std::move(create_move_processing_thread()));
+    command_processing_threads.push_back(std::move(create_apply_processing_thread()));
+    command_processing_threads.push_back(std::move(create_reduce_processing_thread()));
   }
 
   // create all the request threads if we are using storage
@@ -272,16 +274,39 @@ std::thread bbts::node_t::create_deleter_thread() {
     _command_runner->run_deleter();
   });
 }
-std::thread bbts::node_t::create_command_processing_thread() {
+std::thread bbts::node_t::create_move_processing_thread() {
 
   // create the thread to pull
   std::thread t = std::thread([this]() {
 
-    _command_runner->local_command_runner();
+    _command_runner->local_move_command_runner();
   });
 
   return std::move(t);
 }
+
+std::thread bbts::node_t::create_apply_processing_thread() {
+
+  // create the thread to pull
+  std::thread t = std::thread([this]() {
+
+    _command_runner->local_apply_command_runner();
+  });
+
+  return std::move(t);
+}
+
+std::thread bbts::node_t::create_reduce_processing_thread() {
+
+  // create the thread to pull
+  std::thread t = std::thread([this]() {
+
+    _command_runner->local_reduce_command_runner();
+  });
+
+  return std::move(t);
+}
+
 std::thread bbts::node_t::expect_remote_command() {
 
   // create the thread

@@ -34,7 +34,9 @@ class reservation_station_t {
   void notify_available_tensors(node_id_t node, const std::vector<tid_t> &tensors);
 
   // get the next command, you must use the result of this command as it is a unique ptr
-  [[nodiscard]] command_ptr_t get_next_command();
+  [[nodiscard]] command_ptr_t get_next_move_command();
+  [[nodiscard]] command_ptr_t get_next_apply_command();
+  [[nodiscard]] command_ptr_t get_next_reduce_command();
 
   // register the tensor that was added externally,
   // that is it was not created through the execution of a command
@@ -139,7 +141,9 @@ class reservation_station_t {
   command_id_t _last_cmd = -1;
 
   // commands ready to execute
-  std::vector<command_ptr_t> _execute;
+  std::vector<command_ptr_t> _execute_ud;
+  std::vector<command_ptr_t> _execute_move;
+  std::vector<command_ptr_t> _execute_reduce;
 
   // the local commands and the number of tensors they are waiting for
   std::unordered_map<command_id_t, std::pair<command_ptr_t, int32_t>> _local_commands;
