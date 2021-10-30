@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <tuple>
 #include <memory>
+#include <deque>
 #include "command.h"
 #include "../tensor/tensor.h"
 #include "../storage/storage.h"
@@ -141,9 +142,9 @@ class reservation_station_t {
   command_id_t _last_cmd = -1;
 
   // commands ready to execute
-  std::vector<command_ptr_t> _execute_ud;
-  std::vector<command_ptr_t> _execute_move;
-  std::vector<command_ptr_t> _execute_reduce;
+  std::deque<command_ptr_t> _execute_ud;
+  std::deque<command_ptr_t> _execute_move;
+  std::deque<command_ptr_t> _execute_reduce;
 
   // the local commands and the number of tensors they are waiting for
   std::unordered_map<command_id_t, std::pair<command_ptr_t, int32_t>> _local_commands;

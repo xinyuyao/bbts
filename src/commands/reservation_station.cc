@@ -211,8 +211,8 @@ bbts::command_ptr_t bbts::reservation_station_t::get_next_move_command() {
   }
 
   // pop the unique pointer of the vector
-  auto tmp = std::move(_execute_move.back());
-  _execute_move.pop_back();
+  auto tmp = std::move(_execute_move.front());
+  _execute_move.pop_front();
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
@@ -237,8 +237,8 @@ bbts::command_ptr_t bbts::reservation_station_t::get_next_apply_command() {
   }
 
   // pop the unique pointer of the vector
-  auto tmp = std::move(_execute_ud.back());
-  _execute_ud.pop_back();
+  auto tmp = std::move(_execute_ud.front());
+  _execute_ud.pop_front();
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
@@ -263,8 +263,8 @@ bbts::command_ptr_t bbts::reservation_station_t::get_next_reduce_command() {
   }
 
   // pop the unique pointer of the vector
-  auto tmp = std::move(_execute_reduce.back());
-  _execute_reduce.pop_back();
+  auto tmp = std::move(_execute_reduce.front());
+  _execute_reduce.pop_front();
 
   // call the hook if necessary
   if constexpr (static_config::enable_hooks) {
