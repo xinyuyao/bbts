@@ -28,11 +28,12 @@ struct memory_storage_t {
 
     // bootstrap cuda
     if constexpr(static_config::enable_gpu) {
-
+      #ifdef ENABLE_GPU
       // bootstrap managed memory
       void *ts;
       checkCudaErrors(cudaMallocManaged(&ts, 1024));
       cudaFree(ts);
+      #endif
     }
   }
 

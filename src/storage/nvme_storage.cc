@@ -3,14 +3,16 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
+
+#ifdef GPU_ENABLED
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>  
+#include <cuda_runtime_api.h>
+#endif
 
 #include "../server/static_config.h"
 #include "../utils/terminal_color.h"
-#include <cuda_runtime_api.h>
-#include <driver_types.h>
 #include <iostream>
 #include <future>
 #include <sstream>
@@ -520,9 +522,10 @@ tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes) {
   // malloc the tensor
   tensor_t *ts;
   if constexpr(static_config::enable_gpu) {
-    
+    #ifdef GPU_ENABLED
     // allocate the GPU
     checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
+    #endif
   }
   else {
     
@@ -537,9 +540,10 @@ void nvme_storage_t::free_tensor(tensor_t *tensor) {
 
   // check if we even support the GPU
   if constexpr(static_config::enable_gpu) {
-    
+    #ifdef GPU_ENABLED
     // free the GPU
     checkCudaErrors(cudaFree(tensor));
+    #endif
   }
   else {
 

@@ -1,5 +1,7 @@
 #include "gpu_scheduler_impl.h"
 
+#ifdef ENABLE_GPU
+
 namespace bbts {
 
 gpu_scheduler_impl_t::gpu_scheduler_impl_t(const bbts::tensor_factory_ptr_t &fact) : _factory(fact) {
@@ -148,3 +150,5 @@ void gpu_scheduler_impl_t::_rotate() {
 
 
 }
+
+#endif

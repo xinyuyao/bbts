@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef ENABLE_GPU
 #include <future>
 #include <condition_variable>
 #include <mutex>
@@ -97,3 +98,5 @@ private:
 };
 
 }
+
+#endif

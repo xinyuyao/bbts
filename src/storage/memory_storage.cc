@@ -1,13 +1,14 @@
 #include "memory_storage.h"
 
+#ifdef GPU_ENABLED
 #include <cstddef>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>  
+#endif
 
 #include "../server/static_config.h"
 #include "../utils/terminal_color.h"
-#include <driver_types.h>
 #include <iostream>
 #include <sstream>
 
@@ -74,9 +75,10 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
 
   // check if we even support the GPU
   if constexpr(static_config::enable_gpu) {
-    
+    #ifdef GPU_ENABLED
     // allocate the GPU
     checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
+    #endif
   }
   else {
 
@@ -91,9 +93,10 @@ void memory_storage_t::free_tensor(tensor_t *tensor) {
 
   // check if we even support the GPU
   if constexpr(static_config::enable_gpu) {
-    
+    #ifdef GPU_ENABLED
     // free the GPU
     checkCudaErrors(cudaFree(tensor));
+    #endif
   }
   else {
 

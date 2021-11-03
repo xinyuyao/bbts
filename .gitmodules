@@ -1,6 +1,3 @@
 [submodule "third_party/cli"]
 	path = third_party/cli
 	url = https://github.com/daniele77/cli.git
-[submodule "third_party/einkorn"]
-	path = third_party/einkorn
-	url = https://github.com/dcbdan/einkorn
