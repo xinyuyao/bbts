@@ -1,6 +1,8 @@
 #include "communicator.h"
+#include <bits/stdint-intn.h>
 #include <cstddef>
 #include <mpi.h>
+#include <unistd.h>
 
 namespace bbts {
 
@@ -82,8 +84,12 @@ bool mpi_communicator_t::tensors_created_notification(node_id_t out_node, const 
 std::tuple<node_id_t, std::vector<bbts::tid_t>> mpi_communicator_t::receive_tensor_created_notification() {
 
   // wait for a request
-  sync_request_t _req;
-  auto mpi_errno = MPI_Mprobe(ANY_NODE, NOTIFY_TENSOR_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+  sync_request_t _req; int32_t flag = false;
+  int32_t mpi_errno;
+  while (!flag) {
+    mpi_errno = MPI_Improbe(ANY_NODE, NOTIFY_TENSOR_TAG, MPI_COMM_WORLD, &flag, &_req.message, &_req.status);
+    usleep(100);
+  }
 
   // check for errors
   if(mpi_errno != MPI_SUCCESS) {
@@ -198,8 +204,12 @@ bool mpi_communicator_t::shutdown_op_request() {
 command_ptr_t mpi_communicator_t::expect_op_request() {
 
   // wait for a request
-  sync_request_t _req;
-  auto mpi_errno = MPI_Mprobe(ANY_NODE, SEND_CMD_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
+  sync_request_t _req; int32_t flag = false;
+  int32_t mpi_errno;
+  while (!flag) {
+    mpi_errno = MPI_Improbe(ANY_NODE, SEND_CMD_TAG, MPI_COMM_WORLD, &flag, &_req.message, &_req.status);
+    usleep(100);
+  }
 
   // check for errors
   if(mpi_errno != MPI_SUCCESS) {
