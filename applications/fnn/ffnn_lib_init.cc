@@ -8,9 +8,6 @@
 #include "ffnn_add.h"
 #include "ffnn_matrix_hadamard.h"  
 #include "ffnn_mult.h"  
-#include "ffnn_relu.h"  
-#include "ffnn_relu_dif.h"  
-#include "ffnn_sigmoid.h"  
 #include "ffnn_uniform_data.h"  
 #include "ffnn_uniform_weights.h"  
 #include "ffnn_weighted_sum.h"
@@ -70,41 +67,6 @@ extern "C" {
         .impls = {}
       }));
     udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_mult>());
-
-    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
-      bbts::ud_func_t {
-        .ud_name = "ffnn_relu",
-        .is_ass = true,
-        .is_com = true,
-        .num_in = 2,
-        .num_out = 1,
-        .impls = {}
-      }));
-    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_relu>());
-
-    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
-      bbts::ud_func_t {
-        .ud_name = "ffnn_relu_dif",
-        .is_ass = false,
-        .is_com = false,
-        .num_in = 1,
-        .num_out = 1,
-        .impls = {}
-      }));
-    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_relu_dif>());
-
-
-    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
-      bbts::ud_func_t {
-        .ud_name = "ffnn_sigmoid",
-        .is_ass = false,
-        .is_com = false,
-        .num_in = 1,
-        .num_out = 1,
-        .impls = {}
-      }));
-    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_sigmoid>());
-
 
     udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
       bbts::ud_func_t {

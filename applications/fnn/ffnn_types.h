@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../src/tensor/tensor.h"
+#include <cstdint>
 
 namespace bbts {
 
@@ -12,6 +13,7 @@ struct ffnn_dense_meta_t : public tensor_meta_t {
     uint32_t num_rows;
     uint32_t num_cols;
     bool     has_bias;
+    uint32_t num_aggregated;
   };
 
   // returns the meta data struct
@@ -26,7 +28,7 @@ struct ffnn_dense_meta_t : public tensor_meta_t {
 
   // init the tensor meta with row and column numbers
   ffnn_dense_meta_t(tfid_t _id, bool has_bias, uint32_t num_rows, uint32_t num_cols) : tensor_meta_t{.fmt_id = _id} {
-    this->m() = {.num_rows = num_rows, .num_cols = num_cols, .has_bias = has_bias};
+    this->m() = {.num_rows = num_rows, .num_cols = num_cols, .has_bias = has_bias, .num_aggregated = 1};
   }
 };
 

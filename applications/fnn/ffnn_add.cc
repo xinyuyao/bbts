@@ -1,5 +1,6 @@
-#include "ffnn_types.h"
 #include "ffnn_add.h"
+#include <cmath>
+#include <cstdint>
 
 bbts::ffnn_add::ffnn_add() {
 
@@ -21,31 +22,40 @@ bbts::ffnn_add::ffnn_add() {
   fn = &ffnn_add::add;
 }
 
-size_t bbts::ffnn_add::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
-                                                     const bbts::ud_impl_t::meta_args_t &_in) {
+size_t bbts::ffnn_add::get_complexity_hint(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
   return m_a.num_rows * m_a.num_cols;
 }
 
-void bbts::ffnn_add::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
-                                  const bbts::ud_impl_t::meta_args_t &_in,
-                                  bbts::ud_impl_t::meta_args_t &_out) const {
+void bbts::ffnn_add::get_out_meta(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::meta_args_t &_in,
+    bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
+  const auto &m_b = _in.get<0>().as<ffnn_dense_meta_t>().m();
 
   // get the output argeters
   auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
-  m_out = { m_a.num_rows, m_a.num_cols, m_a.has_bias};
+  bool has_bias = m_a.has_bias && m_b.has_bias;
+  m_out = {.num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = has_bias, .num_aggregated = 1};
 }
 
 void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
                          const bbts::ud_impl_t::tensor_args_t &_in,
                          bbts::ud_impl_t::tensor_args_t &_out) {
+
+  // get the number of
+  auto num_to_reduce = params.get_int_or_default<0>(-1);
+  auto elementwise_op = (elementwise_fn_type)params.get_int_or_default<1>(
+      (int32_t)elementwise_fn_type::NOOP);
 
   // get the tensors as dense tensors
   auto &a = _in.get<0>().as<ffnn_dense_t>();
@@ -77,13 +87,55 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
     }
   }
 
-  if(m_a.has_bias && m_b.has_bias) {
+  if (m_a.has_bias && m_b.has_bias) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
 
       float ta = a.bias()[col];
       float tb = b.bias()[col];
 
       out.bias()[col] = ta + tb;
+    }
+  }
+
+  // we aggregated one more
+  out.meta().m().num_rows = m_a.num_rows;
+  out.meta().m().num_cols = m_a.num_cols;
+  out.meta().m().has_bias = m_a.has_bias && m_b.has_bias;
+  out.meta().m().num_aggregated = m_a.num_aggregated + m_b.num_aggregated;
+
+  // ok we need to a
+  if (out.meta().m().num_aggregated == num_to_reduce) {
+    if (elementwise_op == elementwise_fn_type::RELU) {
+      relu(out);
+    } else if (elementwise_op == elementwise_fn_type::SIGMOID) {
+      sigmoid(out);
+    }
+  }
+}
+
+void bbts::ffnn_add::sigmoid(ffnn_dense_t &_out) {
+  auto num_rows = _out.meta().m().num_rows;
+  auto num_cols = _out.meta().m().num_cols;
+  auto out = _out.data();
+
+  for (auto row = 0; row < num_rows; ++row) {
+    for (auto col = 0; col < num_cols; ++col) {
+      auto v = out[row * num_cols + col];
+      out[row * num_cols + col] = 1 / (1.0f + std::exp(v));
+    }
+  }
+}
+
+void bbts::ffnn_add::relu(ffnn_dense_t &_out) {
+
+  auto num_rows = _out.meta().m().num_rows;
+  auto num_cols = _out.meta().m().num_cols;
+  auto out = _out.data();
+
+  for (auto row = 0; row < num_rows; ++row) {
+    for (auto col = 0; col < num_cols; ++col) {
+      out[row * num_cols + col] =
+          out[row * num_cols + col] > 0 ? out[row * num_cols + col] : 0;
     }
   }
 }

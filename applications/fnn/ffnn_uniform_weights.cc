@@ -43,7 +43,7 @@ void bbts::ffnn_uniform_weights::get_out_meta(const bbts::ud_impl_t::tensor_para
   auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
-  m_out = { params.get_uint<0>() + 1,  params.get_uint<1>(), true };
+  m_out = { .num_rows = params.get_uint<0>() + 1,  .num_cols = params.get_uint<1>(), .has_bias = true, .num_aggregated = 1 };
 }
 
 void bbts::ffnn_uniform_weights::uniform_rand(const bbts::ud_impl_t::tensor_params_t &params,
@@ -69,7 +69,7 @@ void bbts::ffnn_uniform_weights::uniform_rand(const bbts::ud_impl_t::tensor_para
   auto right = params.get_float_or_default<3>(1.0f);
 
   // set the new meta data
-  m_out = {.num_rows = numRows, .num_cols = numCols, .has_bias = true};
+  m_out = {.num_rows = numRows, .num_cols = numCols, .has_bias = true, .num_aggregated = 1 };
 
   // create a bunch of random numbers
   vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, (int32_t) ((numRows  + 1) * numCols), out.data(), left, right);

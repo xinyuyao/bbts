@@ -211,7 +211,8 @@ void bbts::command_runner_t::local_reduce_command_runner() {
       }
 
       // create the reduce op
-      local_reduce_op_t op(*_tf, *_ts, inputs, { ._params = cmd->get_parameters() },
+      ud_impl_t::tensor_params_t _params = { ._params = cmd->get_parameters() };
+      local_reduce_op_t op(*_tf, *_ts, inputs, _params,
                             cmd->get_output(0).tid, *ud);
 
       // do the apply
@@ -258,7 +259,8 @@ void bbts::command_runner_t::local_reduce_command_runner() {
       assert(inputs.size() != 0);
 
       // create the move operation
-      reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, { ._params = cmd->get_parameters() }, cmd->get_output(0).tid, *ud);
+      ud_impl_t::tensor_params_t _params = { ._params = cmd->get_parameters() };
+      reduce_op_t op(*_comm, *_tf, *_ts, nodes, cmd->id, inputs, _params, cmd->get_output(0).tid, *ud);
 
       // do the apply
       op.apply();
@@ -360,7 +362,8 @@ void bbts::command_runner_t::remote_command_handler() {
         assert(inputs.size() != 0);
 
         // create the move operation
-        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, { ._params = c->get_parameters() }, c->get_output(0).tid, *ud);
+        ud_impl_t::tensor_params_t _params = { ._params = c->get_parameters() };
+        reduce_op_t op(*_comm, *_tf, *_ts, nodes, c->id, inputs, _params, c->get_output(0).tid, *ud);
 
         // do the apply
         op.apply();

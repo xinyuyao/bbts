@@ -41,7 +41,7 @@ void bbts::ffnn_weighted_sum::get_out_meta(const bbts::ud_impl_t::tensor_params_
   auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
-  m_out = { m_a.num_rows, m_a.num_cols, m_a.has_bias};
+  m_out = { .num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = m_a.has_bias, .num_aggregated = 1};
 }
 
 void bbts::ffnn_weighted_sum::add(const bbts::ud_impl_t::tensor_params_t &params,
@@ -77,7 +77,7 @@ void bbts::ffnn_weighted_sum::add(const bbts::ud_impl_t::tensor_params_t &params
   }
 
   // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
+  m_out = { .num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = m_a.has_bias, .num_aggregated = 1};
 
   // sum their biases if they exists
   if(m_a.has_bias && m_b.has_bias) {

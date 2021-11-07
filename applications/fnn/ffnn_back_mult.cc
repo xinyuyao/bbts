@@ -46,7 +46,7 @@ void bbts::ffnn_back_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &
   // set the output
   uint32_t I = m_a.num_cols;
   uint32_t J = m_b.num_cols;
-  m_out = {I, J, true};
+  m_out = {.num_rows = I, .num_cols = J, .has_bias = true, .num_aggregated = 1};
 }
 
 void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
@@ -80,7 +80,7 @@ void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
 
   // set the new meta data
-  m_out = {I, J, true};
+  m_out = {.num_rows = I, .num_cols = J, .has_bias = true, .num_aggregated = 1};
 
   // add the bias
   for (auto row = 0; row < m_b.num_rows; ++row) {

@@ -46,7 +46,7 @@ void bbts::ffnn_weighted_sum_sparse_dense::get_out_meta(const bbts::ud_impl_t::t
   auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
-  m_out = { m_a.num_rows, m_a.num_cols, false};
+  m_out = { .num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = false, .num_aggregated = 1};
 }
 
 void bbts::ffnn_weighted_sum_sparse_dense::add(const bbts::ud_impl_t::tensor_params_t &params,
@@ -84,5 +84,5 @@ void bbts::ffnn_weighted_sum_sparse_dense::add(const bbts::ud_impl_t::tensor_par
   }
 
   // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, false};
+  m_out = { .num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = false, .num_aggregated = 1};
 }

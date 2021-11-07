@@ -47,7 +47,7 @@ void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_para
   // set the output
   uint32_t I = m_a.num_rows;
   uint32_t J = m_b.num_cols;
-  m_out = {I, J, false};
+  m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
 
   auto num_elements = m_out.num_cols * m_out.num_rows;
   num_elements += m_out.has_bias ? m_out.num_cols : 0;
@@ -82,7 +82,7 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
   float *in2Data = b.data();
 
   // set the new meta data
-  m_out = {I, J, false};
+  m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
 
   // do the multiply
   cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);

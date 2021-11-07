@@ -64,13 +64,23 @@ void bbts::ffnn_matrix_hadamard::mult(const bbts::ud_impl_t::tensor_params_t &pa
   assert(m_a.has_bias == m_b.has_bias);
 
   // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
+  m_out = {.num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = m_a.has_bias, .num_aggregated = 1};
 
   // multiply a and b
+  auto out_data = out.data();
+  auto a_data = a.data();
+  auto b_data = b.data();
   for (auto row = 0; row < m_a.num_rows; ++row) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
-      out.data()[row * m_a.num_cols + col] = a.data()[row * m_a.num_cols + col] *
-                                             b.data()[row * m_a.num_cols + col];
+      out_data[row * m_a.num_cols + col] = a_data[row * m_a.num_cols + col] *
+                                           b_data[row * m_a.num_cols + col];
+    }
+  }
+
+  // apply the relu diff
+  for (auto row = 0; row < m_a.num_rows; ++row) {
+    for (auto col = 0; col < m_a.num_cols; ++col) {
+      out_data[row * m_a.num_cols + col] = out_data[row * m_a.num_cols + col] > 0 ? 1.0f : 0;
     }
   }
 

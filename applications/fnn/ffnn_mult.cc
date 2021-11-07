@@ -89,5 +89,5 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   cblas_sgemm(CblasRowMajor, l_trans, r_trans, I, J, K1, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
 
   // set the new meta data
-  m_out = {I, J, false};
+  m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
 }
