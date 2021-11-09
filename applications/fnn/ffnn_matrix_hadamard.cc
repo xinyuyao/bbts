@@ -26,7 +26,9 @@ size_t bbts::ffnn_matrix_hadamard::get_complexity_hint(const bbts::ud_impl_t::te
 
   // O(n * m)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
-  return m_a.num_rows * m_a.num_cols;
+
+  // this is not exactly correct but I use it because I am lazy...
+  return 5.91992e-10 * m_a.num_rows * m_a.num_cols;
 }
 
 void bbts::ffnn_matrix_hadamard::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,

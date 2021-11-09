@@ -28,7 +28,7 @@ size_t bbts::ffnn_add::get_complexity_hint(
 
   // O(n * m)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
-  return m_a.num_rows * m_a.num_cols;
+  return 5.91992e-10 * m_a.num_rows * m_a.num_cols;
 }
 
 void bbts::ffnn_add::get_out_meta(

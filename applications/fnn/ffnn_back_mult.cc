@@ -29,7 +29,9 @@ size_t bbts::ffnn_back_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_p
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
   const auto &m_b = _in.get<1>().as<ffnn_dense_meta_t>().m();
-  return m_a.num_rows * m_a.num_cols * m_b.num_cols;
+
+  // get the sizes
+  return 1.45838e-11 * m_a.num_cols * m_b.num_cols * m_a.num_rows;
 }
 
 void bbts::ffnn_back_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,

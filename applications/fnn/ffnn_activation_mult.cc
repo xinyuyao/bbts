@@ -30,7 +30,7 @@ size_t bbts::ffnn_activation_mult::get_complexity_hint(const bbts::ud_impl_t::te
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
   const auto &m_b = _in.get<1>().as<ffnn_dense_meta_t>().m();
-  return m_a.num_rows * m_a.num_cols * m_b.num_cols;
+  return 1.45838e-11 * m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
 void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
