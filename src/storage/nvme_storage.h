@@ -20,6 +20,7 @@
 #include <mutex>
 #include "../tensor/tensor.h"
 #include "../communication/communicator.h"
+#include "../../third_party/cuda/gpu.h"
 
 namespace bbts {
 
