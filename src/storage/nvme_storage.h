@@ -136,7 +136,7 @@ struct nvme_storage_t {
 
     // bootstrap the managed memory
     if constexpr(static_config::enable_gpu) {
-      #ifdef GPU_ENABLED
+      #ifdef ENABLE_GPU
       void *ts;
       checkCudaErrors(cudaMallocManaged(&ts, 1024));
       cudaFree(ts);
