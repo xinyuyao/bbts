@@ -1,8 +1,8 @@
 #include "ffnn_activation_mult.h"
 #include "ffnn_types.h"
 #include <cassert>
-#include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
+#include <mkl/mkl_cblas.h>
 
 bbts::ffnn_activation_mult::ffnn_activation_mult() {
 
@@ -24,8 +24,9 @@ bbts::ffnn_activation_mult::ffnn_activation_mult() {
   fn = &ffnn_activation_mult::mult;
 }
 
-size_t bbts::ffnn_activation_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
-                                                      const bbts::ud_impl_t::meta_args_t &_in) {
+size_t bbts::ffnn_activation_mult::get_complexity_hint(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
@@ -33,9 +34,10 @@ size_t bbts::ffnn_activation_mult::get_complexity_hint(const bbts::ud_impl_t::te
   return 1.45838e-11 * m_a.num_rows * m_a.num_cols * m_b.num_cols;
 }
 
-void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
-                                              const bbts::ud_impl_t::meta_args_t &_in,
-                                              bbts::ud_impl_t::meta_args_t &_out) const {
+void bbts::ffnn_activation_mult::get_out_meta(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::meta_args_t &_in,
+    bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
@@ -47,15 +49,21 @@ void bbts::ffnn_activation_mult::get_out_meta(const bbts::ud_impl_t::tensor_para
   // set the output
   uint32_t I = m_a.num_rows;
   uint32_t J = m_b.num_cols;
-  m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
+  m_out = {.num_rows = I,
+           .num_cols = J,
+           .row_idx = m_a.row_idx,
+           .col_idx = m_b.col_idx,
+           .has_bias = false,
+           .num_aggregated = 1};
 
   auto num_elements = m_out.num_cols * m_out.num_rows;
   num_elements += m_out.has_bias ? m_out.num_cols : 0;
 }
 
-void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
-                                     const bbts::ud_impl_t::tensor_args_t &_in,
-                                     bbts::ud_impl_t::tensor_args_t &_out) {
+void bbts::ffnn_activation_mult::mult(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::tensor_args_t &_in,
+    bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
   auto &a = _in.get<0>().as<ffnn_dense_t>();
@@ -72,7 +80,8 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
   uint32_t J = m_b.num_cols;
   uint32_t K = m_a.num_cols;
 
-  // make sure the matrix size matches, this is only present during the debug build
+  // make sure the matrix size matches, 
+  // this is only present during the debug build
   assert(m_a.num_cols == m_b.num_rows);
   assert(m_b.has_bias);
 
@@ -82,15 +91,24 @@ void bbts::ffnn_activation_mult::mult(const bbts::ud_impl_t::tensor_params_t &pa
   float *in2Data = b.data();
 
   // set the new meta data
-  m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
+  m_out = {.num_rows = I,
+           .num_cols = J,
+           .row_idx = m_a.row_idx,
+           .col_idx = m_b.col_idx,
+           .has_bias = false,
+           .num_aggregated = 1};
 
   // do the multiply
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I, J, K, 1.0f, in1Data,
+              m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
 
-  // add the bias
-  for (auto row = 0; row < I; ++row) {
-    for (auto col = 0; col < J; ++col) {
-      outData[row * J + col] += b.bias()[col];
+  if(m_a.col_idx == 0 && m_b.row_idx == 0) {
+    
+    // add the bias
+    for (auto row = 0; row < I; ++row) {
+      for (auto col = 0; col < J; ++col) {
+        outData[row * J + col] += b.bias()[col];
+      }
     }
   }
 }

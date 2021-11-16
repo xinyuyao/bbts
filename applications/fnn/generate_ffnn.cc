@@ -71,13 +71,20 @@ matrix_index generate_random(abstract_ud_spec_id_t ud,
 
   // the parameter data
   std::vector<command_param_t> param_data = {
-      command_param_t{.u = (std::uint32_t)(num_rows / split_rows)},
-      command_param_t{.u = (std::uint32_t)(num_cols / split_cols)},
-      command_param_t{.f = 0.0f}, command_param_t{.f = 1.0f}};
+      command_param_t{.i = (std::int32_t)(num_rows / split_rows)},
+      command_param_t{.i = (std::int32_t)(num_cols / split_cols)},
+      command_param_t{.i = 0},
+      command_param_t{.i = 0},
+      command_param_t{.f = 0.0f}, 
+      command_param_t{.f = 1.0f}};
 
   matrix_index out;
   for (size_t rowID = 0; rowID < split_rows; ++rowID) {
     for (size_t colID = 0; colID < split_cols; ++colID) {
+
+      // set the row and column id
+      param_data[2].i = rowID;
+      param_data[3].i = colID;
 
       // store the index
       auto tid = currentTID++;

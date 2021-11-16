@@ -42,7 +42,12 @@ void bbts::ffnn_matrix_hadamard::get_out_meta(const bbts::ud_impl_t::tensor_para
   auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
   // set the new values
-  m_out = { m_a.num_rows, m_a.num_cols, m_a.has_bias };
+  m_out = {.num_rows = m_a.num_rows, 
+           .num_cols = m_a.num_cols, 
+           .row_idx = m_a.row_idx,
+           .col_idx = m_a.col_idx,
+           .has_bias = true, 
+           .num_aggregated = 1};
 }
 
 void bbts::ffnn_matrix_hadamard::mult(const bbts::ud_impl_t::tensor_params_t &params,
@@ -66,7 +71,12 @@ void bbts::ffnn_matrix_hadamard::mult(const bbts::ud_impl_t::tensor_params_t &pa
   assert(m_a.has_bias == m_b.has_bias);
 
   // set the new meta data
-  m_out = {.num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = m_a.has_bias, .num_aggregated = 1};
+  m_out = {.num_rows = m_a.num_rows, 
+           .num_cols = m_a.num_cols, 
+           .row_idx = m_a.row_idx,
+           .col_idx = m_a.col_idx,
+           .has_bias = true, 
+           .num_aggregated = 1};
 
   // multiply a and b
   auto out_data = out.data();

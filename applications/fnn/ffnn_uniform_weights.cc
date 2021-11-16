@@ -42,8 +42,21 @@ void bbts::ffnn_uniform_weights::get_out_meta(const bbts::ud_impl_t::tensor_para
   // get the output argeters
   auto &m_out = _out.get<0>().as<ffnn_dense_meta_t>().m();
 
+  // the number of rows and columns
+  auto numRows = (uint32_t) params.get_int<0>();
+  auto numCols = (uint32_t) params.get_int<1>();
+
+  // get the row and column indices
+  auto rowID = (uint32_t) params.get_int<2>();
+  auto colID = (uint32_t) params.get_int<3>();
+
   // set the new values
-  m_out = { .num_rows = params.get_uint<0>() + 1,  .num_cols = params.get_uint<1>(), .has_bias = true, .num_aggregated = 1 };
+  m_out = { .num_rows = numRows,  
+            .num_cols = numCols, 
+            .row_idx = rowID, 
+            .col_idx = colID, 
+            .has_bias = true, 
+            .num_aggregated = 1 };
 }
 
 void bbts::ffnn_uniform_weights::uniform_rand(const bbts::ud_impl_t::tensor_params_t &params,
@@ -60,16 +73,25 @@ void bbts::ffnn_uniform_weights::uniform_rand(const bbts::ud_impl_t::tensor_para
   auto &out = _out.get<0>().as<ffnn_dense_t>();
   auto &m_out = out.meta().m();
 
-  // the number of rows and columns
+  // set the new meta data
   auto numRows = (uint32_t) params.get_int<0>();
   auto numCols = (uint32_t) params.get_int<1>();
 
-  // the left and right boundary
-  auto left = params.get_float_or_default<2>(0.0f);
-  auto right = params.get_float_or_default<3>(1.0f);
+  // get the row and column indices
+  auto rowID = (uint32_t) params.get_int<2>();
+  auto colID = (uint32_t) params.get_int<3>();
 
-  // set the new meta data
-  m_out = {.num_rows = numRows, .num_cols = numCols, .has_bias = true, .num_aggregated = 1 };
+  // the left and right boundary
+  auto left = params.get_float_or_default<4>(0.0f);
+  auto right = params.get_float_or_default<5>(1.0f);
+
+  // set the new values
+  m_out = { .num_rows = numRows,  
+            .num_cols = numCols, 
+            .row_idx = rowID, 
+            .col_idx = colID, 
+            .has_bias = true, 
+            .num_aggregated = 1 };
 
   // create a bunch of random numbers
   vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, (int32_t) ((numRows  + 1) * numCols), out.data(), left, right);

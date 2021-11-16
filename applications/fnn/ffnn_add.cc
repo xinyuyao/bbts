@@ -45,7 +45,12 @@ void bbts::ffnn_add::get_out_meta(
 
   // set the new values
   bool has_bias = m_a.has_bias && m_b.has_bias;
-  m_out = {.num_rows = m_a.num_rows, .num_cols = m_a.num_cols, .has_bias = has_bias, .num_aggregated = 1};
+  m_out = {.num_rows = m_a.num_rows, 
+           .num_cols = m_a.num_cols, 
+           .row_idx = m_a.row_idx,
+           .col_idx = m_a.col_idx,
+           .has_bias = has_bias, 
+           .num_aggregated = 1};
 }
 
 void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
@@ -68,8 +73,13 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
   auto &m_out = out.meta().m();
 
   // set the new meta data
-  m_out = {m_a.num_rows, m_a.num_cols, m_a.has_bias};
-
+  m_out.num_rows = m_a.num_rows;
+  m_out.num_cols = m_a.num_cols;
+  m_out.has_bias = m_a.has_bias && m_b.has_bias;
+  m_out.num_aggregated = m_a.num_aggregated + m_b.num_aggregated;
+  m_out.row_idx = m_a.row_idx;
+  m_out.col_idx = m_a.col_idx;
+  
   // make sure the matrix size matches, this is only
   // present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
@@ -96,12 +106,6 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
       out.bias()[col] = ta + tb;
     }
   }
-
-  // we aggregated one more
-  out.meta().m().num_rows = m_a.num_rows;
-  out.meta().m().num_cols = m_a.num_cols;
-  out.meta().m().has_bias = m_a.has_bias && m_b.has_bias;
-  out.meta().m().num_aggregated = m_a.num_aggregated + m_b.num_aggregated;
 
   // ok we need to a
   if (out.meta().m().num_aggregated == num_to_reduce) {

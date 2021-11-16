@@ -1,7 +1,7 @@
 #include "ffnn_back_mult.h"
 #include "ffnn_types.h"
-#include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
+#include <mkl/mkl_cblas.h>
 
 bbts::ffnn_back_mult::ffnn_back_mult() {
 
@@ -23,8 +23,9 @@ bbts::ffnn_back_mult::ffnn_back_mult() {
   fn = &ffnn_back_mult::mult;
 }
 
-size_t bbts::ffnn_back_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_params_t &params,
-                                                      const bbts::ud_impl_t::meta_args_t &_in) {
+size_t bbts::ffnn_back_mult::get_complexity_hint(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::meta_args_t &_in) {
 
   // O(n * m * k)
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
@@ -34,9 +35,10 @@ size_t bbts::ffnn_back_mult::get_complexity_hint(const bbts::ud_impl_t::tensor_p
   return 1.45838e-11 * m_a.num_cols * m_b.num_cols * m_a.num_rows;
 }
 
-void bbts::ffnn_back_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &params,
-                                             const bbts::ud_impl_t::meta_args_t &_in,
-                                             bbts::ud_impl_t::meta_args_t &_out) const {
+void bbts::ffnn_back_mult::get_out_meta(
+    const bbts::ud_impl_t::tensor_params_t &params,
+    const bbts::ud_impl_t::meta_args_t &_in,
+    bbts::ud_impl_t::meta_args_t &_out) const {
 
   // get the input argeters
   const auto &m_a = _in.get<0>().as<ffnn_dense_meta_t>().m();
@@ -48,12 +50,17 @@ void bbts::ffnn_back_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &
   // set the output
   uint32_t I = m_a.num_cols;
   uint32_t J = m_b.num_cols;
-  m_out = {.num_rows = I, .num_cols = J, .has_bias = true, .num_aggregated = 1};
+  m_out = {.num_rows = I, 
+           .num_cols = J, 
+           .row_idx = m_a.col_idx,
+           .col_idx = m_b.col_idx,
+           .has_bias = true, 
+           .num_aggregated = 1};
 }
 
 void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
-                                     const bbts::ud_impl_t::tensor_args_t &_in,
-                                     bbts::ud_impl_t::tensor_args_t &_out) {
+                                const bbts::ud_impl_t::tensor_args_t &_in,
+                                bbts::ud_impl_t::tensor_args_t &_out) {
 
   // get the tensors as dense tensors
   auto &a = _in.get<0>().as<ffnn_dense_t>();
@@ -70,7 +77,8 @@ void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   uint32_t J = m_b.num_cols;
   uint32_t K = m_a.num_rows;
 
-  // make sure the matrix size matches, this is only present during the debug build
+  // make sure the matrix size matches, 
+  // this is only present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
 
   // get the ptrs
@@ -79,10 +87,16 @@ void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   float *in2Data = b.data();
 
   // do the multiply
-  cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, I, J, K, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
+  cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, I, J, K, 1.0f, in1Data,
+              m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
 
   // set the new meta data
-  m_out = {.num_rows = I, .num_cols = J, .has_bias = true, .num_aggregated = 1};
+  m_out = {.num_rows = I, 
+           .num_cols = J, 
+           .row_idx = m_a.col_idx,
+           .col_idx = m_b.col_idx,
+           .has_bias = true, 
+           .num_aggregated = 1};
 
   // add the bias
   for (auto row = 0; row < m_b.num_rows; ++row) {

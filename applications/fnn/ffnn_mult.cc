@@ -1,5 +1,6 @@
 #include "ffnn_mult.h"
 #include "ffnn_types.h"
+#include <cmath>
 #include <mkl/mkl_cblas.h>
 #include <mkl/mkl.h>
 
@@ -51,8 +52,17 @@ void bbts::ffnn_mult::get_out_meta(const bbts::ud_impl_t::tensor_params_t &param
   uint32_t I = !params.get_bool_or_default<0>(false) ? m_a.num_rows : m_a.num_cols;
   uint32_t J = !params.get_bool_or_default<1>(false) ? m_b.num_cols : m_b.num_rows;
 
+  // get the indices
+  uint32_t row_idx = !params.get_bool_or_default<0>(false) ? m_a.row_idx : m_a.col_idx;
+  uint32_t col_idx = !params.get_bool_or_default<1>(false) ? m_b.col_idx : m_b.row_idx;
+
   // set the output
-  m_out = {I, J, false};
+  m_out = {.num_rows = I, 
+           .num_cols = J, 
+           .row_idx = row_idx,
+           .col_idx = col_idx,
+           .has_bias = false, 
+           .num_aggregated = 1};
 }
 
 void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
@@ -72,6 +82,10 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   // get the sizes
   uint32_t I = !params.get_bool_or_default<0>(false) ? m_a.num_rows : m_a.num_cols;
   uint32_t J = !params.get_bool_or_default<1>(false) ? m_b.num_cols : m_b.num_rows;
+
+  // get the indices
+  uint32_t row_idx = !params.get_bool_or_default<0>(false) ? m_a.row_idx : m_a.col_idx;
+  uint32_t col_idx = !params.get_bool_or_default<1>(false) ? m_b.col_idx : m_b.row_idx;
 
   // get the inner dimensions
   uint32_t K1 = !params.get_bool_or_default<0>(false) ? m_a.num_cols : m_a.num_rows;
@@ -94,4 +108,11 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
 
   // set the new meta data
   m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
+
+  m_out = {.num_rows = I, 
+           .num_cols = J, 
+           .row_idx = row_idx,
+           .col_idx = col_idx,
+           .has_bias = false, 
+           .num_aggregated = 1};
 }
