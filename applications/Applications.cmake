@@ -15,6 +15,7 @@ endfunction()
 # add the applications
 add_aplication("bmm")
 add_aplication("cpmm")
-add_aplication("fnn")
+add_aplication("ffnn")
+add_aplication("ffnn-gpu")
 add_aplication("node")
 add_aplication("multiplication_chain")

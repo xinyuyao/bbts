@@ -100,15 +100,16 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   float *in2Data = b.data();
 
   // figure out if we need to transpose
-  CBLAS_TRANSPOSE l_trans = params.get_bool_or_default<0>(false) ? CblasTrans : CblasNoTrans;
-  CBLAS_TRANSPOSE r_trans = params.get_bool_or_default<1>(false) ? CblasTrans : CblasNoTrans;
+  cublasOperation_t l_trans = params.get_bool_or_default<0>(false) ? CUBLAS_OP_T : CUBLAS_OP_N;
+  cublasOperation_t r_trans = params.get_bool_or_default<1>(false) ? CUBLAS_OP_T : CUBLAS_OP_N;
 
   // do the multiply
-  cblas_sgemm(CblasRowMajor, l_trans, r_trans, I, J, K1, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
+  float alpha = 1.0f;
+  float beta = 0.0f;
+  cublasSgemm(params.cublas_handle, l_trans, r_trans, I, J, K1, &alpha,
+              in1Data, K1, in2Data, J, &beta, outData, J);
 
   // set the new meta data
-  m_out = {.num_rows = I, .num_cols = J, .has_bias = false, .num_aggregated = 1};
-
   m_out = {.num_rows = I, 
            .num_cols = J, 
            .row_idx = row_idx,
