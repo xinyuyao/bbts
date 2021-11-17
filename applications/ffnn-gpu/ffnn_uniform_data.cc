@@ -1,8 +1,7 @@
 #include "ffnn_uniform_data.h"
 #include "ffnn_types.h"
 #include <cstdint>
-#include <mkl/mkl_cblas.h>
-#include <mkl/mkl.h>
+#include <curand.h>
 
 bbts::ffnn_uniform_data::ffnn_uniform_data() {
 
@@ -66,9 +65,12 @@ void bbts::ffnn_uniform_data::uniform_rand(const bbts::ud_impl_t::tensor_params_
 
 
   // make the random stream
-  VSLStreamStatePtr stream;
-  auto ret = vslNewStream(&stream, VSL_BRNG_MCG31, time(nullptr));
-  assert(VSL_ERROR_OK == ret);
+  curandGenerator_t gen;
+  auto success = curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+  if(success != CURAND_STATUS_SUCCESS) { throw std::runtime_error("failed to create a curand generator"); }
+
+  success = curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
+  if(success != CURAND_STATUS_SUCCESS) { throw std::runtime_error("failed to set a curand seed"); }
 
   // get the dense tensor
   auto &out = _out.get<0>().as<ffnn_dense_t>();
@@ -82,10 +84,6 @@ void bbts::ffnn_uniform_data::uniform_rand(const bbts::ud_impl_t::tensor_params_
   auto rowID = (uint32_t) params.get_int<2>();
   auto colID = (uint32_t) params.get_int<3>();
 
-  // the left and right boundary
-  auto left = params.get_float_or_default<4>(0.0f);
-  auto right = params.get_float_or_default<5>(1.0f);
-
   // set the new meta data
   m_out = {.num_rows = numRows, 
            .num_cols = numCols, 
@@ -95,8 +93,6 @@ void bbts::ffnn_uniform_data::uniform_rand(const bbts::ud_impl_t::tensor_params_
            .num_aggregated = 1};
 
   // create a bunch of random numbers
-  vsRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, (int32_t) (numRows * numCols), out.data(), left, right);
-  
-  // delete the stream
-  vslDeleteStream(&stream);
+  success = curandGenerateUniform(gen, out.data(), (int32_t) (numRows * numCols));
+  if(success != CURAND_STATUS_SUCCESS) { throw std::runtime_error("failed to sample flaots with curand"); }
 }
