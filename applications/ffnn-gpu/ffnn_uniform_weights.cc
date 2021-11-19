@@ -19,7 +19,7 @@ bbts::ffnn_uniform_weights::ffnn_uniform_weights() {
   inputInplace = {};
 
   // this is a CPU dense add
-  is_gpu = false;
+  is_gpu = true;
 
   // set the function that actually performs the add
   fn = &ffnn_uniform_weights::uniform_rand;

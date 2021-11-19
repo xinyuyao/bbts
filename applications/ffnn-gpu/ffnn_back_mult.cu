@@ -17,7 +17,7 @@ bbts::ffnn_back_mult::ffnn_back_mult() {
   inputInplace = {};
 
   // this is a CPU dense mult
-  is_gpu = false;
+  is_gpu = true;
 
   // set the function that actually performs the add
   fn = &ffnn_back_mult::mult;

@@ -3,6 +3,8 @@
 #include "abstract_command.h"
 #include "command.h"
 #include "cost_model.h"
+#include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -330,6 +332,7 @@ public:
       }
 
       // pick the one with the smallest cost, and generate the commands
+      assert(!gpu_assigment_best.empty());
       generate_for_node(cmd, commands, best_node, tensor_locations,
                         gpu_assigment_best, generated_cmds);
 
@@ -848,6 +851,7 @@ public:
 
     int64_t cur = trace.size() - 1;
     gpu_assigment.resize(trace.size());
+    assert(!gpu_assigment.empty());
 
     while (cur >= 0) {
 
@@ -902,6 +906,7 @@ public:
     std::vector<std::tuple<char, char>> choices;
     choices.reserve(cmd.size());
 
+    assert(!cmd.empty());
     for (auto &c : cmd) {
 
       // calculate to run the kernels
@@ -929,7 +934,7 @@ public:
         } else {
           cpu_cost[1] = cpu_cost[0];
           gpu_transfer[1] = gpu_transfer[0] + gpu_transfer_cost;
-          gpu_cost[1] = gpu_cost[1] + cst.gpu;
+          gpu_cost[1] = gpu_cost[0] + cst.gpu;
           std::get<1>(choices.back()) = 0;
         }
       } else {
@@ -1028,7 +1033,7 @@ public:
         } else {
           cpu_cost[1] = cpu_cost[0];
           gpu_transfer[1] = gpu_transfer[0] + gpu_transfer_cost;
-          gpu_cost[1] = gpu_cost[1] + cst.gpu;
+          gpu_cost[1] = gpu_cost[0] + cst.gpu;
         }
       } else {
 

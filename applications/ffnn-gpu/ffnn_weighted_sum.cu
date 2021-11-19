@@ -16,7 +16,7 @@ bbts::ffnn_weighted_sum::ffnn_weighted_sum() {
   inputInplace = {0, 1};
 
   // this is a CPU dense add
-  is_gpu = false;
+  is_gpu = true;
 
   // set the function that actually performs the add
   fn = &ffnn_weighted_sum::add;

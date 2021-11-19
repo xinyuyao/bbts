@@ -15,7 +15,7 @@ bbts::ffnn_matrix_hadamard::ffnn_matrix_hadamard() {
   inputInplace = {0, 1};
 
   // this is a CPU kernel
-  is_gpu = false;
+  is_gpu = true;
 
   // set the function that actually performs the product
   fn = &ffnn_matrix_hadamard::mult;

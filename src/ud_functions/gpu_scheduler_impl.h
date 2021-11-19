@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #ifdef ENABLE_GPU
 #include <future>
 #include <condition_variable>
@@ -40,9 +41,6 @@ struct gpu_scheduler_impl_t {
 
 private:
 
-  // rotate everything
-  void _rotate();
-
   // specifies the kernel function to run and the parameters
   struct kernel_spec_t {
 
@@ -62,19 +60,43 @@ private:
     std::promise<bool> success;
   };
   
+  struct gpu_t {
+    
+    // the kernels we are running  
+    kernel_spec_t _specs[3] = {0};
+
+    // the streams and handles FRONT, MID, BACK
+    cudaStream_t _streams[3];
+    cudaEvent_t  _events[3];
+    cublasHandle_t _handles[3];
+
+    // do we have something to do on the FRONT, MID, BACK stream
+    bool _has_something[3] = {false, false, false};
+
+    // the stream
+    size_t FRONT = 0;
+    size_t MID = 1;
+    size_t BACK = 2;
+  };
+
+  // run the thread for a particular device
+  void _run(int device);
+
+  // rotate everything
+  void _rotate(size_t &FRONT, size_t &MID, size_t &BACK);
+
   // used to sync 
   std::mutex _m;
   std::condition_variable _cv;
 
+  // the number of available gpu devices
+  int num_devices;
+
+  // the number of devices
+  std::vector<gpu_t> devices;
+
   // the queue of things to process
   std::queue<kernel_spec_t> _q;
-
-  // the streams FRONT, MID, BACK
-  cudaStream_t _streams[3];
-  cudaEvent_t  _events[3];
-
-  // the handle
-  cublasHandle_t _handles[3];
 
   // do we have something to do
   std::uint32_t _left_to_process = 0;
@@ -82,19 +104,9 @@ private:
   // is it shutdown
   bool _shutdown = false;
 
-  // do we have something to do on the FRONT, MID, BACK stream
-  bool _has_something[3] = {false, false, false};
-
-  // the kernels we are running  
-  kernel_spec_t _specs[3] = {0};
-
   // the tensor factory
   bbts::tensor_factory_ptr_t _factory;
 
-  // the stream
-  size_t FRONT = 0;
-  size_t MID = 1;
-  size_t BACK = 2;
 };
 
 }

@@ -16,7 +16,7 @@ bbts::ffnn_add::ffnn_add() {
   inputInplace = {0, 1};
 
   // this is a CPU dense add
-  is_gpu = false;
+  is_gpu = true;
 
   // set the function that actually performs the add
   fn = &ffnn_add::add;
