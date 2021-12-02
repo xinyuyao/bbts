@@ -17,6 +17,9 @@ gpu_scheduler_impl_t::gpu_scheduler_impl_t(
   devices.resize(num_devices);
   for (auto dev = 0; dev < num_devices; ++dev) {
 
+    // set the device
+    cudaSetDevice(dev);
+
     // get the buffers
     auto &FRONT = devices[dev].FRONT;
     auto &MID = devices[dev].MID;
