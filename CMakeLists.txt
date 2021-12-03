@@ -12,6 +12,9 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/libraries")
 # set the location for cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
+# link the std::filesystem
+link_libraries(stdc++fs)
+
 # if we are compiling for debug add the debug flags
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 
@@ -58,6 +61,15 @@ if(${ENABLE_GPU})
     
     # try to find cuda
     find_package(CUDA REQUIRED)
+
+    # set the right architecture
+    include(FindCUDA/select_compute_arch)
+    CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_CCS_1)
+    string(STRIP "${INSTALLED_GPU_CCS_1}" INSTALLED_GPU_CCS_2)
+    string(REPLACE " " ";" INSTALLED_GPU_CCS_3 "${INSTALLED_GPU_CCS_2}")
+    string(REPLACE "." "" CUDA_ARCH_LIST "${INSTALLED_GPU_CCS_3}")
+    SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
+    set_property(GLOBAL PROPERTY CUDA_ARCHITECTURES "${CUDA_ARCH_LIST}")
 
     # add the include directory
     include_directories("${CUDA_INCLUDE_DIRS}")
@@ -146,8 +158,6 @@ endif()
 include(tests/Tests.cmake)
 include(integration_tests/Integration.cmake)
 include(applications/Applications.cmake)
-include(libraries/Libraries.cmake)
-
 
 # enable einkorn if necesasry
 if(${ENABLE_EINKORN})

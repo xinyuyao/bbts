@@ -22,9 +22,5 @@ add_library(ffnn_gpu_lib SHARED ${app_dir}/ffnn_lib_init.cc
                                 ${app_dir}/ffnn_uniform_sparse_data.cc  
                                 ${app_dir}/ffnn_weighted_sum_sparse_dense.cc)
 
-# link the curand library
-find_package(curand REQUIRED)
-target_link_libraries(ffnn_gpu_lib curand)
-
 # add the dependencies
 add_dependencies(applications generate_gpu_ffnn)
