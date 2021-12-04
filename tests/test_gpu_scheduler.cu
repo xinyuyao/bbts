@@ -33,6 +33,18 @@ inline void gpuAssert(cudaError_t code, const char *file, int line,
 
 using namespace std::chrono;
 
+enum steam_type_t {
+  MULT = 0,
+  ADD = 1,
+  COPY = 2
+};
+
+struct stream_t {
+  cudaStream_t stream;
+  cudaEvent_t event;
+};
+
+
 // kernel definition
 __global__ void add_kernel(float *a, float *b, int n) {
 
@@ -109,7 +121,7 @@ std::vector<std::vector<char>> order {
   {3, 0, 1, 2},
 };
 
-float *copy_to_device(int32_t dev, block_info_t &blk) {
+float *copy_to_device(stream_t *streams, int32_t dev, block_info_t &blk) {
   float *tmp = nullptr;
   checkCudaErrors(cudaMalloc(&tmp, block_size * block_size * sizeof(float)));
   if (blk.location != 0) {
@@ -124,14 +136,16 @@ float *copy_to_device(int32_t dev, block_info_t &blk) {
 
     checkCudaErrors(cudaMemcpyPeerAsync(tmp, dev, 
                                         blk.gpu[src_dev], src_dev, 
-                                        block_size * block_size * sizeof(float)));
+                                        block_size * block_size * sizeof(float), 
+                                        streams[COPY].stream));
 
     num_gpu_transfers++;
   } else {
     // this is a fallback in case something went wrong
     checkCudaErrors(cudaMemcpyAsync(tmp, blk.cpu,
                                     block_size * block_size * sizeof(float),
-                                    cudaMemcpyHostToDevice));
+                                    cudaMemcpyHostToDevice, 
+                                    streams[COPY].stream));
     num_cpu_transfers++;
   }
   return tmp;
@@ -139,7 +153,7 @@ float *copy_to_device(int32_t dev, block_info_t &blk) {
 
 
 
-void prefetch(int32_t dev, int32_t i, int32_t j, int32_t k) {
+void prefetch(stream_t* streams, int32_t dev, int32_t i, int32_t j, int32_t k) {
 
   std::unique_lock<std::mutex> lck(m);
 
@@ -148,33 +162,37 @@ void prefetch(int32_t dev, int32_t i, int32_t j, int32_t k) {
 
   // do we already have it
   if((at->second.location & (1 << dev)) == 0) {
-    auto a_blk = copy_to_device(dev, at->second);
+    auto a_blk = copy_to_device(streams, dev, at->second);
     at->second.gpu[dev] = a_blk;  
   }
 
   // do we already have it
   if((bt->second.location & (1 << dev)) == 0) {
-    auto b_blk = copy_to_device(dev, bt->second);
+    auto b_blk = copy_to_device(streams, dev, bt->second);
     bt->second.gpu[dev] = b_blk;
   }
+
+  // mark this as a checkpoint
+  cudaEventRecord(streams[COPY].event, streams[COPY].stream);
 }
 
-void do_muliply(cublasHandle_t &cublas_handle, int32_t dev, int32_t i,
+void do_muliply(stream_t *streams, cublasHandle_t &cublas_handle, int32_t dev, int32_t i,
                 int32_t j, int32_t i_next, int32_t j_next) {
 
   float *c_blk = nullptr;
   for (auto k = 0; k < block_split; ++k) {
 
-    // sync so we get the previous
-    checkCudaErrors(cudaDeviceSynchronize());
+    // sync the copy event so we know stuff is on the GPU
+    checkCudaErrors(cudaEventSynchronize(streams[COPY].event));
 
+    // kick off the next copy
     if(k + 1 < block_split) {
       // prefetch the next block otherwise
-      prefetch(dev, i, j, k + 1);
+      prefetch(streams, dev, i, j, k + 1);
     }
     else if(i_next != -1 && j_next != -1) {
       // prefetch the next block if this is the last block
-      prefetch(dev, i_next, j_next, 0);
+      prefetch(streams, dev, i_next, j_next, 0);
     }
 
     // at this point the previous block is synced
@@ -210,6 +228,13 @@ void do_muliply(cublasHandle_t &cublas_handle, int32_t dev, int32_t i,
                                 a_blk, block_size, b_blk, block_size, &beta,
                                 c_blk, block_size));
 
+    // mark this as a checkpoint
+    cudaEventRecord(streams[MULT].event, streams[MULT].stream);
+    
+    // wait for the previous add to finish and the current multiply
+    checkCudaErrors(cudaEventSynchronize(streams[ADD].event));
+    checkCudaErrors(cudaEventSynchronize(streams[MULT].event));
+
     // do we need to preform an add
     float *ct;
     {
@@ -223,9 +248,6 @@ void do_muliply(cublasHandle_t &cublas_handle, int32_t dev, int32_t i,
       }
     }
 
-    // sync here to do the add
-    checkCudaErrors(cudaDeviceSynchronize());
-
     // number of thread blocks in grid
     uint32_t threads_num = 1024;
     uint32_t n = block_size * block_size;
@@ -235,16 +257,20 @@ void do_muliply(cublasHandle_t &cublas_handle, int32_t dev, int32_t i,
     assert(ct != nullptr);
     assert(c_blk != nullptr);
     add_kernel<<<grid_size, threads_num, 0>>>(ct, c_blk, n);
+
+    // mark that we kicked off the ADD
+    cudaEventRecord(streams[ADD].event, streams[ADD].stream);
   }
 }
+
 
 void product_thread(int32_t dev,
                     std::vector<std::tuple<int32_t, int32_t>> &final_blks) {
 
   // set the device
   cudaSetDevice(dev);
-  cublasHandle_t cublas_handle;
-  cublasCreate(&cublas_handle);
+
+  
 
   for(auto peer = 0; peer < num_devices; ++peer) {
     if(peer != dev) {
@@ -252,7 +278,21 @@ void product_thread(int32_t dev,
     }
   }
 
-  prefetch(dev, std::get<0>(final_blks[0]), std::get<0>(final_blks[0]), 0);
+  // init the streams and events
+  stream_t streams[3];
+  cudaStreamCreate(&streams[MULT].stream);
+  cudaEventCreate(&streams[MULT].event);
+  cudaStreamCreate(&streams[ADD].stream);
+  cudaEventCreate(&streams[ADD].event);
+  cudaStreamCreate(&streams[COPY].stream);
+  cudaEventCreate(&streams[COPY].event);
+
+  // create the cublas handle
+  cublasHandle_t cublas_handle;
+  cublasCreate(&cublas_handle);
+  cublasSetStream(cublas_handle, streams[MULT].stream);
+
+  prefetch(streams, dev, std::get<0>(final_blks[0]), std::get<0>(final_blks[0]), 0);
   for (auto idx = 0; idx < final_blks.size(); ++idx) {
 
     int32_t i = std::get<0>(final_blks[idx]);
@@ -266,7 +306,7 @@ void product_thread(int32_t dev,
     }
 
     // do the multiply
-    do_muliply(cublas_handle, dev, i, j, i_next, j_next);
+    do_muliply(streams, cublas_handle, dev, i, j, i_next, j_next);
   }
 
   checkCudaErrors(cudaDeviceSynchronize());
