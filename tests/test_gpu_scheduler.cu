@@ -277,7 +277,7 @@ void host_to_dev_thread() {
         agg_group_mappings[agg_group] = cur_gpu_dev;
         cur_gpu_dev = (cur_gpu_dev + 1) % num_devices;
       }
-      std::cout << "Queued : " << jg << '\n';
+      // std::cout << "Queued : " << jg << '\n';
       to_prep[agg_group_mappings[agg_group]].enqueue(jg);
     }
     queued_to_run.clear();
@@ -315,7 +315,7 @@ void gpu_copy_thread(int32_t dev) {
 
     // take the join group
     to_prep[dev].wait_dequeue(join_group);
-    std::cout << "Pulled : " << join_group << '\n';
+    // std::cout << "Pulled : " << join_group << '\n';
 
     // we are done
     if(join_group == -1) {
@@ -345,7 +345,7 @@ void gpu_copy_thread(int32_t dev) {
       tensors[right].location[dev] = true;
     }
       
-    std::cout << "Pushed 2 : " << join_group << '\n';
+    // std::cout << "Pushed 2 : " << join_group << '\n';
     to_run[dev].enqueue(join_group);
   }
 }
@@ -464,7 +464,8 @@ int main() {
   for (int idx = 0; idx < block_split; idx++) {
     for (int jdx = 0; jdx < block_split; jdx++) {
 
-      float *a_blk = (float *)malloc(sizeof(float) * block_size * block_size);
+      float *a_blk;
+      cudaMallocHost((void**)&a_blk, sizeof(float) * block_size * block_size);
       set_to_one(a_blk);
       block_info_t &a_nfo = tensors[i];
       a_nfo.cpu = a_blk;
@@ -472,7 +473,8 @@ int main() {
       a_nfo.gpu.resize(num_devices);
       a[{idx, jdx}] = i++;
 
-      float *b_blk = (float *)malloc(sizeof(float) * block_size * block_size);
+      float *b_blk;
+      cudaMallocHost((void**)&b_blk, sizeof(float) * block_size * block_size);
       set_to_one(b_blk);
       block_info_t &b_nfo = tensors[i];
       b_nfo.cpu = b_blk;
