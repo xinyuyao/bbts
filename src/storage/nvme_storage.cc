@@ -521,17 +521,14 @@ tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes) {
 
   // malloc the tensor
   tensor_t *ts;
-  if constexpr(static_config::enable_gpu) {
-    #ifdef ENABLE_GPU
+
+  #ifdef ENABLE_GPU
     // allocate the GPU
     checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
-    #endif
-  }
-  else {
-    
+  #else
     // this is a CPU
     ts = (tensor_t*) malloc(num_bytes); 
-  }
+  #endif
 
   return ts;
 }
@@ -539,17 +536,13 @@ tensor_t *nvme_storage_t::_allocate_tensor(size_t num_bytes) {
 void nvme_storage_t::free_tensor(tensor_t *tensor) {
 
   // check if we even support the GPU
-  if constexpr(static_config::enable_gpu) {
-    #ifdef ENABLE_GPU
+  #ifdef ENABLE_GPU
     // free the GPU
     checkCudaErrors(cudaFree(tensor));
-    #endif
-  }
-  else {
-
+  #else
     // free the regular tensor
     free(tensor);
-  }
+  #endif
 }
 
 void nvme_storage_t::_evict_some(std::unique_lock<std::mutex> &lck, size_t required) {

@@ -11,7 +11,9 @@
 #include <mutex>
 #include "../tensor/tensor.h"
 #include "../communication/communicator.h"
+#ifdef ENABLE_GPU
 #include "../../third_party/cuda/gpu.h"
+#endif
 
 namespace bbts {
 
@@ -28,14 +30,12 @@ struct memory_storage_t {
     _tensor_delete_hook = [](tid_t _) {};
 
     // bootstrap cuda
-    if constexpr(static_config::enable_gpu) {
-      #ifdef ENABLE_GPU
-      // bootstrap managed memory
-      void *ts;
-      checkCudaErrors(cudaMallocManaged(&ts, 1024));
-      cudaFree(ts);
-      #endif
-    }
+    #ifdef ENABLE_GPU
+    // bootstrap managed memory
+    void *ts;
+    checkCudaErrors(cudaMallocManaged(&ts, 1024));
+    cudaFree(ts);
+    #endif
   }
 
   // destructor

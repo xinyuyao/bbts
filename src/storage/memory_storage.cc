@@ -73,36 +73,26 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
   // malloc the tensor
   tensor_t *ts;
 
-  // check if we even support the GPU
-  if constexpr(static_config::enable_gpu) {
-    #ifdef ENABLE_GPU
+  #ifdef ENABLE_GPU
     // allocate the GPU
     checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
-    #endif
-  }
-  else {
-
+  #else
     // we can not do this
     ts = (tensor_t*) malloc(num_bytes); 
-  }
+  #endif
 
   return ts;
 }
 
 void memory_storage_t::free_tensor(tensor_t *tensor) {
 
-  // check if we even support the GPU
-  if constexpr(static_config::enable_gpu) {
-    #ifdef ENABLE_GPU
+  #ifdef ENABLE_GPU
     // free the GPU
     checkCudaErrors(cudaFree(tensor));
-    #endif
-  }
-  else {
-
+  #else
     // free the regular tensor
     free(tensor);
-  }
+  #endif
 }
 
 bool memory_storage_t::has_tensor(tid_t _id) {
