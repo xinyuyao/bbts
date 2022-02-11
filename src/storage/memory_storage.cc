@@ -1,4 +1,5 @@
 #include "memory_storage.h"
+#include <stdexcept>
 
 #ifdef ENABLE_GPU
 #include <cstddef>
@@ -11,6 +12,7 @@
 #include "../utils/terminal_color.h"
 #include <iostream>
 #include <sstream>
+#include <sys/mman.h>
 
 
 namespace bbts {
@@ -19,7 +21,7 @@ memory_storage_t::~memory_storage_t() {
 
   // go through each allocated tensor and free it
   for(auto &it : _tensor_nfo) {
-    free_tensor(it.second.address);
+    free_tensor(it.second.address, it.second.num_bytes);
   }
 }
 
@@ -79,12 +81,15 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
   #else
     // we can not do this
     ts = (tensor_t*) malloc(num_bytes); 
+    if(mlock(ts, num_bytes) == -1) {
+      throw std::runtime_error("Failed to lock the memory.");
+    }
   #endif
 
   return ts;
 }
 
-void memory_storage_t::free_tensor(tensor_t *tensor) {
+void memory_storage_t::free_tensor(tensor_t *tensor, size_t num_bytes) {
 
   #ifdef ENABLE_GPU
     // free the GPU
@@ -116,7 +121,7 @@ bool memory_storage_t::remove_by_tid(tid_t _id) {
   }
 
   // free the tensor
-  free_tensor(it->second.address);
+  free_tensor(it->second.address, it->second.num_bytes);
 
   // remove the tensor
   _tensor_nfo.erase(it);
@@ -188,7 +193,7 @@ void memory_storage_t::clear() {
   for(auto &it : _tensor_nfo) {
     
     // is it gpu
-    free_tensor(it.second.address);
+    free_tensor(it.second.address, it.second.num_bytes);
   }
   _tensor_nfo.clear();
 }

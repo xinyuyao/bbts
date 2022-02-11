@@ -125,7 +125,7 @@ struct memory_storage_t {
   tensor_t *_allocate_tensor(size_t num_bytes);
 
   // free the allocated tensor
-  void free_tensor(tensor_t *tensor);
+  void free_tensor(tensor_t *tensor, size_t num_bytes);
   
   // check if there is a tensor in the storage
   bool has_tensor(tid_t _id);
@@ -208,6 +208,8 @@ private:
   // communicator used for remote transactions
   bbts::communicator_ptr_t _com;
 
+  // the tensors that are preallocated so far
+  std::unordered_map<size_t, std::vector<tensor_t*>> _preallocated_tensors;
 };
 
 }
