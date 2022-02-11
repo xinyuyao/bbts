@@ -18,6 +18,7 @@ add_aplication("cpmm")
 add_aplication("ffnn")
 add_aplication("node")
 add_aplication("multiplication_chain")
+add_aplication("mm_single_node")
 
 if(${ENABLE_GPU})
     add_aplication("ffnn-gpu")
