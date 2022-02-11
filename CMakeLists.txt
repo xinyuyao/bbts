@@ -149,6 +149,10 @@ target_link_libraries(bbts-common ${CMAKE_DL_LIBS})
 # the blas implementation
 target_link_libraries(bbts-common ${BLAS_LIBRARIES})
 
+# try to find jemalloc
+find_package(Jemalloc)
+target_link_libraries(bbts-common ${JEMALLOC_LIBRARY})
+
 # link the cublas library
 if(${ENABLE_GPU})
     cuda_add_cublas_to_target(bbts-common)

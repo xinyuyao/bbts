@@ -1,4 +1,5 @@
 #include "memory_storage.h"
+#include <cstdlib>
 #include <stdexcept>
 
 #ifdef ENABLE_GPU
@@ -7,12 +8,12 @@
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>  
 #endif
-
 #include "../server/static_config.h"
 #include "../utils/terminal_color.h"
 #include <iostream>
 #include <sstream>
 #include <sys/mman.h>
+#include <jemalloc/jemalloc.h>
 
 
 namespace bbts {
