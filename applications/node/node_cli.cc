@@ -164,14 +164,15 @@ bool load_tensors(std::ostream &out, bbts::node_t &node, const std::string &file
 
   // kick off a loading message
   std::atomic_bool b; b = false;
-  // auto t = loading_message(out, "Loading tensors from a file", b);
+  auto t = loading_message(out, "Loading tensors from a file", b);
 
   // try to open the file
   std::ifstream in(file_list);
 
   if(in.fail()) {
     // finish the loading message
-    // b = true; t.join();
+    // Should I also uncomment this line below?
+    b = true; t.join();
 
     out << bbts::red << "Failed to load the filelist " << file_list << '\n' << bbts::reset;
     return false;
@@ -186,16 +187,17 @@ bool load_tensors(std::ostream &out, bbts::node_t &node, const std::string &file
     if(values.size() != 3) {
 
       // finish the loading message
-      // b = true; t.join();
+      b = true; t.join();
       out << bbts::red << "The file list format must be <tid>|<format>|<file> \n" << bbts::reset;
       return false;
     }
 
-    // TODO make sure this is actually an integer
+    // make sure this is actually an integer
     std::string tid_string = values[0].c_str();
     // Check if tid is a non-negative integer
     for (int i = 0; i < tid_string.size(); i++){
       if (!isdigit(tid_string[i])){
+        b = true; t.join();
         out << bbts::red << "\nThe tid must be an integer \n" << bbts::reset;
         return false;
       }  
@@ -203,7 +205,20 @@ bool load_tensors(std::ostream &out, bbts::node_t &node, const std::string &file
     bbts::tid_t parsed_tid = std::atoi(values[0].c_str());
     
 
-    // TODO turn the values[2] into a full path and make sure it exists 
+    // turn the values[2] into a full path and make sure it exists
+
+    // get the path of the filelist
+    const std::filesystem::path filelist_path = file_list;
+    std::string directory = filelist_path.parent_path();
+    std::string file_relative_path = values[2];
+    std::string concated_path = directory + "/" + file_relative_path;
+    if(!std::filesystem::exists(concated_path)){
+      b = true; t.join();
+      out << bbts::red << "\nCould not find the tensor file: " << concated_path << " \n" << bbts::reset;
+      return false;
+    } 
+
+
     // right now it is hardcoded to add  tensors in front of it
 
     // store this <tid, type, filepath>
@@ -213,7 +228,7 @@ bool load_tensors(std::ostream &out, bbts::node_t &node, const std::string &file
   auto [did_load, message] = node.load_tensor_list(parsed_file_list);
 
   // finish the registering message
-  // b = true; t.join();
+  b = true; t.join();
 
   if(!did_load) {
     out << bbts::red << "Failed to load the tensor list : \"" << message << "\"\n" << bbts::reset;

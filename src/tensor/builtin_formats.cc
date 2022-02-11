@@ -61,7 +61,6 @@ tensor_creation_fs_t bbts::dense_tensor_t::get_creation_fs() {
   };
 
   auto deserialize_tensor = [](tensor_t* here, tfid_t id, const char *data) -> tensor_t& {
-    // std::cout << "TODO 2\n";
     
     auto &a = here->as<dense_tensor_t>();
     // set meta data

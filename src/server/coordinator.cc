@@ -577,8 +577,13 @@ void bbts::coordinator_t::_load_tensor_list(std::stringstream &ss, size_t total_
     // recieve the bytes
     std::vector<char> out; out.resize(num_bytes);
 
-    // TODO error check this
-    _comm->expect_bytes(num_bytes, out);
+    // check if we received it
+    auto received = _comm->expect_bytes(num_bytes, out);
+    if (!received){
+      ss << bbts::red << "Communication error: expect_bytes unsuccessful " << bbts::reset;
+      // I guess we don't really want to load the tensor if it fails
+      return;
+    }
 
     // load the tensor
     _load_tensor(ss, tid, tf, out.data());
