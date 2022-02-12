@@ -23,20 +23,7 @@ namespace bbts {
 // tensors to disk or moving them to GPU
 struct memory_storage_t {
 
-  memory_storage_t(communicator_ptr_t com) : _com(std::move(com)) {
-
-    // just empty hooks
-    _tensor_create_hook = [](tid_t _) {};
-    _tensor_delete_hook = [](tid_t _) {};
-
-    // bootstrap cuda
-    #ifdef ENABLE_GPU
-    // bootstrap managed memory
-    void *ts;
-    checkCudaErrors(cudaMallocManaged(&ts, 1024));
-    cudaFree(ts);
-    #endif
-  }
+  memory_storage_t(communicator_ptr_t com);
 
   // destructor
   ~memory_storage_t();
@@ -166,6 +153,10 @@ struct memory_storage_t {
   std::vector<std::tuple<bbts::tid_t, bbts::tensor_meta_t>> extract_meta();
 
 private:
+
+  size_t ____num_bytes = 0;
+
+  char* ____bytes;
 
   // information about the stored tensor
   struct sto_tensor_nfo_t {
