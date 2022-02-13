@@ -1,7 +1,7 @@
 #include "ffnn_uniform_weights.h"
 #include "ffnn_types.h"
-#include <mkl/mkl_cblas.h>
-#include <mkl/mkl.h>
+#include <mkl_cblas.h>
+#include <mkl.h>
 
 bbts::ffnn_uniform_weights::ffnn_uniform_weights() {
 

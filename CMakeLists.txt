@@ -93,8 +93,10 @@ if(${ENABLE_STORAGE})
 endif()
 
 # try to find mkl
-set(BLA_VENDOR Intel10_64lp_seq)
-find_package(BLAS)
+set(MKL_ARCH intel64)
+set(MKL_LINK static)
+set(MKL_THREADING sequential)
+find_package(MKL CONFIG REQUIRED)
 
 # try to find the mpi library
 find_package(MPI REQUIRED)
@@ -147,7 +149,8 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
 target_link_libraries(bbts-common ${CMAKE_DL_LIBS})
 
 # the blas implementation
-target_link_libraries(bbts-common ${BLAS_LIBRARIES})
+include_directories(${MKL_INCLUDE})
+target_link_libraries(bbts-common MKL::MKL)
 
 # try to find jemalloc
 find_package(Jemalloc)

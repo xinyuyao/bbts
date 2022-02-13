@@ -175,7 +175,7 @@ bbts::parsed_command_list_t generate_commands(index_t &a_idx, index_t b_idx, boo
 
 int main(int argc, char **argv) {
 
-  if (argc != 8) {
+  if (argc != 7) {
     std::cout << "Incorrect usage\n";
     std::cout << "Usage ./generate_bmm <gpu_add> <gpu_mult> <split> <matrix_size> <gen_file>.bbts <cmd_file>.bbts\n";
     return 0;
@@ -188,16 +188,15 @@ int main(int argc, char **argv) {
   // 
   char *end;
   auto split = std::strtol(argv[3], &end, 10);
-  auto num_nodes = std::strtol(argv[4], &end, 10);
-  auto matrix_size = std::strtol(argv[5], &end, 10);
+  auto matrix_size = std::strtol(argv[4], &end, 10);
 
   // make the generate matrix commands
   auto [matrix_gen, a_idx, b_idx] = generate_matrices(split, matrix_size);
-  matrix_gen.serialize(argv[6]);
+  matrix_gen.serialize(argv[5]);
 
   // make the multiply commands
   auto cmds = generate_commands(a_idx, b_idx, gpu_add, gpu_mult, split, matrix_size);
-  cmds.serialize(argv[7]);
+  cmds.serialize(argv[6]);
 
   return 0;
 }

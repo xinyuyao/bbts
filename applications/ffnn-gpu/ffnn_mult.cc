@@ -1,8 +1,8 @@
 #include "ffnn_mult.h"
 #include "ffnn_types.h"
 #include <cmath>
-#include <mkl/mkl_cblas.h>
-#include <mkl/mkl.h>
+#include <mkl_cblas.h>
+#include <mkl.h>
 
 bbts::ffnn_mult::ffnn_mult() {
 

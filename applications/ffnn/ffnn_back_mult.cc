@@ -1,7 +1,7 @@
 #include "ffnn_back_mult.h"
 #include "ffnn_types.h"
-#include <mkl/mkl.h>
-#include <mkl/mkl_cblas.h>
+#include <mkl.h>
+#include <mkl_cblas.h>
 
 bbts::ffnn_back_mult::ffnn_back_mult() {
 

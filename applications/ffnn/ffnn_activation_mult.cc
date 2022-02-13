@@ -1,8 +1,8 @@
 #include "ffnn_activation_mult.h"
 #include "ffnn_types.h"
 #include <cassert>
-#include <mkl/mkl.h>
-#include <mkl/mkl_cblas.h>
+#include <mkl.h>
+#include <mkl_cblas.h>
 
 bbts::ffnn_activation_mult::ffnn_activation_mult() {
 

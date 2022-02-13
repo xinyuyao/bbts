@@ -1,7 +1,7 @@
 #include "ffnn_uniform_sparse_data.h"
 #include "ffnn_types.h"
-#include <mkl/mkl_cblas.h>
-#include <mkl/mkl.h>
+#include <mkl_cblas.h>
+#include <mkl.h>
 #include <random>
 
 bbts::ffnn_uniform_sparse_data::ffnn_uniform_sparse_data() {

@@ -29,7 +29,7 @@ memory_storage_t::memory_storage_t(communicator_ptr_t com)
   // 10GB 
   ____bytes = (char*) aligned_alloc(sizeof(float), 10lu * 1024lu * 1024lu * 1024lu);
   if(mlock(____bytes, 5lu * 1024lu * 1024lu * 1024lu) == -1) {
-      throw std::runtime_error("Failed to lock the memory.");
+     throw std::runtime_error("Failed to lock the memory.");
   }
 // bootstrap cuda
 #ifdef ENABLE_GPU
@@ -107,7 +107,6 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
   #else
     // we can not do this
     // ts = (tensor_t*) malloc(num_bytes);
-    std::cout <<  this->____num_bytes << '\n';
     assert(this->____num_bytes < 20lu * 1024lu * 1024lu * 1024lu);
     ts = (tensor_t*) (____bytes + this->____num_bytes);
     this->____num_bytes += num_bytes;

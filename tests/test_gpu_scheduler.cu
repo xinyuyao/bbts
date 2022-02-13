@@ -11,7 +11,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
-#include <mkl/mkl_types.h>
+#include <mkl_types.h>
 #include <mutex>
 #include <pthread.h>
 #include <thread>
