@@ -154,10 +154,6 @@ struct memory_storage_t {
 
 private:
 
-  size_t ____num_bytes = 0;
-
-  char* ____bytes;
-
   // information about the stored tensor
   struct sto_tensor_nfo_t {
     

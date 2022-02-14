@@ -26,11 +26,6 @@ memory_storage_t::memory_storage_t(communicator_ptr_t com)
   _tensor_create_hook = [](tid_t _) {};
   _tensor_delete_hook = [](tid_t _) {};
 
-  // 10GB 
-  ____bytes = (char*) aligned_alloc(sizeof(float), 10lu * 1024lu * 1024lu * 1024lu);
-  if(mlock(____bytes, 5lu * 1024lu * 1024lu * 1024lu) == -1) {
-     throw std::runtime_error("Failed to lock the memory.");
-  }
 // bootstrap cuda
 #ifdef ENABLE_GPU
   // bootstrap managed memory
@@ -46,9 +41,6 @@ memory_storage_t::~memory_storage_t() {
   for(auto &it : _tensor_nfo) {
     free_tensor(it.second.address, it.second.num_bytes);
   }
-
-  std::cout << "Total bytes required " << ____num_bytes << '\n';
-
 }
 
 memory_storage_t::tensor_ref_t memory_storage_t::_get_by_tid(tid_t _id) { 
@@ -106,10 +98,7 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
     checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
   #else
     // we can not do this
-    // ts = (tensor_t*) malloc(num_bytes);
-    assert(this->____num_bytes < 20lu * 1024lu * 1024lu * 1024lu);
-    ts = (tensor_t*) (____bytes + this->____num_bytes);
-    this->____num_bytes += num_bytes;
+    ts = (tensor_t*) malloc(num_bytes);
   #endif
 
   return ts;
@@ -122,7 +111,7 @@ void memory_storage_t::free_tensor(tensor_t *tensor, size_t num_bytes) {
     checkCudaErrors(cudaFree(tensor));
   #else
     // free the regular tensor
-    // free(tensor);
+    free(tensor);
   #endif
 }
 
