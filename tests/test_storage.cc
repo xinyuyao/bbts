@@ -8,7 +8,7 @@
 namespace bbts {
 
 // make the configuration
-auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=0, .argv = nullptr});
+auto config = std::make_shared<bbts::node_config_t>(0, nullptr);
 
 TEST(TestStorage, TestTwoTransactionSingleThreaded) {
 

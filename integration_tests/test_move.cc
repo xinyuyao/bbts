@@ -5,7 +5,7 @@ using namespace bbts;
 int main(int argc, char **argv) {
 
   // make the configuration
-  auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv});
+  auto config = std::make_shared<bbts::node_config_t>(argc, argv);
 
   // create the tensor factory
   bbts::tensor_factory_ptr_t factory = std::make_shared<bbts::tensor_factory_t>();
