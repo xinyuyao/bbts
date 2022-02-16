@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
   }
 
   // create the storage
-  bbts::storage_t storage(comm);
+  bbts::storage_t storage(comm, config);
 
   // get the impl_id
   auto id = factory->get_tensor_ftm("dense");

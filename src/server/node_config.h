@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <thread>
+#include <sys/sysinfo.h>
 
 namespace bbts {
 
@@ -22,7 +24,25 @@ struct node_config_t {
   size_t num_threads = std::thread::hardware_concurrency() / 2;
 
   // the total available ram memory
-  size_t total_ram = 0;
+  size_t get_total_ram() const {
+    struct sysinfo info;
+    if (sysinfo(&info) < 0) {
+      throw std::runtime_error("Failed to initialize the node configuration : Could not get the free RAM\n");
+    }
+    return info.freeram;
+  }
+  
+  // reserved ram memory
+  size_t reserved_ram = 110lu * 1024lu * 1024lu * 1024lu;
+
+  // returns the free memory
+  size_t get_free_ram() const {
+    struct sysinfo info;
+    if (sysinfo(&info) < 0) {
+      throw std::runtime_error("Failed to initialize the node configuration : Could not get the free RAM\n");
+    }
+    return info.freeram;
+  }
 
   // should we print out everything?
   bool verbose = false;
@@ -32,7 +52,7 @@ struct node_config_t {
 
   // the cost to send bytes per byte
   float send_cost_per_byte = 1.16415322E-9;
-  
+
 };
 
 // a nice way to reference the configuration ptr

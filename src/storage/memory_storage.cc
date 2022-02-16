@@ -1,6 +1,8 @@
 #include "memory_storage.h"
 #include <cassert>
+#include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <stdexcept>
 
 #ifdef ENABLE_GPU
@@ -16,10 +18,10 @@
 #include <sys/mman.h>
 #include <jemalloc/jemalloc.h>
 
-
 namespace bbts {
 
-memory_storage_t::memory_storage_t(communicator_ptr_t com)
+memory_storage_t::memory_storage_t(communicator_ptr_t com, 
+                                   const node_config_ptr_t &node_config)
     : _com(std::move(com)) {
 
   // just empty hooks
@@ -28,19 +30,37 @@ memory_storage_t::memory_storage_t(communicator_ptr_t com)
 
 // bootstrap cuda
 #ifdef ENABLE_GPU
-  // bootstrap managed memory
-  void *ts;
-  checkCudaErrors(cudaMallocManaged(&ts, 1024));
-  cudaFree(ts);
+
+  // get the free RAM on the node
+  auto free_ram = node_config->get_free_ram();
+  auto reserved = node_config->reserved_ram;
+
+  // check if we have enough RAM
+  if(free_ram < reserved) {
+    throw std::runtime_error("The TOS storage needs at least " + 
+                             std::to_string(reserved / (1024 * 1024)) + "MB.");
+  }
+
+  // allocate a bunch of pinned memory
+  cudaMallocHost(&_mem, free_ram - reserved);
+
+  // make the block allocator
+  _allocator = std::make_shared<block_allocator_t>(free_ram - reserved);
+
 #endif
 }
 
 memory_storage_t::~memory_storage_t() {
 
+#ifdef ENABLE_GPU
+  // free all the pinned memory
+  cudaFreeHost(_mem);
+#else
   // go through each allocated tensor and free it
   for(auto &it : _tensor_nfo) {
     free_tensor(it.second.address, it.second.num_bytes);
   }
+#endif
 }
 
 memory_storage_t::tensor_ref_t memory_storage_t::_get_by_tid(tid_t _id) { 
@@ -92,10 +112,11 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
 
   // malloc the tensor
   tensor_t *ts;
-
   #ifdef ENABLE_GPU
-    // allocate the GPU
-    checkCudaErrors(cudaMallocManaged(&ts, num_bytes));
+
+    // allocate the host pinned memory
+    auto offset = _allocator->allocate(num_bytes);
+    ts = (tensor_t*) (_mem + offset);
   #else
     // we can not do this
     ts = (tensor_t*) malloc(num_bytes);
@@ -108,7 +129,8 @@ void memory_storage_t::free_tensor(tensor_t *tensor, size_t num_bytes) {
 
   #ifdef ENABLE_GPU
     // free the GPU
-    checkCudaErrors(cudaFree(tensor));
+    size_t offset = (size_t)((uint8_t*) tensor - _mem);
+    _allocator->free(offset, num_bytes);
   #else
     // free the regular tensor
     free(tensor);

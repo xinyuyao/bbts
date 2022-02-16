@@ -7,7 +7,11 @@
 
 namespace bbts {
 
+// make the configuration
+auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=0, .argv = nullptr});
+
 TEST(TestStorage, TestTwoTransactionSingleThreaded) {
+
 
   // 
   storage_ptr_t storage;
@@ -15,7 +19,7 @@ TEST(TestStorage, TestTwoTransactionSingleThreaded) {
    storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
   }
   else {
-    storage = std::make_shared<storage_t>(nullptr);
+    storage = std::make_shared<storage_t>(nullptr, config);
   }
 
   tensor_factory_ptr_t tf = std::make_shared<tensor_factory_t>();
@@ -83,7 +87,7 @@ TEST(TestStorage, TestNoEvictionMultiThreaded) {
     storage = std::make_shared<storage_t>(nullptr, 100 * 1024 * 1024, "tmp.sto");
   }
   else {
-    storage = std::make_shared<storage_t>(nullptr);
+    storage = std::make_shared<storage_t>(nullptr, config);
   }
 
   // make a tensor factory
@@ -176,7 +180,7 @@ TEST(TestStorage, TestEvictionMultiThreaded) {
    storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
   }
   else {
-    storage = std::make_shared<storage_t>(nullptr);
+    storage = std::make_shared<storage_t>(nullptr, config);
   }
 
   // make a tensor factory
@@ -270,7 +274,7 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads1) {
    storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
   }
   else {
-    storage = std::make_shared<storage_t>(nullptr);
+    storage = std::make_shared<storage_t>(nullptr, config);
   }
 
   // make a tensor factory
@@ -369,7 +373,7 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRequestThreads2) {
    storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
   }
   else {
-    storage = std::make_shared<storage_t>(nullptr);
+    storage = std::make_shared<storage_t>(nullptr, config);
   }
 
   // make a tensor factory
@@ -492,7 +496,7 @@ TEST(TestStorage, TestEvictionMultiThreadedMultiRead) {
    storage = std::make_shared<storage_t>(nullptr, 1024 * 1024, "tmp.sto");
   }
   else {
-    storage = std::make_shared<storage_t>(nullptr);
+    storage = std::make_shared<storage_t>(nullptr, config);
   }
 
   // make a tensor factory

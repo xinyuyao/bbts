@@ -20,13 +20,13 @@ void bbts::node_t::init() {
 
     // create the storage with 90% of the total ram
     _storage = std::make_shared<storage_t>(_comm, 
-                                          (size_t) (0.9f * (float) _config->total_ram),
+                                          (size_t) (0.9f * (float) _config->get_total_ram()),
                                           "./tmp.ts" + std::to_string(_comm->get_rank()));
   }
   else {
 
     // memory storage is not limited
-    _storage = std::make_shared<storage_t>(_comm);
+    _storage = std::make_shared<storage_t>(_comm, _config);
   }
 
   // init the factory
@@ -156,7 +156,7 @@ void bbts::node_t::print_cluster_info(std::ostream& out) {
   out << "Cluster Information : \n";
   out << "\tNumber of Nodes : " << _comm->get_num_nodes() << " \n";
   out << "\tNumber of physical cores : " << _config->num_threads << " \n";
-  out << "\tTotal RAM : " << _config->total_ram / (1024 * 1024) << " MB \n";
+  out << "\tTotal RAM : " << _config->get_total_ram() / (1024 * 1024) << " MB \n";
 }
 
 

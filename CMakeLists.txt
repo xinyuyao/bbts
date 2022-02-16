@@ -92,6 +92,22 @@ if(${ENABLE_STORAGE})
     add_compile_definitions(ENABLE_STORAGE)
 endif()
 
+# try to find mkl
+set(MKL_LINK sdl)
+# set(MKL_LINK static)
+# set(MKL_THREADING sequential)
+find_package(MKL CONFIG REQUIRED)
+
+# try to find the mpi library
+find_package(MPI REQUIRED)
+if (MPI_FOUND)
+    include_directories(${MPI_INCLUDE_PATH})
+    message(${MPI_INCLUDE_PATH})
+endif(MPI_FOUND)
+
+# the blas implementation
+include_directories(${MKL_INCLUDE})
+
 # include the third party stuff
 include_directories(third-party)
 
@@ -135,21 +151,6 @@ add_library(bbts-common $<TARGET_OBJECTS:tensor>
 
 # to open .so files and stuff
 target_link_libraries(bbts-common ${CMAKE_DL_LIBS})
-
-# try to find mkl
-set(MKL_LINK sdl)
-# set(MKL_LINK static)
-# set(MKL_THREADING sequential)
-find_package(MKL CONFIG REQUIRED)
-
-# try to find the mpi library
-find_package(MPI REQUIRED)
-if (MPI_FOUND)
-    include_directories(SYSTEM ${MPI_INCLUDE_PATH})
-endif(MPI_FOUND)
-
-# the blas implementation
-include_directories(${MKL_INCLUDE})
 target_link_libraries(bbts-common MKL::MKL)
 
 # link the cublas library

@@ -37,15 +37,6 @@ public:
 
     // move the config
     _config = std::move(config);
-
-    /// TODO this needs to be filled by more detailed information, once the systems starts
-    /// supporting multiple numa nodes and multiple GPUs
-    // set the number of thread to the number of physical cores
-    _config->num_threads = std::thread::hardware_concurrency() / 2;
-
-    // set the total memory
-    struct sysinfo info{}; sysinfo(&info);
-    _config->total_ram = info.totalram;
   }
 
   // initialize stuff like communication

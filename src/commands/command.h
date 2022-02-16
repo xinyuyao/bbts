@@ -6,6 +6,7 @@
 #include <vector>
 #include <assert.h>
 #include <cstring>
+#include <algorithm>
 #include "command_utils.h"
 #include "../ud_functions/ud_function.h"
 #include "../server/node_config.h"

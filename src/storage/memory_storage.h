@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <unistd.h>
 #include <unordered_map>
@@ -9,6 +10,9 @@
 #include <thread>
 #include <memory>
 #include <mutex>
+
+#include "block_allocator.h"
+
 #include "../tensor/tensor.h"
 #include "../communication/communicator.h"
 #ifdef ENABLE_GPU
@@ -23,7 +27,7 @@ namespace bbts {
 // tensors to disk or moving them to GPU
 struct memory_storage_t {
 
-  memory_storage_t(communicator_ptr_t com);
+  memory_storage_t(communicator_ptr_t com, const node_config_ptr_t &node_config);
 
   // destructor
   ~memory_storage_t();
@@ -179,6 +183,12 @@ private:
 
   // the mutex to lock this thing as it is going to be hammered by threads
   std::mutex _m;
+
+  // all the allocated host memory
+  uint8_t *_mem = nullptr; 
+
+  // this gives us the allocated memory block
+  block_allocator_ptr_t _allocator;
 
   // init it to the first available negative number
   tid_t _current_anon = TID_NONE - 1;
