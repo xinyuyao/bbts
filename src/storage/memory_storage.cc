@@ -41,11 +41,13 @@ memory_storage_t::memory_storage_t(communicator_ptr_t com,
                              std::to_string(reserved / (1024 * 1024)) + "MB.");
   }
 
-  // allocate a bunch of pinned memory
-  cudaMallocHost(&_mem, free_ram - reserved);
+  // allocate a bunch of pinned memory (if this is a dev cluster allocate only 10GB)
+  auto to_allocate = node_config->is_dev_cluster ? 10lu * 1024lu * 1024lu * 1024lu : 
+                                                   free_ram - reserved;
+  cudaMallocHost(&_mem, to_allocate);
 
   // make the block allocator
-  _allocator = std::make_shared<block_allocator_t>(free_ram - reserved);
+  _allocator = std::make_shared<block_allocator_t>(to_allocate);
 
 #endif
 }

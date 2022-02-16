@@ -14,11 +14,20 @@ using node_id_t = int32_t;
 // this structure information on how the node is configured
 struct node_config_t {
 
-  // the number of arguments passed to the node
-  int argc;
+  node_config_t(int32_t argc, char **argv) {
 
-  // the arguments as string pointers
-  char **argv;
+    // check if we have something to parse
+    if(argc == 0) { return; }
+
+    // parse each flag
+    for(int32_t idx = 0; idx < argc; ++idx){
+
+      // check each argument
+      if(std::string(argv[idx]) == "--dev") {
+        is_dev_cluster = true;
+      }
+    }
+  }
 
   // the number of threads we are running
   size_t num_threads = std::thread::hardware_concurrency() / 2;
@@ -33,7 +42,7 @@ struct node_config_t {
   }
   
   // reserved ram memory
-  size_t reserved_ram = 110lu * 1024lu * 1024lu * 1024lu;
+  size_t reserved_ram = 10lu * 1024lu * 1024lu * 1024lu;
 
   // returns the free memory
   size_t get_free_ram() const {
@@ -43,6 +52,9 @@ struct node_config_t {
     }
     return info.freeram;
   }
+
+  // is this a local cluster that we use for testing
+  bool is_dev_cluster = false;
 
   // should we print out everything?
   bool verbose = false;
