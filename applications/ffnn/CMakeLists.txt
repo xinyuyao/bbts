@@ -5,7 +5,7 @@ add_executable(generate_ffnn ${app_dir}/generate_ffnn.cc)
 set_target_properties(generate_ffnn PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # link the stuff we need
-target_link_libraries(generate_ffnn ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(generate_ffnn ${CMAKE_THREAD_LIBS_INIT}) #library for managing threads
 target_link_libraries(generate_ffnn ${MPI_LIBRARIES})
 target_link_libraries(generate_ffnn bbts-common)
 

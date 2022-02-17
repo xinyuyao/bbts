@@ -15,7 +15,7 @@
 #include "ffnn_weighted_sum_sparse_dense.h"
 #include "ffnn_uniform_sparse_data.h"
 
-extern "C" {
+extern "C" { // call C in c++
 
   void register_tensors(bbts::tensor_factory_ptr_t tensor_factory) {
     tensor_factory->register_fmt("ffnn_dense", bbts::ffnn_dense_t::get_creation_fs());
@@ -26,9 +26,9 @@ extern "C" {
 
     udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
           bbts::ud_func_t {
-            .ud_name = "ffnn_act_mult",
-            .is_ass = false,
-            .is_com = false,
+            .ud_name = "ffnn_act_mult", // join/agg...
+            .is_ass = false, //associative
+            .is_com = false, //commutative
             .num_in = 2,
             .num_out = 1,
             .impls = {}
