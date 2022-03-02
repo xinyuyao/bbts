@@ -138,10 +138,10 @@ void generate_join_commands(int32_t num_row, int32_t num_cols, int32_t row_split
 
 int main() {
   //*********************************** test aggregation ***********************************
-  int32_t num_rows = 90;
-  int32_t num_cols = 90;
-  int32_t row_split = 3;
-  int32_t col_split = 3;
+  int32_t num_rows = 10;
+  int32_t num_cols = 10;
+  int32_t row_split = 2;
+  int32_t col_split = 2;
   
   // the functions
   std::vector<abstract_ud_spec_t> funs_agg;
@@ -185,9 +185,9 @@ int main() {
 
   std::map<std::tuple<int32_t, int32_t>, tid_t> index_join;
 
-  generate_matrix_commands(90, 90, 3, 3, commands_join, index_join);
+  generate_matrix_commands(num_rows,num_cols, row_split, col_split, commands_join, index_join);
 
-  generate_join_commands(90, 90, 3, 3, commands_join, index_join, "0", "1", MULT_ID);
+  generate_join_commands(num_rows,num_cols, row_split, col_split, commands_join, index_join, "0", "1", MULT_ID);
 
   // specify functions
   funs_join.push_back(abstract_ud_spec_t{.id = UNFORM_ID,

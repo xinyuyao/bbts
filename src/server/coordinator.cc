@@ -199,6 +199,8 @@ std::tuple<bool, std::string> bbts::coordinator_t::set_verbose(bool val) {
   std::tuple<bool, std::string> out = {true, "Set the verbose flag to " + std::to_string(val) + "\n"};
   _collect(out);
 
+  
+
   return out;
 }
 
