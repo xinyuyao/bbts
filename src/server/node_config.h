@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <thread>
 
 namespace bbts {
 
@@ -18,7 +19,7 @@ struct node_config_t {
   char **argv;
 
   // the number of threads we are running
-  size_t num_threads = 8;
+  size_t num_threads = std::thread::hardware_concurrency() / 2;
 
   // the total available ram memory
   size_t total_ram = 0;

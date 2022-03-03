@@ -13,13 +13,6 @@ struct static_config {
   static const bool enable_hooks = false;
 #endif
 
-// are we using gpu
-#ifdef ENABLE_GPU
-  static constexpr bool enable_gpu = true;
-#else 
-  static constexpr bool enable_gpu = false;
-#endif
-
 // are we using a buffer manager that relies on storage
 #ifdef ENABLE_STORAGE
   static const bool enable_storage = true;

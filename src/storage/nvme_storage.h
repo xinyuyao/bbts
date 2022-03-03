@@ -20,7 +20,10 @@
 #include <mutex>
 #include "../tensor/tensor.h"
 #include "../communication/communicator.h"
+
+#ifdef ENABLE_GPU
 #include "../../third_party/cuda/gpu.h"
+#endif
 
 namespace bbts {
 
@@ -113,13 +116,11 @@ struct nvme_storage_t {
     _fd = open("./tmp.ts", O_CREAT | O_TRUNC | O_RDWR, 0777);
 
     // bootstrap the managed memory
-    if constexpr(static_config::enable_gpu) {
-      #ifdef ENABLE_GPU
+    #ifdef ENABLE_GPU
       void *ts;
       checkCudaErrors(cudaMallocManaged(&ts, 1024));
       cudaFree(ts);
-      #endif
-    }
+    #endif
   }
 
   nvme_storage_t(communicator_ptr_t com, 
@@ -135,13 +136,11 @@ struct nvme_storage_t {
     _fd = open(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, 0777);
 
     // bootstrap the managed memory
-    if constexpr(static_config::enable_gpu) {
-      #ifdef ENABLE_GPU
+    #ifdef ENABLE_GPU
       void *ts;
       checkCudaErrors(cudaMallocManaged(&ts, 1024));
       cudaFree(ts);
-      #endif
-    }
+    #endif
   }
 
   // destructor
