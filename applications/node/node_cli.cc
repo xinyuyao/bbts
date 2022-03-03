@@ -171,7 +171,6 @@ bool load_tensors(std::ostream &out, bbts::node_t &node, const std::string &file
 
   if(in.fail()) {
     // finish the loading message
-    // Should I also uncomment this line below?
     b = true; t.join();
 
     out << bbts::red << "Failed to load the filelist " << file_list << '\n' << bbts::reset;
