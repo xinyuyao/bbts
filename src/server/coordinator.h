@@ -78,6 +78,9 @@ public:
   // load the shared library contained in file_bytes
   std::tuple<bool, std::string> load_shared_library(char* file_bytes, size_t file_size);
 
+  // loads a list of tensors
+  std::tuple<bool, std::string> load_tensor_list(const std::vector<std::tuple<bbts::tid_t, std::string, std::string>> &file_list);
+
   // shutdown the coordinator
   void shutdown();
 
@@ -152,6 +155,12 @@ private:
 
   // handles a request to fetch the meta data
   void _handle_fetch_meta(std::stringstream &ss);
+
+  // handle the request to load a tensor list
+  void _load_tensor_list(std::stringstream &ss, size_t total_to_load);
+
+  // loads a single tensor
+  void _load_tensor(std::stringstream &ss, tid_t tid, tfid_t type, char *file_data);
 
   // the communicator
   bbts::communicator_ptr_t _comm;

@@ -62,5 +62,11 @@ namespace bbts {
 
     // prints the content of a tensor
     std::function<void(const void* here, std::stringstream &ss)> print;
+
+    // looks at serialized data and fills in the mata data for the tensor that is about to be deserialized
+    std::function<void(tensor_meta_t& _meta, tfid_t id, const char *data)> deserialize_meta;
+
+    // deserializes the tensor must be implemented to laod data for this format
+    std::function<tensor_t&(tensor_t* here, tfid_t id, const char *data)> deserialize_tensor;
   };
 }

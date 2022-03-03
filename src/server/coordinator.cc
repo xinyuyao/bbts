@@ -1,5 +1,8 @@
+#include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -7,6 +10,7 @@
 #include <unistd.h>
 #include "coordinator.h"
 #include "../utils/terminal_color.h"
+#include "coordinator_ops.h"
 #include "node_config.h"
 
 using namespace std::chrono;
@@ -84,6 +88,13 @@ void bbts::coordinator_t::accept() {
       case coordinator_op_types_t::FETCH_META : {
         _handle_fetch_meta(ss);
         break;
+      }
+      case coordinator_op_types_t::LOAD_TENSOR_LIST : {
+        _load_tensor_list(ss, op._val);
+        break;
+      }
+      default: {
+        throw std::runtime_error("This op is not supposed to be handled here.");
       }
     }
 
@@ -374,6 +385,72 @@ std::tuple<bool, std::string> bbts::coordinator_t::load_shared_library(char* fil
   return out;
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::load_tensor_list(const std::vector<std::tuple<bbts::tid_t, std::string, std::string>> &file_list) {
+
+  if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::LOAD_TENSOR_LIST, ._val = file_list.size()})) {
+    return {false, "Failed to load the list of tensors!\n"};
+  }
+
+  std::stringstream ss;
+  auto num_nodes = _comm->get_num_nodes();
+  auto current_node = _comm->get_rank();
+
+  for(const auto &file : file_list) {
+    
+      auto [tid, fmt_name, file_path] = file;
+
+      // format indentifier
+      auto tfid = _tf->get_tensor_ftm(fmt_name);
+
+      // try to open the file
+      std::ifstream in(file_path, std::ifstream::ate | std::ifstream::binary);
+
+      // did we fail to open it
+      if(in.fail()) {
+        return {false, "Can not open file for tensor " + std::to_string(tid) + "!\n"}; 
+      }
+
+      // we load the whole file
+      auto file_len = (size_t) in.tellg();
+      in.seekg (0, std::ifstream::beg);
+      auto file_bytes = new char[file_len];
+      in.readsome(file_bytes, file_len);
+  
+      // is this local or not
+      if(current_node == _comm->get_rank()) {
+        _load_tensor(ss, tid, tfid, file_bytes);
+      }
+      else {
+
+        // load the tensor
+        if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::LOAD_TENSOR, 
+                                                  ._val = file_len,
+                                                  ._small_val_1 = tfid,
+                                                  ._small_val_2 = tid}, 
+                                                  current_node)) {
+          return {false, "Could initiate the transfer" + std::to_string(tid) + "!\n"}; 
+        }
+      
+        if(!_comm->send_bytes(file_bytes, file_len)) {
+          return {false, "Could not send the file " + std::to_string(tid) + "!\n"};
+        }
+      }
+
+      // pick next node round robin
+      current_node = (current_node + 1) % num_nodes;
+
+      delete[] file_bytes;
+  }
+
+  // sync everything
+  std::tuple<bool, std::string> out;
+  out = {true, ss.str()};
+  _collect(out);
+
+  // return the output
+  return out;
+}
+
 void bbts::coordinator_t::_schedule(coordinator_op_t op, std::stringstream &ss) {
 
   // expect all the commands
@@ -481,6 +558,51 @@ void bbts::coordinator_t::_handle_fetch_meta(std::stringstream &ss) {
   if(_comm->send_tensor_meta(m)) {
     ss << bbts::red << "Failed to send the tensor meta data." << bbts::reset;
   }
+}
+
+void bbts::coordinator_t::_load_tensor_list(std::stringstream &ss, size_t total_to_load) {
+
+  // load only my tensors (the tensors are send round robin)
+  for(auto idx = _comm->get_rank(); idx < total_to_load; idx += _comm->get_num_nodes()) {
+
+    // get the next op
+    auto op = _comm->expect_coord_op();
+    assert(op._type == coordinator_op_types_t::LOAD_TENSOR);
+
+    // grab what we need 
+    tfid_t tf = static_cast<bbts::tfid_t>(op._small_val_1);
+    tid_t tid = static_cast<bbts::tid_t>(op._small_val_2);
+    size_t num_bytes = op._val;
+
+    // recieve the bytes
+    std::vector<char> out; out.resize(num_bytes);
+
+    // check if we received it
+    auto received = _comm->expect_bytes(num_bytes, out);
+    if (!received){
+      ss << bbts::red << "Communication error: expect_bytes unsuccessful " << bbts::reset;
+      // I guess we don't really want to load the tensor if it fails
+      return;
+    }
+
+    // load the tensor
+    _load_tensor(ss, tid, tf, out.data());
+  }
+}
+
+void bbts::coordinator_t::_load_tensor(std::stringstream &ss, tid_t tid, tfid_t type, char *file_data) {
+
+  // get the meta so we can calculate the size
+  tensor_meta_t meta{};
+  _tf->deserialize_meta(meta, type, file_data);
+
+  // calculate the size and allocate the memory for out deserialized tensor
+  auto num_bytes = _tf->get_tensor_size(meta);
+  _storage->local_transaction({}, {{tid, num_bytes}}, [&](const storage_t::reservation_result_t &res) {
+
+    // we deserialize the tensor here
+    _tf->deserialize_tensor(res.create.front().tensor, type, file_data);
+  });
 }
 
 bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_size, std::stringstream &ss) {

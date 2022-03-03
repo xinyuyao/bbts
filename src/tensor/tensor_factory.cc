@@ -16,6 +16,32 @@ bbts::tfid_t bbts::tensor_factory_t::register_fmt(const std::string &_fmt_name,
   return -1;
 }
 
+void bbts::tensor_factory_t::deserialize_meta(tensor_meta_t& _meta, tfid_t id, const char *data) {
+
+  // find the function to initialize the tensor, run it and set the right fmt_id
+  if(_meta.fmt_id < _fmt_fs.size()) {
+    _fmt_fs[_meta.fmt_id].deserialize_meta(_meta, id, data);
+    _meta.fmt_id = _meta.fmt_id;
+    return;
+  }
+
+  // check if the format exits
+  throw std::runtime_error("Requested deserialize_meta for a format " + std::to_string(_meta.fmt_id) + " not registered with the system.");
+}
+
+bbts::tensor_t & bbts::tensor_factory_t::deserialize_tensor(tensor_t* here, tfid_t id, const char *data) {
+
+  // find the function to initialize the tensor, run it and set the right fmt_id
+  if(id < _fmt_fs.size()) {
+    bbts::tensor_t &out = _fmt_fs[id].deserialize_tensor(here, id, data);
+    out._meta.fmt_id = id;
+    return out;
+  }
+
+  // check if the format exits
+  throw std::runtime_error("Requested deserialize_densor for a format " + std::to_string(id) + " not registered with the system.");
+}
+
 bbts::tensor_t &bbts::tensor_factory_t::init_tensor(tensor_t *here, const bbts::tensor_meta_t &_meta) {
 
   // find the function to initialize the tensor, run it and set the right fmt_id
