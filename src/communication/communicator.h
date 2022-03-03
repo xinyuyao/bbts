@@ -120,6 +120,9 @@ public:
   // send the coord op to all nodes
   bool send_coord_op(const bbts::coordinator_op_t &op);
 
+  // send a coord op to one node only
+  bool send_coord_op(const bbts::coordinator_op_t &op, node_id_t node);
+
   // expect the a coord op
   bbts::coordinator_op_t expect_coord_op();
 

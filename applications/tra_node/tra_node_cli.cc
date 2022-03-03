@@ -128,6 +128,7 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
 
   auto file_bytes = new char[file_len];
   in.readsome(file_bytes, file_len);
+  out << "file_bytes: " << file_bytes;
 
   // finish the loading message  
   b = true; t.join();
