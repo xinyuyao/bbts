@@ -86,6 +86,7 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
   assert(m_a.num_cols == m_b.num_cols);
   assert(m_a.has_bias == m_b.has_bias);
 
+/************************** switching the operation calculating here to collecting linearge ******************/
   // add a and b
   for (auto row = 0; row < m_a.num_rows; ++row) {
     for (auto col = 0; col < m_a.num_cols; ++col) {

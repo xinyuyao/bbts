@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(tra_sub_sys_barbatos LANGUAGES CXX)
+project(tra_sub_sys_barbatos LANGUAGES C CXX)
 
 # set the c++ and cuda version
 set(CMAKE_CXX_STANDARD 20)

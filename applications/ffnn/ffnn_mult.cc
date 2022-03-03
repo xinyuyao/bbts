@@ -11,8 +11,8 @@ bbts::ffnn_mult::ffnn_mult() {
   ud_name = "ffnn_mult";
 
   // set the input and output types
-  inputTypes = {"ffnn_dense", "ffnn_dense"};
-  outputTypes = {"ffnn_dense"};
+  inputTypes = {"ffnn_dense", "ffnn_dense"}; // inputTypes = {"lineageTree", "lineageTree"};
+  outputTypes = {"ffnn_dense"};//outputTypes = {"lineageTree"};
 
   // both inputs zero and one can be used as the inplace output
   inputInplace = {};
