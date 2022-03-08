@@ -22,10 +22,6 @@ add_aplication("tra_operations")
 add_aplication("matrix_addition") 
 add_aplication("multiplication_chain")
 
-
-add_aplication("multiplication_chain")
-add_aplication("mm_single_node")
-
 if(${ENABLE_GPU})
     add_aplication("ffnn-gpu")
 endif()

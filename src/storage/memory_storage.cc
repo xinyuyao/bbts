@@ -13,7 +13,7 @@
 #include <iostream>
 #include <sstream>
 #include <sys/mman.h>
-#include <jemalloc/jemalloc.h>
+// #include <jemalloc/jemalloc.h>
 
 
 namespace bbts {

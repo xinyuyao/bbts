@@ -43,6 +43,7 @@ using namespace cli;
 
 
 static bbts::tid_t current_tid = 0; // tensor_id
+static bbts::abstract_ud_spec_id_t current_uid = 0; // udf_id
 
 const int32_t UNFORM_ID = 0;
 const int32_t ADD_ID = 1;
@@ -128,7 +129,6 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
 
   auto file_bytes = new char[file_len];
   in.readsome(file_bytes, file_len);
-  out << "file_bytes: " << file_bytes;
 
   // finish the loading message  
   b = true; t.join();
@@ -150,9 +150,115 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
     out << bbts::green << message << bbts::reset;
     return true;
   }
+
+  
 }
 
-bool generate_binary_file(std::ostream &out, bbts::node_t &node, const unsigned row_num, const unsigned col_num, const std::string &file){
+
+// for string delimiter
+std::vector<std::string> split (std::string s, std::string delimiter) {
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector<std::string> res;
+
+    while ((pos_end = s.find (delimiter, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    return res;
+}
+
+
+
+
+bool load_tensors(std::ostream &out, bbts::node_t &node, const std::string &file_list) {
+
+  // kick off a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message(out, "Loading tensors from a file", b);
+
+  // try to open the file
+  std::ifstream in(file_list);
+
+  if(in.fail()) {
+    // finish the loading message
+    b = true; t.join();
+
+    out << bbts::red << "Failed to load the filelist " << file_list << '\n' << bbts::reset;
+    return false;
+  }
+
+  std::vector<std::tuple<bbts::tid_t, std::string, std::string>> parsed_file_list;
+  std::string line;
+  while(std::getline(in, line)){
+    
+    // split the file list
+    auto values = split(line, "|");
+    if(values.size() != 3) {
+
+      // finish the loading message
+      b = true; t.join();
+      out << bbts::red << "The file list format must be <tid>|<format>|<file> \n" << bbts::reset;
+      return false;
+    }
+
+    // make sure this is actually an integer
+    std::string tid_string = values[0].c_str();
+    // Check if tid is a non-negative integer
+    for (int i = 0; i < tid_string.size(); i++){
+      if (!isdigit(tid_string[i])){
+        b = true; t.join();
+        out << bbts::red << "\nThe tid must be an integer \n" << bbts::reset;
+        return false;
+      }  
+    }
+    bbts::tid_t parsed_tid = std::atoi(values[0].c_str());
+    
+
+    // turn the values[2] into a full path and make sure it exists
+
+    // get the path of the filelist
+    const std::filesystem::path filelist_path = file_list;
+    std::string directory = filelist_path.parent_path();
+    std::string file_relative_path = values[2];
+    std::string concated_path = directory + "/" + file_relative_path;
+    if(!std::filesystem::exists(concated_path)){
+      b = true; t.join();
+      out << bbts::red << "\nCould not find the tensor file: " << concated_path << " \n" << bbts::reset;
+      return false;
+    } 
+
+
+    // right now it is hardcoded to add  tensors in front of it
+
+    // store this <tid, type, filepath>
+    parsed_file_list.push_back({parsed_tid, values[1], "tensors/" + values[2]});
+  }
+
+  auto [did_load, message] = node.load_tensor_list(parsed_file_list);
+
+  // finish the registering message
+  b = true; t.join();
+
+  if(!did_load) {
+    out << bbts::red << "Failed to load the tensor list : \"" << message << "\"\n" << bbts::reset;
+    return false;
+  } else {
+    out << bbts::green << message << bbts::reset;
+    return true;
+  }
+
+  return false;
+}
+
+
+
+
+
+bool generate_binary_file(const unsigned row_num, const unsigned col_num, const std::string &file){
   srand(0);
   //create random data
   std::vector<double> data(row_num * col_num);
@@ -191,7 +297,7 @@ cnpy::NpyArray load_binary_file(std::ostream &out, bbts::node_t &node, const std
 
   
   //make sure the loaded data matches the saved data
-  // assert(arr.word_size == sizeof(double));
+  // assert(arr.word_size == sizeof(long));
   // assert(arr.shape.size() == 2 && arr.shape[0] == col_num && arr.shape[1] == row_num );
   // for(int i = 0; i < row_num * col_num;i++) assert(data[i] == loaded_data[i]);
 
@@ -362,6 +468,55 @@ void create_id_table(std::ostream &out, bbts::node_t &node,const std::string &db
 }
 
 
+void create_kernel_table(std::ostream &out, bbts::node_t &node,const std::string &kernel_func_file, const std::string &db){
+  const char* db_name = db.c_str();
+  // char* sql0 = "DROP TABLE TENSOR_IDS";
+  // execute_command(sql0, db_name, 0);
+
+  char* sql1 = "CREATE TABLE KERNEL_FUNC(" \
+              "KERNEL_ID INT PRIMARY KEY NOT NULL," \
+              "KERNEL_NAME VARCHAR(100) NOT NULL);";
+
+  execute_command(sql1, db_name, 0);
+
+  std::string readline;
+
+  std::ifstream kernel_file(kernel_func_file);
+
+  if (!kernel_file){
+    out << "There was an error opening the kernel file.\n";
+  }
+
+  std::string sql_str;
+
+  std::getline(kernel_file, readline);
+  std::istringstream ss(readline);
+  std::string read_number;
+  std::string record;
+
+  while(std::getline(ss, read_number, '|')){
+    sql_str += "INSERT INTO KERNEL_FUNC (KERNEL_ID, KERNEL_NAME)\n";
+    record = "";
+    record += std::to_string(current_uid);
+    current_uid++;
+    record += ",\'";
+    record += read_number;
+    record += "\'";
+    sql_str += ("VALUES (" + record + "); \n");
+    
+  }
+    
+  const char* sql2 = sql_str.c_str();
+
+  out << sql2;
+  execute_command(sql2, db_name, 0);
+
+
+  kernel_file.close();
+
+}
+
+
 void update_id_table(std::ostream &out, bbts::node_t &node,const std::string &db, std::map<bbts::tid_t, std::string> id_map){
   const char* db_name = db.c_str();
   
@@ -496,14 +651,17 @@ void generate_matrix_commands(int32_t num_row, int32_t num_cols, int32_t row_spl
 
 //TRA operations: AGGREGATION//
 // Generate commands for aggregation
-void generate_aggregation_commands(std::ostream &out, int32_t num_rows, int32_t num_cols, int32_t row_split,
+void generate_aggregation_commands(std::ostream &out, bbts::node_t &node, int32_t num_rows, int32_t num_cols, int32_t row_split,
                           int32_t col_split,
                           std::vector<bbts::abstract_command_t> &commands,
                           std::map<std::tuple<int32_t, int32_t>, bbts::tid_t> &index,
+                          std::vector<bbts::abstract_ud_spec_t> funs,
                           std::string dimension,
                           bbts::abstract_ud_spec_id_t kernel_func, 
                           std::vector<bbts::tid_t> &output_tids_list,
-                          std::vector<std::vector<bbts::tid_t>> &input_tids_list) { //Find a way to pass dynamic library
+                          std::vector<std::vector<bbts::tid_t>> &input_tids_list,
+                          const std::string &file_path,
+                          const std::string &db) { //Find a way to pass dynamic library
   
 
   // generate_matrix_commands(num_rows, num_cols, row_split, col_split, commands, index); 
@@ -512,8 +670,46 @@ void generate_aggregation_commands(std::ostream &out, int32_t num_rows, int32_t 
   std::vector<bbts::command_param_t> param_data = {};
   std::vector<bbts::tid_t> input_tids_sublist;
 
-  // get the output result
   
+  
+  // get info from id_table
+  const char* db_char= db.c_str();
+  sqlite3_stmt * stmt;
+  sqlite3 *sql_db;
+
+  std::map<std::vector<std::string>, bbts::tid_t> id_map;
+  const char* sql = "SELECT TOS_ID FROM TENSOR_IDS";
+  // execute_command(sql, db_name, data);
+
+  if(sqlite3_open(db_char, &sql_db) == SQLITE_OK){
+     // preparing the statement
+    int rc = sqlite3_prepare_v2(sql_db, sql,-1, &stmt, NULL);
+
+    if(rc != SQLITE_OK){
+      out << "ERRORS PREPARING THE STATEMENT";
+      return;
+    }
+    // sqlite3_step(stmt); // executing the statement
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW){
+      bbts::tid_t tid = sqlite3_column_int(stmt, 0);
+      std::string tra_id = std::string(reinterpret_cast< const char* >(sqlite3_column_text(stmt, 0)));
+      id_map.insert(std::pair<std::vector<std::string>, bbts::tid_t>(split(tra_id, ","), tid));
+    }
+  }
+  else{
+    std::cout << "Failed to open db\n";
+  }
+
+  int i = 0;
+  for (auto row_id = 0; row_id < row_split; row_id++) {
+    for (auto col_id = 0; col_id < col_split; col_id++) {
+      std::vector<std::string> key = {std::to_string(row_id), std::to_string(col_id)};
+      index[{row_id, col_id}] = id_map.find(key)->second;
+      i++;
+    }
+  }
+  //TODO: find a way to keep up with current_tid
+  // current_tid = tid_list.back() + 1;
   
 
   if(dimension.compare("") == 0) {
@@ -563,6 +759,46 @@ void generate_aggregation_commands(std::ostream &out, int32_t num_rows, int32_t 
       input_tids_sublist.clear();
     }
   }
+
+  // get ud_name from kernel_table
+  sqlite3_stmt * stmt2;
+  sqlite3 *sql_db2;
+  std::string ud_name = "";
+  std::string sql2_pre = "SELECT KERNEL_NAME FROM KERNEL_FUNC WHERE KERNEL_ID = " + std::to_string(kernel_func) + ";\n";
+  const char* sql2 = sql2_pre.c_str();
+
+  if(sqlite3_open(db_char, &sql_db2) == SQLITE_OK){
+     // preparing the statement
+    int rc = sqlite3_prepare_v2(sql_db, sql2,-1, &stmt2, NULL);
+
+    if(rc != SQLITE_OK){
+      out << "ERRORS PREPARING THE STATEMENT";
+      return;
+    }
+    // sqlite3_step(stmt); // executing the statement
+    while((rc = sqlite3_step(stmt2)) == SQLITE_ROW){
+      ud_name = std::string(reinterpret_cast< const char* >(sqlite3_column_text(stmt2, 0)));
+    }
+  }
+
+  else{
+    std::cout << "Failed to open db\n";
+  }
+
+  out << "ud_name: " << ud_name << "\n";
+
+  std::vector<std::string> input_types_list(col_split,"dense");
+  funs.push_back(bbts::abstract_ud_spec_t{.id = kernel_func,
+                                  .ud_name = ud_name,
+                                  .input_types = input_types_list,
+                                  .output_types = {"dense"}});
+  
+  // std::string file_path = "TRA_commands_aggregation.sbbts";
+  std::ofstream gen(file_path);
+  bbts::compile_source_file_t gsf{.function_specs = funs, .commands = commands};
+  gsf.write_to_file(gen);
+  gen.close();
+  load_text_file(out, node, file_path);
 }
 
 
@@ -674,13 +910,55 @@ void generate_join_commands(std::ostream &out, bbts::node_t &node, int32_t num_r
                             int32_t col_split,
                             std::vector<bbts::abstract_command_t> &commands,
                             std::map<std::tuple<int32_t, int32_t>, bbts::tid_t> &index,
+                            std::vector<bbts::abstract_ud_spec_t> funs,
                             std::string joinKeysL,
                             std::string joinKeysR,
                             bbts::abstract_ud_spec_id_t kernel_func, 
                             std::vector<bbts::tid_t> &output_tids_list,
-                            std::vector<std::vector<bbts::tid_t>> &input_tids_list) { //Find a way to pass dynamic library
+                            std::vector<std::vector<bbts::tid_t>> &input_tids_list,
+                            const std::string &file_path,
+                            const std::string &db) { //Find a way to pass dynamic library
   
   std::vector<bbts::command_param_t> param_data = {};
+  
+  // get info from id_table
+  const char* db_char= db.c_str();
+  sqlite3_stmt * stmt;
+  sqlite3 *sql_db;
+
+  std::map<std::vector<std::string>, bbts::tid_t> id_map;
+  const char* sql = "SELECT TOS_ID FROM TENSOR_IDS";
+  // execute_command(sql, db_name, data);
+
+  if(sqlite3_open(db_char, &sql_db) == SQLITE_OK){
+     // preparing the statement
+    int rc = sqlite3_prepare_v2(sql_db, sql,-1, &stmt, NULL);
+
+    if(rc != SQLITE_OK){
+      out << "ERRORS PREPARING THE STATEMENT";
+      return;
+    }
+    // sqlite3_step(stmt); // executing the statement
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW){
+      bbts::tid_t tid = sqlite3_column_int(stmt, 0);
+      std::string tra_id = std::string(reinterpret_cast< const char* >(sqlite3_column_text(stmt, 0)));
+      id_map.insert(std::pair<std::vector<std::string>, bbts::tid_t>(split(tra_id, ","), tid));
+    }
+  }
+  else{
+    std::cout << "Failed to open db\n";
+  }
+
+  int i = 0;
+  for (auto row_id = 0; row_id < row_split; row_id++) {
+    for (auto col_id = 0; col_id < col_split; col_id++) {
+      std::vector<std::string> key = {std::to_string(row_id), std::to_string(col_id)};
+      index[{row_id, col_id}] = id_map.find(key)->second;
+      i++;
+    }
+  }
+  //TODO: how to keep up current_tid
+  // current_tid = tid_list.back() + 1;
 
   for (auto row_id = 0; row_id < row_split; row_id++) {
     for (auto col_id = 0; col_id < col_split; col_id++) {
@@ -727,6 +1005,45 @@ void generate_join_commands(std::ostream &out, bbts::node_t &node, int32_t num_r
     out << "\n";
   }
   out << "\n";
+
+  // get ud_name from id_table
+  sqlite3_stmt * stmt2;
+  sqlite3 *sql_db2;
+  std::string ud_name = "";
+  std::string sql2_pre = "SELECT KERNEL_NAME FROM KERNEL_FUNC WHERE KERNEL_ID = " + std::to_string(kernel_func) + ";\n";
+  const char* sql2 = sql2_pre.c_str();
+
+  if(sqlite3_open(db_char, &sql_db2) == SQLITE_OK){
+     // preparing the statement
+    int rc = sqlite3_prepare_v2(sql_db, sql2,-1, &stmt2, NULL);
+
+    if(rc != SQLITE_OK){
+      out << "ERRORS PREPARING THE STATEMENT";
+      return;
+    }
+    // sqlite3_step(stmt); // executing the statement
+    while((rc = sqlite3_step(stmt2)) == SQLITE_ROW){
+      ud_name = std::string(reinterpret_cast< const char* >(sqlite3_column_text(stmt2, 0)));
+    }
+  }
+
+  else{
+    std::cout << "Failed to open db\n";
+  }
+
+  out << "ud_name: " << ud_name << "\n";
+  
+  funs.push_back(bbts::abstract_ud_spec_t{.id = kernel_func,
+                                  .ud_name = ud_name, 
+                                  .input_types = {"dense", "dense"},
+                                  .output_types = {"dense"}}); 
+
+  // std::string file_path = "TRA_commands_join.sbbts";
+  std::ofstream gen(file_path);
+  bbts::compile_source_file_t gsf{.function_specs = funs, .commands = commands};
+  gsf.write_to_file(gen);
+  gen.close();
+  load_text_file(out, node, file_path);
   
 }
 
@@ -932,7 +1249,120 @@ void filter(std::ostream &out, bbts::node_t &node, const std::string &db, bool b
 }
 
 
+void transform(std::ostream &out, bbts::node_t &node, const std::string &db, int32_t row_size, int32_t col_size, std::string &tensor_type, bbts::tid_t transform_tid, std::string transformFunc(int32_t, int32_t, std::string)){
+  //take a text file of data from transformFunc
+  std::string file_name = "transform.npy";
+  std::string file = transformFunc(row_size, col_size, file_name);
+  cnpy::NpyArray arr = load_binary_file(out, node, file_name);
+  double* data = arr.data<double>();
+
+
+  //update filelist.txt and other file
+  std::ofstream filelist;
+  std::string tensor_file = "t" + std::to_string(current_tid);
+  std::ofstream tfile;
+  tfile.open("tensors/" + tensor_file);
+
+  filelist.open("tensors/filelist.txt");
+  filelist << current_tid << "|" << tensor_type << "|" << tensor_file;
+  tfile << row_size << "|" << col_size << "|";
+
+  //load_tensors
+  load_tensors(out, node, "tensors/filelist.txt"); 
+
+  //select old tid to get tra_id
+  const char* db_char= db.c_str();
+  sqlite3_stmt * stmt;
+  sqlite3 *sql_db;
+  bbts::tid_t old_tid = 0;
+  std::string old_tra_id = "";
+  std::string sql_pre = "SELECT TRA_ID FROM TENSOR_IDS WHERE TOS_ID = " + std::to_string(transform_tid) + ";\n";
+  const char* sql = sql_pre.c_str();
+
+  if(sqlite3_open(db_char, &sql_db) == SQLITE_OK){
+     // preparing the statement
+    int rc = sqlite3_prepare_v2(sql_db, sql,-1, &stmt, NULL);
+
+    if(rc != SQLITE_OK){
+      out << "ERRORS PREPARING THE STATEMENT";
+      return;
+    }
+    // sqlite3_step(stmt); // executing the statement
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW){
+      old_tid = sqlite3_column_int(stmt, 0);
+      old_tra_id = std::string(reinterpret_cast< const char* >(sqlite3_column_text(stmt, 1)));
+    }
+  }
+
+  else{
+    std::cout << "Failed to open db\n";
+  }
+
+  //delete old tuple and insert (new tid, tra_id) into sqlite table
+  std::string sql_str = "DELETE FROM TENSOR_IDS WHERE TOS_ID = " + std::to_string(old_tid) + ";\n";
+  sql_str += "INSERT INTO TENSOR_IDS (TOS_ID, TRA_ID)\n";
+  sql_str += ("VALUES (\'" + std::to_string(current_tid) + "\', \'" + old_tra_id + "\'); \n");
+
+  const char* sql2 = sql_str.c_str();
+  out << sql2;
+
+  execute_command(sql2, db_char, 0);
+  current_tid++;
+}
+
+
+
+
+
+
+
+
+
+
+
 /**************************** compile and run commands from TOS API ***********************/
+
+//load commands
+
+void load_binary_command(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
+
+  // kick off a loading message
+  std::atomic_bool b; b = false;
+  auto t = loading_message(out, "Loading the file", b);
+
+  // try to deserialize
+  bbts::parsed_command_list_t cmd_list;
+  bool success = cmd_list.deserialize(file_path);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!success) {
+    out << bbts::red << "Failed to load the file " << file_path << '\n' << bbts::reset;
+    return;
+  }
+
+  // kick off a loading message
+  b = false;
+  t = loading_message(out, "Scheduling the loaded commands", b);
+
+  // load the commands we just parsed
+  auto [did_load, message] = node.load_commands(cmd_list);
+
+  // finish the loading message
+  b = true; t.join();
+
+  // did we fail
+  if(!did_load) {
+    out << bbts::red << "Failed to schedule the loaded commands : \"" << message << "\"\n" << bbts::reset;
+  }
+  else {
+    out << bbts::green << message << bbts::reset;
+  }
+}
+
+
 //compile commands
 void compile_commands(std::ostream &out, bbts::node_t &node, const std::string &file_path) {
 
@@ -1038,6 +1468,11 @@ bool boolFunc(std::vector<int> int_list){
   return true;;
 }
 
+std::string transformFunc(int32_t row_size, int32_t col_size, std::string file_name){
+  generate_binary_file(row_size, col_size, file_name);
+  return file_name;
+}
+
 // the prompt
 void prompt(bbts::node_t &node) {
     
@@ -1065,17 +1500,26 @@ void prompt(bbts::node_t &node) {
   
   },"Load a data text file. Usage : load text_file <file>\n");
 
-  loadSubMenu->Insert("library", [&](std::ostream &out, const std::string &file) {
+  loadSubMenu->Insert("library", [&](std::ostream &out, const std::string &shared_lib_file, const std::string &kernel_func_file, const std::string &db) {
 
-    load_shared_library(out, node, file);  
+    // load_shared_library(out, node, shared_lib_file);  
+
+    create_kernel_table(out, node, kernel_func_file, db);
   
-  },"Load a shared object file. Usage : load library <file>\n");
+  },"Load a shared object file with a file holding all kernel functions. Usage : load library <file> <kernel_func_file> <db_name>\n");
 
   loadSubMenu->Insert("binary_file", [&](std::ostream &out, const std::string &file) {
 
     load_binary_file(out, node, file);  
   
   },"Load a binary file. Usage : load binary_file <file>\n");
+
+  loadSubMenu->Insert("tensors",[&](std::ostream &out, const std::string &file_list) {
+
+    load_tensors(out, node, file_list);
+
+  },"Load tensors from filelist. Usage : load tensors <path_to_file_list>\n");
+
 
   rootMenu->Insert(std::move(loadSubMenu));
 
@@ -1099,16 +1543,17 @@ void prompt(bbts::node_t &node) {
 
   generateSubMenu->Insert("matrix_to_binary", [&](std::ostream &out, const unsigned num_row, const unsigned num_col, const std::string &file) {
 
-    generate_binary_file(out, node, num_row, num_col, file);  
+    generate_binary_file(num_row, num_col, file);  
   
   },"Generate matrix with specified rows and cols in binary file. Usage : generate matrix_to_binary <num_row> <num_col> <file>\n");
 
 
-  generateSubMenu->Insert("tensors",[&](std::ostream &out, const std::string &file, const int32_t row_split, const int32_t col_split, const std::string &tensor_type) {
+  generateSubMenu->Insert("tensors",[&](std::ostream &out, const std::string &file, const int32_t row_split, const int32_t col_split, const std::string &tensor_type, const std::string &db) {
 
     create_tensors(out, node, file, row_split, col_split, tensor_type);
+    create_id_table(out, node, "tensor_relation.txt", db);
   
-  },"Create tensors based on the binary data file. Usage : generate tensors <file> <row_split> <col_split> <tensor_type>\n");
+  },"(1) Create tensors based on the binary data file. (2)Generate data file format for data loader (3) Save relation into sqlite. Usage : generate tensors <file> <row_split> <col_split> <tensor_type> <db_name>\n");
 
   
   generateSubMenu->Insert("sqlite_db",[&](std::ostream &out, const std::string& db) {
@@ -1232,7 +1677,9 @@ void prompt(bbts::node_t &node) {
 
   /*************************************   aggregate  **********************************************/
   rootMenu->Insert("aggregate",[&](std::ostream &out, const int32_t num_rows, const int32_t num_cols, 
-                                         const int32_t row_split,const int32_t col_split, std::string dimension,bbts::abstract_ud_spec_id_t kernel_func, const std::string &file_path, const std::string &db) {
+                                         const int32_t row_split,const int32_t col_split, std::string dimension, bbts::abstract_ud_spec_id_t kernel_func, const std::string &file_path, const std::string &db) {
+    
+
 
     //generate commands and put into a sbbts file  ****************************
     // the functions
@@ -1243,15 +1690,10 @@ void prompt(bbts::node_t &node) {
 
     std::map<std::tuple<int32_t, int32_t>, bbts::tid_t> index;
 
-    // for (auto row_id = 0; row_id < row_split; row_id++) {
-    //   for (auto col_id = 0; col_id < col_split; col_id++) {
-    //     index[{row_id, col_id}] = current_tid;
-    //     current_tid++;
-    //   }
-    // }
+    
 
     //REMOVE LATER
-    generate_matrix_commands(num_rows, num_cols, row_split, col_split, commands, index);
+    // generate_matrix_commands(num_rows, num_cols, row_split, col_split, commands, index);
 
 
     std::vector<bbts::tid_t> output_tid_list;
@@ -1259,36 +1701,25 @@ void prompt(bbts::node_t &node) {
 
     const char * db_name = db.c_str();
 
-    generate_aggregation_commands(out, num_rows, num_cols, row_split, col_split, commands, index, dimension, kernel_func, output_tid_list, input_tid_list);
+    generate_aggregation_commands(out, node, num_rows, num_cols, row_split, col_split, commands, index, funs, dimension, kernel_func, output_tid_list, input_tid_list, file_path,db);
   
-     
-
-    generate_aggregation_tra(out, node, output_tid_list, input_tid_list, db_name, dimension);
     
     // //REMOVE LATER
-    funs.push_back(bbts::abstract_ud_spec_t{.id = UNFORM_ID,
-                                    .ud_name = "uniform",
-                                    .input_types = {},
-                                    .output_types = {"dense"}});
+    // funs.push_back(bbts::abstract_ud_spec_t{.id = UNFORM_ID,
+    //                                 .ud_name = "uniform",
+    //                                 .input_types = {},
+    //                                 .output_types = {"dense"}});
 
 
-    std::vector<std::string> input_types_list(col_split,"dense");
-    funs.push_back(bbts::abstract_ud_spec_t{.id = ADD_ID,
-                                    .ud_name = "matrix_add",
-                                    .input_types = input_types_list,
-                                    .output_types = {"dense"}});
     
-    // std::string file_path = "TRA_commands_aggregation.sbbts";
-    std::ofstream gen(file_path);
-    bbts::compile_source_file_t gsf{.function_specs = funs, .commands = commands};
-    gsf.write_to_file(gen);
-    gen.close();
-    load_text_file(out, node, file_path);
-    
+    //load binary commands
+    load_binary_command(out, node, file_path);
     //compile commands
     compile_commands(out, node, file_path);
     //run commands
     run_commands(out, node);
+
+    generate_aggregation_tra(out, node, output_tid_list, input_tid_list, db_name, dimension);
 
     for (bbts::tid_t tid: output_tid_list){
 
@@ -1315,50 +1746,39 @@ void prompt(bbts::node_t &node) {
 
     std::map<std::tuple<int32_t, int32_t>, bbts::tid_t> index;
 
-    // for (auto row_id = 0; row_id < row_split; row_id++) {
-    //   for (auto col_id = 0; col_id < col_split; col_id++) {
-    //     index[{row_id, col_id}] = current_tid;
-    //     current_tid++;
-    //   }
-    // }
+    for (auto row_id = 0; row_id < row_split; row_id++) {
+      for (auto col_id = 0; col_id < col_split; col_id++) {
+        index[{row_id, col_id}] = current_tid;
+        current_tid++;
+      }
+    }
 
 
     //REMOVE LATER
-    generate_matrix_commands(num_rows, num_cols, row_split, col_split, commands, index);
+    // generate_matrix_commands(num_rows, num_cols, row_split, col_split, commands, index);
 
     std::vector<bbts::tid_t> output_tid_list;
     std::vector<std::vector<bbts::tid_t>> input_tid_list;
 
     const char * db_name = db.c_str();
 
-    generate_join_commands(out, node, num_rows, num_cols, row_split, col_split, commands, index, joinKeysL, joinKeysR, kernel_func, output_tid_list, input_tid_list);
-    
-    generate_join_tra(out, node, output_tid_list, input_tid_list, db_name, joinKeysL, joinKeysR);
+    generate_join_commands(out, node, num_rows, num_cols, row_split, col_split, commands, index, funs, joinKeysL, joinKeysR, kernel_func, output_tid_list, input_tid_list, file_path, db);
 
 
     // //REMOVE LATER
-    funs.push_back(bbts::abstract_ud_spec_t{.id = UNFORM_ID,
-                                    .ud_name = "uniform",
-                                    .input_types = {},
-                                    .output_types = {"dense"}});
+    // funs.push_back(bbts::abstract_ud_spec_t{.id = UNFORM_ID,
+    //                                 .ud_name = "uniform",
+    //                                 .input_types = {},
+    //                                 .output_types = {"dense"}});
 
-
-    funs.push_back(bbts::abstract_ud_spec_t{.id = MULT_ID,
-                                    .ud_name = "matrix_mult", 
-                                    .input_types = {"dense", "dense"},
-                                    .output_types = {"dense"}}); //TODO: find a way to take user input for ud_name
-
-    // std::string file_path = "TRA_commands_join.sbbts";
-    std::ofstream gen(file_path);
-    bbts::compile_source_file_t gsf{.function_specs = funs, .commands = commands};
-    gsf.write_to_file(gen);
-    gen.close();
-    load_text_file(out, node, file_path);
+    
 
     //compile commands
     compile_commands(out, node, file_path);
     //run commands
     run_commands(out, node);
+
+    generate_join_tra(out, node, output_tid_list, input_tid_list, db_name, joinKeysL, joinKeysR);
 
 
     for (bbts::tid_t tid: output_tid_list){
@@ -1424,6 +1844,7 @@ void prompt(bbts::node_t &node) {
 
 
 int main(int argc, char **argv) {
+  //TODO: update uid and tid
   auto config = std::make_shared<bbts::node_config_t>(bbts::node_config_t{.argc=argc, .argv = argv, .num_threads = 8});
 
   // create the node

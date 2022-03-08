@@ -642,7 +642,6 @@ void prompt(bbts::node_t &node) {
   },"Returns information about the cluster. Usage : info [cluster, storage, tensor] [tid] \n ");
 
   rootMenu->Insert("run",[&](std::ostream &out) {
-
     run_commands(out, node);
 
   },"Run scheduled commands.\n");
