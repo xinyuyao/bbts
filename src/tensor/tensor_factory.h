@@ -27,6 +27,12 @@ public:
   // the tensor to print
   void print_tensor(tensor_t* here, std::stringstream &ss);
 
+  // fills out the meta data of a tensor by preparsing the data for a particular tensor format id
+  void deserialize_meta(tensor_meta_t& _meta, tfid_t id, const char *data);
+
+  // deserializes a tensor from the input data
+  bbts::tensor_t &deserialize_tensor(tensor_t* here, tfid_t id, const char *data);
+
   // initializes the tensor
   tensor_t& init_tensor(tensor_t* here, const tensor_meta_t& _meta);
 

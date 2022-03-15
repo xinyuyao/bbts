@@ -16,7 +16,9 @@ enum class coordinator_op_types_t : int32_t {
   PRINT_STORAGE, // prints the storage of the node
   PRINT_TENSOR, // prints tensor
   REGISTER, // register a library
-  FETCH_META // fetches meta data from each node
+  FETCH_META, // fetches meta data from each node
+  LOAD_TENSOR_LIST, // loads a list of tensors
+  LOAD_TENSOR // loads a tensor
 };
 
 struct coordinator_op_t {
@@ -26,6 +28,12 @@ struct coordinator_op_t {
 
   // used by schedule
   std::size_t _val;
+
+  // used for 32 bit values like tids etc...
+  std::int32_t _small_val_1;
+
+  // used for 32 bit values like tids etc...
+  std::int32_t _small_val_2;
 };
 
 

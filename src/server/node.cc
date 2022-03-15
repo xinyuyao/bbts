@@ -227,6 +227,10 @@ std::tuple<bool, std::string> bbts::node_t::load_shared_library(char* file_bytes
   return _coordinator->load_shared_library(file_bytes, file_size);
 }
 
+std::tuple<bool, std::string> bbts::node_t::load_tensor_list(const std::vector<std::tuple<bbts::tid_t, std::string, std::string>> &file_list){
+  return _coordinator->load_tensor_list(file_list);
+}
+
 std::tuple<bool, std::string> bbts::node_t::run_commands() {
 
   // run all the commands

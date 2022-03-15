@@ -75,6 +75,9 @@ public:
   // load a shared library
   std::tuple<bool, std::string> load_shared_library(char* file_bytes, size_t file_size);
 
+  // load a list of tensors
+  std::tuple<bool, std::string> load_tensor_list(const std::vector<std::tuple<bbts::tid_t, std::string, std::string>> &file_list);
+
   // run all the scheduled commands
   std::tuple<bool, std::string> run_commands();
 

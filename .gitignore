@@ -19,6 +19,7 @@ tmp.*
 *.nvprof
 *.nvvp
 libraries
+tensors
 generated/commands*
 generated/kernels*
 generated

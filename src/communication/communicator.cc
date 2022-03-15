@@ -307,6 +307,17 @@ bool mpi_communicator_t::send_coord_op(const bbts::coordinator_op_t &op) {
   return success;
 }
 
+bool mpi_communicator_t::send_coord_op(const bbts::coordinator_op_t &op, node_id_t node) {
+
+  // initiate an asynchronous send request
+  async_request_t _req;
+  _req.success = MPI_Isend(&op, sizeof(op), MPI_CHAR, node, COORDINATOR_TAG, MPI_COMM_WORLD, &_req.request) == MPI_SUCCESS;
+
+  // wait for all the requests to finish
+  _req.success = MPI_Wait(&_req.request, MPI_STATUSES_IGNORE) == MPI_SUCCESS && _req.success;
+  return _req.success;
+}
+
 bbts::coordinator_op_t mpi_communicator_t::expect_coord_op() {
 
   // wait for a request
