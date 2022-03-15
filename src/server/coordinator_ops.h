@@ -18,7 +18,8 @@ enum class coordinator_op_types_t : int32_t {
   REGISTER, // register a library
   FETCH_META, // fetches meta data from each node
   LOAD_TENSOR_LIST, // loads a list of tensors
-  LOAD_TENSOR // loads a tensor
+  LOAD_TENSOR, // loads a tensor
+  PRINT_ALL_TID // get all tid on each node
 };
 
 struct coordinator_op_t {

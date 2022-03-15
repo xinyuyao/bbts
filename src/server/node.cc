@@ -253,6 +253,10 @@ std::tuple<bool, std::string> bbts::node_t::print_storage_info() {
   return _coordinator->print_storage_info();
 }
 
+std::tuple<bool, std::string> bbts::node_t::print_all_tid_info() {
+  return _coordinator->print_all_tid_info();
+}
+
 std::tuple<bool, std::string> bbts::node_t::print_tensor_info(tid_t id) {
   return _coordinator->print_tensor_info(id);
 }

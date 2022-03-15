@@ -41,7 +41,7 @@ std::tuple<bool, std::string> mpi_communicator_t::expect_response_string(node_id
   // wait for a request
   sync_request_t _req;
   auto mpi_errno = MPI_Mprobe(_node, RESPONSE_STRING_TAG, MPI_COMM_WORLD, &_req.message, &_req.status);
-
+  
   // check for errors
   if (mpi_errno != MPI_SUCCESS) {        
       return {false, ""};
@@ -55,7 +55,6 @@ std::tuple<bool, std::string> mpi_communicator_t::expect_response_string(node_id
   if(MPI_Mrecv (p.get(), _req.num_bytes, MPI_CHAR, &_req.message, &_req.status) != MPI_SUCCESS) {
     return {false, ""};
   }
-
   // return it
   return {true, std::string(p.get(), _req.num_bytes)};
 }

@@ -77,6 +77,10 @@ void bbts::coordinator_t::accept() {
         _print_storage(ss);
         break;
       }
+      case coordinator_op_types_t::PRINT_ALL_TID : {
+        _get_all_tensor_tid(ss);
+        break;
+      }
       case coordinator_op_types_t::PRINT_TENSOR : {
         _print_tensor((tid_t)(op._val), ss);
         break;
@@ -257,6 +261,26 @@ std::tuple<bool, std::string> bbts::coordinator_t::print_storage_info() {
   // we succeded
   return out;
 }
+
+std::tuple<bool, std::string> bbts::coordinator_t::print_all_tid_info() {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_ALL_TID, ._val = 0})) {
+    return {false, "Failed to print storage!\n"};
+  }
+
+  // print the storage
+  std::stringstream ss;
+  _get_all_tensor_tid(ss);
+
+  // collect the responses from all the nodes
+  std::tuple<bool, std::string> out = {true, ss.str()};
+  _collect(out);
+
+  // we succeded
+  return out;
+}
+
+
 
 std::tuple<bool, std::string> bbts::coordinator_t::print_tensor_info(bbts::tid_t id) {
 
@@ -472,11 +496,14 @@ void bbts::coordinator_t::_collect(std::tuple<bool, std::string> &out) {
   for(bbts::tid_t node = 1; node < _comm->get_num_nodes(); ++node) {
     auto rec = _comm->expect_response_string(node);
 
+
     // combine the result
     std::get<0>(out) = std::get<0>(out) &&  std::get<0>(rec);
     std::get<1>(out) = std::get<1>(out)  +  std::get<1>(rec);
+    
   }
 }
+
 
 void bbts::coordinator_t::_load_cmds(const std::vector<command_ptr_t> &cmds,
                                      std::stringstream &ss) {
@@ -519,6 +546,11 @@ void bbts::coordinator_t::_print_storage(std::stringstream &ss) {
   ss << "<<< For Node " << _comm->get_rank() << ">>>\n";
   _storage->print(ss);
 }
+
+void bbts::coordinator_t::_get_all_tensor_tid(std::stringstream &ss) {
+  _storage->get_all_tensor_tid(ss);
+}
+
 
 void bbts::coordinator_t::_print_tensor(tid_t id, std::stringstream &ss) {
 

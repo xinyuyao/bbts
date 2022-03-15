@@ -57,6 +57,9 @@ public:
   // return the number of nodes
   [[nodiscard]] size_t get_num_nodes() const;
 
+  // get all tid from all nodes
+  std::tuple<bool, std::string> print_all_tid_info();
+
   // return the rank of the node
   [[nodiscard]] size_t get_rank() const;
 

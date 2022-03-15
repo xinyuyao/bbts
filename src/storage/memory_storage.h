@@ -130,6 +130,7 @@ struct memory_storage_t {
   // check if there is a tensor in the storage
   bool has_tensor(tid_t _id);
 
+
   // remove by tid
   bool remove_by_tid(tid_t _id);
 
@@ -138,6 +139,9 @@ struct memory_storage_t {
 
   // print the memory_storage
   void print(std::stringstream &ss);
+
+  //get all tensor tid in the current storage
+  void get_all_tensor_tid(std::stringstream &ss);
 
   // clear the memory_storage
   void clear();
@@ -210,6 +214,8 @@ private:
 
   // the tensors that are preallocated so far
   std::unordered_map<size_t, std::vector<tensor_t*>> _preallocated_tensors;
+
+  
 };
 
 }

@@ -110,6 +110,7 @@ bool memory_storage_t::has_tensor(tid_t _id) {
   return _tensor_nfo.find(_id) != _tensor_nfo.end();
 }
 
+
 bool memory_storage_t::remove_by_tid(tid_t _id) {
   
   // lock this thing
@@ -182,6 +183,17 @@ void memory_storage_t::print(std::stringstream &ss) {
   ss << bbts::green << "TID\tSize (in bytes)\t\taddress\n" << bbts::reset;
   for(auto &t : _tensor_nfo) {
     ss << t.first << "\t" << t.second.num_bytes << "\t\t" << (void*) t.second.address << '\n';
+  }
+}
+
+void memory_storage_t::get_all_tensor_tid(std::stringstream &ss) {
+
+  // lock this thing
+  std::unique_lock<std::mutex> lck (_m);
+
+  // print all the tid info
+  for(auto &t : _tensor_nfo) {
+    ss << t.first << '\n';
   }
 }
 
