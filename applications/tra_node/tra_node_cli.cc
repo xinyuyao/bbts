@@ -116,6 +116,7 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
   // try to open the file
   std::ifstream in(file_path, std::ifstream::ate | std::ifstream::binary);
 
+
   if(in.fail()) {
     // finish the loading message
     b = true; t.join();
@@ -124,11 +125,14 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
     return false;
   }
 
+
   auto file_len = (size_t) in.tellg();
   in.seekg (0, std::ifstream::beg);
 
+
   auto file_bytes = new char[file_len];
   in.readsome(file_bytes, file_len);
+
 
   // finish the loading message  
   b = true; t.join();
@@ -137,11 +141,14 @@ bool load_shared_library(std::ostream &out, bbts::node_t &node, const std::strin
   b = false;
   t = loading_message(out, "Registering the library", b);
 
+
   auto [did_load, message] = node.load_shared_library(file_bytes, file_len);
   delete[] file_bytes;
 
+
   // finish the registering message
   b = true; t.join();
+
 
   if(!did_load) {
     out << bbts::red << "Failed to register the library : \"" << message << "\"\n" << bbts::reset;
