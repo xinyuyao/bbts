@@ -46,8 +46,61 @@ tensor_creation_fs_t bbts::ffnn_dense_t::get_creation_fs() {
 
   };
 
+  auto deserialize_meta = [](tensor_meta_t& _meta, tfid_t id, const char *data) {
+    auto &m = *(ffnn_dense_meta_t *) &_meta;
+    m.fmt_id = id;
+
+    auto s = std::string(data);
+    std::string delimiter = "|";
+    size_t pos = s.find(delimiter);
+    std::string num_rows = s.substr(0, s.find(delimiter));
+    s.erase(0, pos + delimiter.length());
+    std::string num_columns = s.substr(0, s.find(delimiter));
+
+    m.m().num_rows = std::atoi(num_rows.c_str());
+    m.m().num_cols = std::atoi(num_columns.c_str());
+    // QUESTION: Do we need to add bias? Since we got num_rows and num_cols from input data. Maybe we don't need to consider it? The data itself already contains bias?
+
+  };
+
+  auto deserialize_tensor = [](tensor_t* here, tfid_t id, const char *data) -> tensor_t& {
+
+    auto &a = here->as<ffnn_dense_t>();
+    // set meta data
+    // tfid
+    a.meta().fmt_id = id;
+
+    // number of rows and columns
+    auto s = std::string(data);
+    std::string delimiter = "|";
+    size_t pos = s.find(delimiter);
+    std::string num_rows = s.substr(0, s.find(delimiter));
+    s.erase(0, pos + delimiter.length());
+    std::string num_columns = s.substr(0, s.find(delimiter));
+
+    a.meta().m().num_rows = std::atoi(num_rows.c_str());
+    a.meta().m().num_cols = std::atoi(num_columns.c_str());
+
+    // put actual data inside tensor
+    s.erase(0, pos + delimiter.length());
+    std::string data_delimiter = " ";
+    size_t data_pos = s.find(delimiter);
+
+    for (auto row = 0; row < a.meta().m().num_rows; ++row) {
+      for (auto col = 0; col < a.meta().m().num_cols; ++col) {
+        data_pos = s.find(data_delimiter);
+        std::string my_data = s.substr(0, data_pos);
+        s.erase(0, data_pos + data_delimiter.length());
+        auto temp = std::atof(my_data.c_str());
+        a.data()[row * a.meta().m().num_cols + col] = temp;
+      }
+    }
+
+    return a;
+  };
+
   // return the tensor creation functions
-  return tensor_creation_fs_t{.get_size = size, .init_tensor = init, .print = pnt};
+  return tensor_creation_fs_t{.get_size = size, .init_tensor = init, .print = pnt, .deserialize_meta = deserialize_meta, .deserialize_tensor = deserialize_tensor};
 }
 
 
@@ -90,8 +143,66 @@ tensor_creation_fs_t bbts::ffnn_sparse_t::get_creation_fs() {
 
   };
 
+  auto deserialize_meta = [](tensor_meta_t& _meta, tfid_t id, const char *data) {
+    auto &m = *(ffnn_dense_meta_t *) &_meta;
+    m.fmt_id = id;
+
+    auto s = std::string(data);
+    std::string delimiter = "|";
+    size_t pos = s.find(delimiter);
+    std::string num_rows = s.substr(0, s.find(delimiter));
+    s.erase(0, pos + delimiter.length());
+    std::string num_columns = s.substr(0, s.find(delimiter));
+
+    m.m().num_rows = std::atoi(num_rows.c_str());
+    m.m().num_cols = std::atoi(num_columns.c_str());
+    // QUESTION: Do we need to add bias? Since we got num_rows and num_cols from input data. Maybe we don't need to consider it? The data itself already contains bias?
+
+  };
+
+  auto deserialize_tensor = [](tensor_t* here, tfid_t id, const char *data) -> tensor_t& {
+
+    auto &a = here->as<ffnn_dense_t>();
+    // set meta data
+    // tfid
+    a.meta().fmt_id = id;
+
+    // number of rows and columns
+    auto s = std::string(data);
+    std::string delimiter = "|";
+    size_t pos = s.find(delimiter);
+    std::string num_rows = s.substr(0, s.find(delimiter));
+    s.erase(0, pos + delimiter.length());
+    std::string num_columns = s.substr(0, s.find(delimiter));
+
+    a.meta().m().num_rows = std::atoi(num_rows.c_str());
+    a.meta().m().num_cols = std::atoi(num_columns.c_str());
+
+    // put actual data inside tensor
+    s.erase(0, pos + delimiter.length());
+    std::string data_delimiter = " ";
+    size_t data_pos = s.find(delimiter);
+
+    for (auto row = 0; row < a.meta().m().num_rows; ++row) {
+      for (auto col = 0; col < a.meta().m().num_cols; ++col) {
+        data_pos = s.find(data_delimiter);
+        std::string my_data = s.substr(0, data_pos);
+        s.erase(0, data_pos + data_delimiter.length());
+        auto temp = std::atof(my_data.c_str());
+        a.data()[row * a.meta().m().num_cols + col] = temp;
+      }
+    }
+
+    return a;
+  };
+  
+
   // return the tensor creation functions
-  return tensor_creation_fs_t{.get_size = size, .init_tensor = init, .print = pnt};
+  // TODO: need to implement .deserialize_tensor, and .deserialize_meta to make it work. Since data loader change the format of tensor. Library is the 
+  // combined of tensors and kernel func. I need to implement these two func to make it work.
+  // There is a similar implementation for this two functions when implement data loader, check it
+  return tensor_creation_fs_t{.get_size = size, .init_tensor = init, .print = pnt, .deserialize_meta = deserialize_meta, .deserialize_tensor = deserialize_tensor};
+  
 }
 
 }

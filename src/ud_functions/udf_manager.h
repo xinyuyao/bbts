@@ -50,6 +50,9 @@ public:
   // return the implementation
   ud_impl_t* get_fn_impl(ud_impl_id_t _id);
 
+  // get udf name and the impl_id
+  std::unordered_map<std::string, ud_id_t> get_udf_name_impl_id();
+
 private:
 
   // the GPU scheduler
@@ -66,5 +69,9 @@ private:
 };
 
 using udf_manager_ptr = std::shared_ptr<udf_manager_t>;
+
+// TODO: For taking all kernel function and its metadata, write a function similar to get_storage_info function and implement 
+// in this file. Don't need to take info from all node, I can get all library info in one node. The type and parsing should be 
+// similar to get_storage_info
 
 }

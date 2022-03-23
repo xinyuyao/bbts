@@ -532,7 +532,7 @@ void bbts::coordinator_t::_run() {
   _rs->execute_scheduled_async();
 
   // wait for all the commands to be run
-  _rs->wait_until_finished(); // TODO: Problem happens here
+  _rs->wait_until_finished(); 
 
   // stop executing all the commands
   _rs->stop_executing();
