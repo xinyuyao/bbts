@@ -170,8 +170,8 @@ ud_impl_t* udf_manager_t::get_fn_impl(ud_impl_id_t _id) {
   return _udfs[_id.ud_id]->impls[_id.impl_id].get();
 }
 
-std::unordered_map<std::string, ud_id_t> udf_manager_t::get_udf_name_impl_id(){
-  return _udfs_name_to_id;
+std::vector<ud_func_ptr_t> udf_manager_t::get_udf_ptr_list(){
+  return _udfs;
 }
 
 }

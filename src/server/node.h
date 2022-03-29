@@ -99,8 +99,8 @@ public:
   // prints information about the tensor
   std::tuple<bool, std::string> print_tensor_info(tid_t id);
 
-  // print pairs of udf name and the corresponding impl_id
-  std::unordered_map<std::string, ud_id_t> print_udf_name_impl_id();
+  // get all udf ptr
+  std::vector<bbts::ud_func_ptr_t> get_udf_ptr_list();
 
   // resets the cluster
   std::tuple<bool, std::string> clear();

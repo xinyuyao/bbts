@@ -261,8 +261,8 @@ std::tuple<bool, std::string> bbts::node_t::print_tensor_info(tid_t id) {
   return _coordinator->print_tensor_info(id);
 }
 
-std::unordered_map<std::string, bbts::ud_id_t> bbts::node_t::print_udf_name_impl_id(){
-  return _udf_manager->get_udf_name_impl_id();
+std::vector<bbts::ud_func_ptr_t> bbts::node_t::get_udf_ptr_list(){
+  return _udf_manager->get_udf_ptr_list();
 }
 
 std::tuple<bool, std::string> bbts::node_t::clear() {

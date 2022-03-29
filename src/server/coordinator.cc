@@ -387,7 +387,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::load_shared_library(char* fil
   if(!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::REGISTER, ._val = file_size})) {
     return {false, "Failed to register library!\n"};
   }
-  std::cout << "run to line 390\n";
+
 
   // send the data
   if (!_comm->send_bytes(file_bytes, file_size)) {
@@ -708,17 +708,15 @@ bool bbts::coordinator_t::_register_from_bytes(char* file_bytes, size_t file_siz
     register_udfs(_udf_manager);
   }
 
-  std::cout << "run to line 711\n";
 
   // check if we have actually loaded something
   if(!had_something) {
     ss << bbts::red << "Shared library object did not have a valid \"register_tensors\" or \"register_udfs\"!\n" << std::endl;
   }  
-  std::cout << "run to line 717\n";
+
   // keep track of the stuff here so the system can clean it up later
   shared_libs.emplace_back(filename, so_handle);
 
-  std::cout << "run to line 721\n";
   return had_something;
 }
 

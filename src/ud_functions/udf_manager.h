@@ -50,8 +50,8 @@ public:
   // return the implementation
   ud_impl_t* get_fn_impl(ud_impl_id_t _id);
 
-  // get udf name and the impl_id
-  std::unordered_map<std::string, ud_id_t> get_udf_name_impl_id();
+  // get all udf ptr
+  std::vector<ud_func_ptr_t> get_udf_ptr_list();
 
 private:
 
