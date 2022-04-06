@@ -29,9 +29,11 @@ public:
   // run the deleter, responsible to remove all the tensors we don't need anymore...
   void run_deleter();
 
+
   // shutdown the command runner - this just stops the remote
   // command handler as the reservation station shuts down the other two
   void shutdown();
+
 
 private:
 

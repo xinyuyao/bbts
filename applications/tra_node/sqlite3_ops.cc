@@ -7,10 +7,10 @@
 extern "C" {
    static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
       int i;
-      for(i = 0; i<argc; i++) {
-         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
-      }
-      printf("\n");
+      // for(i = 0; i<argc; i++) {
+      //    printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+      // }
+      // printf("\n");
       return 0;
    }
 
@@ -24,9 +24,10 @@ extern "C" {
 
       if( rc ) {
          fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-      } else {
-         fprintf(stderr, "Opened database successfully\n");
       }
+      // } else {
+      //    fprintf(stderr, "Opened database successfully\n");
+      // }
       sqlite3_close(db);
    }
 
@@ -44,9 +45,10 @@ extern "C" {
       if( rc ) {
          fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
          return;
-      } else {
-         fprintf(stdout, "Opened database successfully\n");
-      }
+      } 
+      // else {
+         // fprintf(stdout, "Opened database successfully\n");
+      // }
 
       /* Execute SQL statement */
       rc = sqlite3_exec(db, sqlite_command, callback, (void*)data, &zErrMsg);
@@ -54,9 +56,10 @@ extern "C" {
       if( rc != SQLITE_OK ){
          fprintf(stderr, "SQL error: %s\n", zErrMsg);
          sqlite3_free(zErrMsg);
-      } else {
-         fprintf(stdout, "SQLite command is successfully executed\n");
-      }
+      } 
+      // else {
+      //    fprintf(stdout, "SQLite command is successfully executed\n");
+      // }
       sqlite3_close(db);
    }
 

@@ -287,6 +287,9 @@ std::thread bbts::node_t::create_deleter_thread() {
     _command_runner->run_deleter();
   });
 }
+
+
+
 std::thread bbts::node_t::create_move_processing_thread() {
 
   // create the thread to pull

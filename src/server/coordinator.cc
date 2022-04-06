@@ -162,11 +162,11 @@ std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_tr
     // the compiled commands
     auto compiled_cmds = compiler.compile(cmds, locations);
 
-    std::stringstream ss2;
-    for(auto &c : compiled_cmds) {
-      c->print(ss2);
-    }
-    std::cout << ss2.str() << '\n';
+    // std::stringstream ss2;
+    // for(auto &c : compiled_cmds) {
+    //   c->print(ss2);
+    // }
+    // std::cout << ss2.str() << '\n';
 
     // schedule the compiled commands
     return schedule_commands(compiled_cmds);
