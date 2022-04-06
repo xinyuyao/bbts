@@ -170,8 +170,14 @@ ud_impl_t* udf_manager_t::get_fn_impl(ud_impl_id_t _id) {
   return _udfs[_id.ud_id]->impls[_id.impl_id].get();
 }
 
-std::vector<ud_func_ptr_t> udf_manager_t::get_udf_ptr_list(){
-  return _udfs;
+std::unordered_map<std::string, std::tuple<ud_id_t, bool, bool, size_t, size_t>> udf_manager_t::get_udfs_info(){
+  std::unordered_map<std::string, std::tuple<ud_id_t, bool, bool, size_t, size_t> > udfs_info;
+  for(int i = 0; i < _udfs.size(); i++){
+    std::string udf_name = _udfs[i]->ud_name;
+    std::tuple<ud_id_t, bool, bool, size_t, size_t> udf_meta= std::make_tuple(_udfs[i]->id, _udfs[i]->is_ass, _udfs[i]->is_com, _udfs[i]->num_in, _udfs[i]->num_out);
+    udfs_info.insert(std::pair(udf_name, udf_meta));
+  }
+  return udfs_info;
 }
 
 }

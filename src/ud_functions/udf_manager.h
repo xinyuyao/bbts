@@ -50,8 +50,8 @@ public:
   // return the implementation
   ud_impl_t* get_fn_impl(ud_impl_id_t _id);
 
-  // get all udf ptr
-  std::vector<ud_func_ptr_t> get_udf_ptr_list();
+  // get udf_id, is_ass, is_comm, num_in, num_out of each udf
+  std::unordered_map<std::string, std::tuple<ud_id_t, bool, bool, size_t, size_t> > get_udfs_info();
 
 private:
 

@@ -1,7 +1,0 @@
-1
-1 matrix_add 2 dense dense 1 dense 
-4
-1 APPLY 2 8 10 1 16 0 
-1 APPLY 2 9 11 1 17 0 
-1 APPLY 2 12 14 1 18 0 
-1 APPLY 2 13 15 1 19 0 
