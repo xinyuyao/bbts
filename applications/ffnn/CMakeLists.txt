@@ -18,11 +18,19 @@ add_library(ffnn_lib SHARED ${app_dir}/ffnn_lib_init.cc
                             ${app_dir}/ffnn_add.cc              
                             ${app_dir}/ffnn_uniform_weights.cc
                             ${app_dir}/ffnn_types.cc            
-                            ${app_dir}/ffnn_weighted_sum.cc
+                            ${app_dir}/ffnn_weighted_sum.cc 
                             ${app_dir}/ffnn_matrix_hadamard.cc  
                             ${app_dir}/ffnn_back_mult.cc  
                             ${app_dir}/ffnn_uniform_sparse_data.cc  
-                            ${app_dir}/ffnn_weighted_sum_sparse_dense.cc)
+                            ${app_dir}/ffnn_weighted_sum_sparse_dense.cc
+                            ${app_dir}/ffnn_subtract.cc
+                            ${app_dir}/ffnn_element_mult.cc
+                            ${app_dir}/ffnn_mat_mul_lhs_transpose.cc
+                            ${app_dir}/ffnn_mat_mul_rhs_transpose.cc
+                            ${app_dir}/ffnn_relu.cc
+                            ${app_dir}/ffnn_relu_diff.cc
+                            ${app_dir}/ffnn_sigmoid.cc)
+                            ${app_dir}/ffnn_scale_mul.cc)
 
 
 # add the dependencies

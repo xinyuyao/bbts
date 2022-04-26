@@ -14,6 +14,8 @@
 #include "../../src/utils/terminal_color.h"
 
 
+
+
 #include "sqlite3.h"
 
 #include "../../third_party/cli/include/cli/cli.h"
@@ -50,9 +52,9 @@ const int32_t ADD_ID = 1;
 const int32_t MULT_ID = 2;
 
 // to store the relation before materialize
-std::map<std::string, std::tuple<std::map<std::string, bbts::tid_t>, std::vector<bbts::tid_t>, std::vector<std::string>>> stored_R;
+std::map<std::string, std::map<std::string, bbts::tid_t>> stored_R;
 
-std::unordered_set<std::string> math_op = {"add", "subtract", "multiply", "divide", "+", "-", "*", "/"};
+std::unordered_set<std::string> math_op = {"add", "subtract", "multiply", "divide", "mod", "+", "-", "*", "/", "%"};
 
 std::unordered_set<std::string> collective_op = {"sum"};
 
@@ -312,7 +314,10 @@ bool generate_binary_file(const unsigned row_num, const unsigned col_num, const 
   srand(0);
   //create random data
   std::vector<double> data(row_num * col_num);
-  for(int i = 0;i < row_num * col_num;i++) data[i] = 0.1;
+  for(int i = 0;i < row_num * col_num;i++){
+    if(i % 2 == 0) data[i] = 0.1;
+    else data[i] = - 0.5;
+  }
 
   //save it to file
   cnpy::npy_save(file,&data[0],{col_num, row_num},"w");
@@ -718,35 +723,37 @@ std::map<std::string, bbts::tid_t> get_id_map_from_sqlite(std::ostream &out,bbts
 
 bbts::abstract_ud_spec_id_t get_udf_id_from_sqlite(std::ostream &out,bbts::node_t &node, const char* db_char, const std::string &kernel_name, bool &udf_exist_flag){
   // get udf_name from id_table
-  sqlite3_stmt * stmt2;
-  sqlite3 *sql_db2;
+  sqlite3_stmt * stmt;
+  sqlite3 *sql_db;
   bbts::abstract_ud_spec_id_t udf_id;
-  std::string sql2_pre = "SELECT KERNEL_ID FROM KERNEL_FUNC WHERE KERNEL_NAME = \'" + kernel_name + "\';\n";
-  const char* sql2 = sql2_pre.c_str();
+  std::string sql_str = "SELECT KERNEL_ID FROM KERNEL_FUNC WHERE KERNEL_NAME = \'" + kernel_name + "\';\n";
+  const char* sql = sql_str.c_str();
 
-  if(sqlite3_open(db_char, &sql_db2) == SQLITE_OK){
+  if(sqlite3_open(db_char, &sql_db) == SQLITE_OK){
      // preparing the statement
-    int rc = sqlite3_prepare_v2(sql_db2, sql2,-1, &stmt2, NULL);
+    int rc = sqlite3_prepare_v2(sql_db, sql,-1, &stmt, NULL);
 
     if(rc != SQLITE_OK){
       out << "ERROR preparing sql statement";
       return -1;
     }
-    // sqlite3_step(stmt); // executing the statement
-    if((rc = sqlite3_step(stmt2)) != SQLITE_ROW){
+    // exist_cnt check whether kernel func is inside the table
+    int exist_cnt = 0;
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW){
+      udf_id = sqlite3_column_int(stmt, 0);
+      exist_cnt++;
+    }
+    if(exist_cnt == 0){
       out << "Kernel function \'" << kernel_name << "\' does not exist.\n";
       udf_exist_flag = false;
       return -1;
-    }
-    while((rc = sqlite3_step(stmt2)) == SQLITE_ROW){
-      udf_id = sqlite3_column_int(stmt2, 0);
     }
   }
 
   else{
     std::cout << "Failed to open db\n";
   }
-
+  out << "udf_id: " << udf_id << "\n";
   return udf_id;
 }
 
@@ -893,17 +900,22 @@ void generate_tra_op_commands(std::ostream &out, bbts::node_t &node,
     return;
   }
   // out << "udf_id: " << udf_id << "\n";
+  out << "intput_mapping.size(): " << input_mapping.size() << "\n";
+  out << "output_mapping.size(): " << output_mapping.size() << "\n";
 
-  
   std::map<std::string, std::vector<bbts::tid_t>>::iterator input_it;
 
   for(input_it = input_mapping.begin(); input_it != input_mapping.end(); input_it++){
+    out << "input: " << input_it->second[0] << "\n";
+    out << "output: " << output_mapping.find(input_it->first)->second << "\n";
     commands.push_back(
         bbts::abstract_command_t{.ud_id = udf_id,
                                   .type = bbts::abstract_command_type_t::APPLY,
                                   .input_tids = input_it->second,
                                   .output_tids = {output_mapping.find(input_it->first)->second},
                                   .params = {}});
+    check_input_output_size_for_kernel_func(out,node, db_char, kernel_name, commands[commands.size() - 1].input_tids.size(), 
+                                            commands[commands.size() - 1].output_tids.size());
   }
     
   
@@ -914,8 +926,6 @@ void generate_tra_op_commands(std::ostream &out, bbts::node_t &node,
                                           .output_types = {"dense"}});
 
 
-  check_input_output_size_for_kernel_func(out,node, db_char, kernel_name, funs[0].input_types.size(), funs[0].output_types.size());
- 
   
   // std::string file_path = "TRA_commands_aggregation.sbbts";
   std::ofstream gen(file_path);
@@ -1062,7 +1072,7 @@ void generate_aggregation_tra(std::ostream &out, bbts::node_t &node, std::map<st
     }
   }
   
-  stored_R.insert(std::pair(stored_tr_name, std::tuple(output_mapping, removed_tid_list, input_tr_name)));
+  stored_R.insert(std::pair(stored_tr_name, output_mapping));
 
 }
 
@@ -1079,6 +1089,7 @@ void generate_join_tra(std::ostream &out, bbts::node_t &node, std::map<std::stri
   std::map<std::string, bbts::tid_t> id_map_l = generate_id_map_for_all_current_node_from_sqlite(out, node, db, tr_name_l, relation_exist_flag);
   std::map<std::string, bbts::tid_t> id_map_r = generate_id_map_for_all_current_node_from_sqlite(out, node, db, tr_name_r, relation_exist_flag);
 
+  // return if relation does not exist
   if(!relation_exist_flag){
     return;
   }
@@ -1088,28 +1099,23 @@ void generate_join_tra(std::ostream &out, bbts::node_t &node, std::map<std::stri
   
   std::map<std::string, bbts::tid_t>::iterator map_it1;
   std::map<std::string, bbts::tid_t>::iterator map_it2;
-  std::vector<bbts::tid_t> removed_tid_list;
-  std::vector<std::string> input_tr_name = {tr_name_l, tr_name_r};
 
+
+  // check if join size for two relations are the same
   if(dimension_list_l.size() != dimension_list_r.size()){
-      out << "join dimension mismatch\n";
-      return;
-    }
+    out << "join dimension mismatch\n";
+    return;
+  }
   
 
+  //
   for(map_it1 = id_map_l.begin(); map_it1!= id_map_l.end(); map_it1++){
-    removed_tid_list.push_back(map_it1->second);
-
     for(map_it2 = id_map_r.begin(); map_it2!= id_map_r.end(); map_it2++){
-      if(map_it1 == id_map_l.begin()){
-        removed_tid_list.push_back(map_it2->second);
-      }
+    
       std::vector<std::string> split_key_l = split(map_it1->first,",");
       std::vector<std::string> split_key_r = split(map_it2->first,",");
       
-      
-      
-
+      // check if left key is equal to right key on all join dimensions
       bool join_key_match = true;
       for(int i = 0; i < dimension_list_l.size(); i++){
         if(split_key_l[stoi(dimension_list_l[i])].compare(split_key_r[stoi(dimension_list_r[i])]) != 0){
@@ -1117,28 +1123,35 @@ void generate_join_tra(std::ostream &out, bbts::node_t &node, std::map<std::stri
           break;
         }
       }
+      // if two keys match on their join dimensions
       if(join_key_match){
-        std::string join_key;
+        
+        // create new key for join
+        std::vector<std::string> join_key_list;
         int dim_idx = 0;
 
         for(int i = 0; i < split_key_l.size(); i++){
-          join_key += (split_key_l[i] + ",");
+          join_key_list.push_back(split_key_l[i]);
         }
         for(int i = 0; i < split_key_r.size(); i++){
+          out<< "i: " << i << "  , dimension_list_r[dim_idx]: " << dimension_list_r[dim_idx] << "\n";
           if(i == stoi(dimension_list_r[dim_idx])){
             if(dim_idx < dimension_list_r.size() - 1){
               dim_idx++;
             }
-            
           }
           else{
-            join_key += split_key_r[i];
-            if(i != split_key_r.size() - 1){
-              join_key += ",";
-            }
+            join_key_list.push_back(split_key_r[i]);
           }
         }
-        // out << "joinkey: " << join_key << "\n";
+        std::string join_key;
+        for(int i = 0; i < join_key_list.size(); i++){
+          join_key += join_key_list[i];
+          if(i != join_key_list.size() - 1){
+            join_key += ",";
+          }
+        }
+        out << "joinkey: " << join_key << "\n";
         std::vector<bbts::tid_t> mapping_list;
         mapping_list.push_back(map_it1->second);
         mapping_list.push_back(map_it2->second);
@@ -1150,8 +1163,9 @@ void generate_join_tra(std::ostream &out, bbts::node_t &node, std::map<std::stri
     }
   }
   
-  stored_R.insert(std::pair(stored_tr_name, std::tuple(output_mapping, removed_tid_list, input_tr_name)));
+  stored_R.insert(std::pair(stored_tr_name, output_mapping));
 }
+  
 
 
 
@@ -1284,8 +1298,8 @@ void generate_join_tra(std::ostream &out, bbts::node_t &node, std::map<std::stri
 // }
 
 
-void generate_transform_tra(std::ostream &out, bbts::node_t &node, std::map<std::string, bbts::tid_t> output_mapping, 
-                            std::map<std::string, std::vector<bbts::tid_t>> input_mapping, const std::string &db, 
+void generate_transform_tra(std::ostream &out, bbts::node_t &node, std::map<std::string, bbts::tid_t> &output_mapping, 
+                            std::map<std::string, std::vector<bbts::tid_t>> &input_mapping, const std::string &db, 
                             const std::string &stored_tr_name, std::vector<bbts::tid_t> removed_tid_list, 
                             const std::string &tr_name, bool &relation_exist_flag){
   
@@ -1303,12 +1317,17 @@ void generate_transform_tra(std::ostream &out, bbts::node_t &node, std::map<std:
   for(map_it = id_map.begin(); map_it != id_map.end(); map_it++){
     std::vector<bbts::tid_t> mapping_list;
     mapping_list.push_back(map_it->second);
+    out << "input_mapping: ( " << map_it->first << " )\n";
+    for(auto i: mapping_list){
+      out << i << "  "; 
+    }
+    out << "\n";
     input_mapping.insert(std::pair(map_it->first, mapping_list));
+    out << "output mapping: " << current_tid << "\n";
     output_mapping.insert(std::pair(map_it->first, current_tid++));
-    removed_tid_list.push_back(map_it->second);
   }
 
-  stored_R.insert(std::pair(stored_tr_name, std::tuple(output_mapping, removed_tid_list, input_tr_name)));
+  stored_R.insert(std::pair(stored_tr_name, output_mapping));
 
 }
 
@@ -1401,6 +1420,12 @@ void handle_math_op_for_rekey(std::ostream &out, bbts::node_t &node, const std::
               return;
             }
             new_tra_id.push_back(std::to_string(stoi(tra_id[stoi(num_or_dim_1_list[i])]) / changed_number));
+          }
+          else if(op == "mod" || op == "%"){
+            if(changed_number == 0){
+              out << "Error for mod. Denominator could not be 0.\n";
+            }
+            new_tra_id.push_back(std::to_string(stoi(tra_id[stoi(num_or_dim_1_list[i])]) % changed_number));
           }
           break;
         }
@@ -1631,6 +1656,12 @@ void append_dimension_to_relation(std::ostream &out, bbts::node_t &node, const s
           }
           new_tra_id.push_back(std::to_string(changed_number_left / changed_number_right));
         }
+        else if(op == "mod" || op == "%"){
+          if(changed_number_right == 0){
+            out << "Error for mod. Denominator could not be 0.\n";
+          }
+          new_tra_id.push_back(std::to_string(changed_number_left % changed_number_right));
+        }
         break;
       }
       
@@ -1707,6 +1738,7 @@ void compile_commands(std::ostream &out, bbts::node_t &node, const std::string &
   // auto t = loading_message(out, "Compiling commands", b);
 
   // compile the commands and load them
+  std::cout << "please hit me!!!\n";
   auto [did_compile, message] = node.compile_commands(file_path);
 
   // finish the loading message  
@@ -1749,6 +1781,7 @@ void materialize_commands(std::ostream &out, bbts::node_t &node, const std::stri
     compile_commands(out, node, file_path);
     //run commands
     run_commands(out, node);
+    std::remove(file_path.c_str());
   }
   else{
     out << file_path << " does not exist";
@@ -1756,7 +1789,7 @@ void materialize_commands(std::ostream &out, bbts::node_t &node, const std::stri
   }
   
   // rename_sqlite_table(db, old_table_name, new_table_name);
-  create_id_table(out, node, db, std::get<0>(stored_R.find(tr_name)->second), tr_name);
+  create_id_table(out, node, db, stored_R.find(tr_name)->second, tr_name);
 }
 
 void delete_tensor_from_cluster(std::ostream &out, bbts::node_t &node, std::vector<bbts::tid_t> id_list, const std::string &file_path, bool &relation_exist_flag){
@@ -1783,6 +1816,7 @@ void delete_tensor_from_cluster(std::ostream &out, bbts::node_t &node, std::vect
     compile_commands(out, node, file_path);
     //run commands
     run_commands(out, node);
+    std::remove(file_path.c_str());
   }
   else{
     out << file_path << " does not exist";
@@ -1879,6 +1913,12 @@ void filter_relations(std::ostream &out, bbts::node_t &node, const std::string &
         return;
       }
       compare_result = left_side - right_side;
+    }
+    else if(op == "mod" || op == "%"){
+      if(right_side == 0){
+        out << "Error for mod. Denominator could not be 0.\n";
+      }
+      compare_result = left_side % right_side;
     }
     else{
       out << "Only support operations: add(+), subtract(-), multiply(*), divide(/).\n";
@@ -2088,6 +2128,33 @@ void drop_table(std::ostream &out, bbts::node_t &node, const std::string &table_
   // out << "\n\n\n\n";
 }
 
+void display_all_table(std::ostream &out, bbts::node_t &node, const std::string &db){
+
+  const char* db_name = db.c_str();
+  std::string  sql = "SELECT * FROM sqlite_master where type='table';";
+  const char* sql_char = sql.c_str();
+  sqlite3_stmt * stmt;
+  sqlite3 *sql_db;
+
+  if(sqlite3_open(db_name, &sql_db) == SQLITE_OK){
+     // preparing the statement
+    int rc = sqlite3_prepare_v2(sql_db, sql_char,-1, &stmt, NULL);
+
+    // sqlite3_step(stmt); // executing the statement
+    out<< "\n Current tables in tra.db are the following: \n";
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW){
+      std::string table_info = std::string(reinterpret_cast< const char* >(sqlite3_column_text(stmt, 1)));
+      out << table_info << "\n";
+    }
+    out << "\n";
+  }
+  else{
+    std::cout << "Failed to open db\n";
+  }
+
+  sqlite3_close(sql_db);
+}
+
 // the prompt
 void prompt(bbts::node_t &node) {
     
@@ -2102,6 +2169,7 @@ void prompt(bbts::node_t &node) {
   std::cout << "\t\t\t\tEmail : xy38@rice.edu\n";
   std::cout << '\n';
 
+  
 
   auto rootMenu = std::make_unique<Menu>("tra_cli");
 
@@ -2308,14 +2376,14 @@ void prompt(bbts::node_t &node) {
     bool relation_exist_flag = true;
 
     materialize_commands(out, node, file_path, tr_name, db);
-    delete_tensor_from_cluster(out, node, std::get<1>(stored_R.find(tr_name)->second), delete_file_path, relation_exist_flag);
+    // delete_tensor_from_cluster(out, node, std::get<1>(stored_R.find(tr_name)->second), delete_file_path, relation_exist_flag);
 
-    std::vector<std::string> input_tr_name_list = std::get<2>(stored_R.find(tr_name)->second);
-    for(auto input_tr_name: input_tr_name_list){
-      bool relation_exist_flag = true;
-      stored_R.erase(input_tr_name);
-      drop_table(out, node, input_tr_name, db, relation_exist_flag);
-    }
+    // std::vector<std::string> input_tr_name_list = std::get<2>(stored_R.find(tr_name)->second);
+    // for(auto input_tr_name: input_tr_name_list){
+    //   bool relation_exist_flag = true;
+    //   stored_R.erase(input_tr_name);
+    //   drop_table(out, node, input_tr_name, db, relation_exist_flag);
+    // }
     
   },"Materialize commands. Usage : materialize <TR name>\n");
 
@@ -2341,29 +2409,16 @@ void prompt(bbts::node_t &node) {
 
     generate_tra_op_commands(out, node, kernel_name, output_mapping, input_mapping, file_path, db, relation_exist_flag);
 
-    // auto out_it = output_mapping.begin();
-    // auto in_it = input_mapping.begin();
-
-    // for(int i = 0; i < output_mapping.size(); i++){
-    //   out << in_it->first << " | ";
-    //   for(int j = 0; j < in_it->second.size(); j++){
-    //     out << in_it->second[j] << " ";
+    // std::map<std::string, bbts::tid_t>::iterator output_it;
+    // for (output_it = output_mapping.begin(); output_it != output_mapping.end(); output_it++){
+      
+    //   auto [success, message] = node.print_tensor_info(static_cast<bbts::tid_t>(output_it->second));
+    //   if(!success) {
+    //     out << bbts::red << "[ERROR]\n";
     //   }
-    //   out << "| " << out_it->second << "\n";
-    //   in_it++;
-    //   out_it++;
+    //   out << message << '\n';
+      
     // }
-
-    std::map<std::string, bbts::tid_t>::iterator output_it;
-    for (output_it = output_mapping.begin(); output_it != output_mapping.end(); output_it++){
-      
-      auto [success, message] = node.print_tensor_info(static_cast<bbts::tid_t>(output_it->second));
-      if(!success) {
-        out << bbts::red << "[ERROR]\n";
-      }
-      out << message << '\n';
-      
-    }
 
   
   },"Generate and run commands for join. Usage : join <left_tr_name> <right_tr_name> on <left dimension list> = <right dimension list> using <kernel_name> -> <stored tr name>\n");
@@ -2529,12 +2584,6 @@ void prompt(bbts::node_t &node) {
 
   
 
-  rootMenu->Insert("drop_table",[&](std::ostream &out, const std::string &table) {
-  const std::string &db = "tra.db";
-  
-  
-  }, "DROP table in sqlite; Usage drop_table <db_name> <table_name>");
-
   rootMenu->Insert("read_table",[&](std::ostream &out, const std::string &table) {
   const std::string &db = "tra.db";
   read_table(out, db, table);
@@ -2564,6 +2613,11 @@ void prompt(bbts::node_t &node) {
     delete_tensor_from_cluster(out, node, id_list, file_path, relation_exist_flag);
   }, "Display id pairs of Tensor Relation; Usage display <TR name>");
 
+  rootMenu->Insert("tables",[&](std::ostream &out){
+    const std::string &db = "tra.db";
+    display_all_table(out, node, db);
+  },"Display all tables in tra.db.");
+
   // init the command line interface
   Cli tra_cli(std::move(rootMenu));
 
@@ -2591,6 +2645,7 @@ int main(int argc, char **argv) {
   // sync everything
   node.sync();
 
+  
   // kick off the prompt
   std::thread t;
   if (node.get_rank() == 0) {

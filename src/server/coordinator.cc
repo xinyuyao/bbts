@@ -162,6 +162,8 @@ std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_tr
     // the compiled commands
     auto compiled_cmds = compiler.compile(cmds, locations);
 
+
+    std::cout << "The numer is " << compiled_cmds.size() << '\n';
     // std::stringstream ss2;
     // for(auto &c : compiled_cmds) {
     //   c->print(ss2);
@@ -397,8 +399,8 @@ std::tuple<bool, std::string> bbts::coordinator_t::load_shared_library(char* fil
   
   // do the actual registering, on this node
   std::stringstream ss;
-  std::cout << "file_bytes: " << file_bytes << "\n";
-  std::cout << "file_size: " << file_size << "\n";
+  // std::cout << "file_bytes: " << file_bytes << "\n";
+  // std::cout << "file_size: " << file_size << "\n";
 
   bool val = _register_from_bytes(file_bytes, file_size, ss);
 

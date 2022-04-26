@@ -15,6 +15,7 @@
 #include "ffnn_weighted_sum_sparse_dense.h"
 #include "ffnn_uniform_sparse_data.h"
 
+
 extern "C" {
 
   void register_tensors(bbts::tensor_factory_ptr_t tensor_factory) {

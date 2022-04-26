@@ -23,6 +23,15 @@ const int32_t FFNN_MULT_BACK = 7;
 const int32_t FFNN_UNIFORM_SPARSE = 8;
 const int32_t FFNN_WEIGHTED_SUM_SPARSE_DENSE = 9;
 
+const int32_t FFNN_SUBTRACT = 10;
+const int32_t FFNN_ELEMENT_MULT = 11;
+const int32_t FFNN_MAT_MUL_LHS_TRANSPOSE = 12;
+const int32_t FFNN_MAT_MUL_RHS_TRANSPOSE = 13;
+const int32_t FFNN_RELU = 14;
+const int32_t FFNN_SIGMOID = 15;
+const int32_t FFNN_SCALE_MUL = 16;
+const int32_t FFNN_RELU_DIFF = 17;
+
 using namespace bbts;
 
 float learning_rate = 1.0f;

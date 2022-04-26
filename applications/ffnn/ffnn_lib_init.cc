@@ -15,6 +15,16 @@
 #include "ffnn_weighted_sum_sparse_dense.h"
 #include "ffnn_uniform_sparse_data.h"
 
+#include "ffnn_subtract.h"
+#include "ffnn_element_mult.h"
+#include "ffnn_mat_mul_lhs_transpose.h"
+#include "ffnn_mat_mul_rhs_transpose.h"
+#include "ffnn_relu.h"
+#include "ffnn_relu_diff.h"
+#include "ffnn_sigmoid.h"
+#include "ffnn_scale_mul.h"
+
+
 extern "C" { // call C in c++
 
   void register_tensors(bbts::tensor_factory_ptr_t tensor_factory) {
@@ -135,6 +145,94 @@ extern "C" { // call C in c++
         .impls = {}
       }));
     udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_weighted_sum_sparse_dense>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_subtract",
+        .is_ass = false,
+        .is_com = false,
+        .num_in = 2,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_subtract>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_element_mult",
+        .is_ass = false,
+        .is_com = false,
+        .num_in = 2,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_element_mult>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_mat_mul_lhs_transpose",
+        .is_ass = false,
+        .is_com = false,
+        .num_in = 2,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_mat_mul_lhs_transpose>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_mat_mul_rhs_transpose",
+        .is_ass = false,
+        .is_com = false,
+        .num_in = 2,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_mat_mul_rhs_transpose>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_relu",
+        .is_ass = true,
+        .is_com = true,
+        .num_in = 1,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_relu>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_relu_diff",
+        .is_ass = true,
+        .is_com = true,
+        .num_in = 1,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_relu_diff>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_sigmoid",
+        .is_ass = false,
+        .is_com = false,
+        .num_in = 1,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_sigmoid>());
+
+    udf_manager->register_udf(std::make_unique<bbts::ud_func_t>(
+      bbts::ud_func_t {
+        .ud_name = "ffnn_scale_mul",
+        .is_ass = false,
+        .is_com = false,
+        .num_in = 1,
+        .num_out = 1,
+        .impls = {}
+      }));
+    udf_manager->register_udf_impl(std::make_unique<bbts::ffnn_scale_mul>());
 
   }
 }
