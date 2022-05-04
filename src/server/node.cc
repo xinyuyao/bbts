@@ -261,6 +261,10 @@ std::tuple<bool, std::string> bbts::node_t::print_tensor_info(tid_t id) {
   return _coordinator->print_tensor_info(id);
 }
 
+std::tuple<bool, std::string> bbts::node_t::get_tensor_info(tid_t id) {
+  return _coordinator->get_tensor_info(id);
+}
+
 
 std::unordered_map<std::string, std::tuple<bbts::ud_id_t, bool, bool, size_t, size_t>> bbts::node_t::get_udfs_info(){
   return _udf_manager->get_udfs_info();

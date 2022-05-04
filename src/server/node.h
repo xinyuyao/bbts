@@ -99,6 +99,9 @@ public:
   // prints information about the tensor
   std::tuple<bool, std::string> print_tensor_info(tid_t id);
 
+  // get information about the tensor
+  std::tuple<bool, std::string> get_tensor_info(tid_t id);
+
   // get all udf ptr
   std::unordered_map<std::string, std::tuple<ud_id_t, bool, bool, size_t, size_t>> get_udfs_info();
 

@@ -302,6 +302,24 @@ std::tuple<bool, std::string> bbts::coordinator_t::print_tensor_info(bbts::tid_t
   return out;
 }
 
+std::tuple<bool, std::string> bbts::coordinator_t::get_tensor_info(bbts::tid_t id) {
+
+  if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::PRINT_TENSOR, ._val = (size_t)(id) } )) {
+    return {false, "Failed to print tensor!\n"};
+  }
+
+  // print the storage
+  std::stringstream ss;
+  _get_tensor(id, ss);
+
+  // sync everything
+  std::tuple<bool, std::string> out = {true, ss.str()};
+  _collect(out);
+
+  // we succeded
+  return out;
+}
+
 std::tuple<bool, std::string> bbts::coordinator_t::clear() {
 
   if (!_comm->send_coord_op(coordinator_op_t{._type = coordinator_op_types_t::CLEAR, ._val = 0})) {
@@ -578,6 +596,26 @@ void bbts::coordinator_t::_print_tensor(tid_t id, std::stringstream &ss) {
       
       // print the tensor since we found it
       ss << bbts::green << "<<< On Node " << _comm->get_rank() << ">>>\n" << bbts::reset;
+      _tf->print_tensor(ts, ss);
+    }
+  });
+}
+
+void bbts::coordinator_t::_get_tensor(tid_t id, std::stringstream &ss) {
+
+  // check if it exists
+  if(!_storage->has_tensor(id)) {
+    return;;
+  }
+
+  // run the transaction
+  _storage->local_transaction({id}, {}, [&](const storage_t::reservation_result_t &res) {
+
+    // the get the tensor
+    auto ts = res.get[0].get().tensor;
+    if(ts != nullptr) {
+      
+      // print the tensor since we found it
       _tf->print_tensor(ts, ss);
     }
   });

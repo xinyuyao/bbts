@@ -69,6 +69,9 @@ public:
   // print info about a tensor
   std::tuple<bool, std::string> print_tensor_info(bbts::tid_t id);
 
+  // print info about a tensor
+  std::tuple<bool, std::string> get_tensor_info(bbts::tid_t id);
+
   // print all tid info
   std::tuple<bool, std::string> print_all_tid_info();
 
@@ -148,6 +151,8 @@ private:
   void _get_all_tensor_tid(std::stringstream &ss);
 
   void _print_tensor(tid_t id, std::stringstream &ss);
+
+  void _get_tensor(tid_t id, std::stringstream &ss);
 
   // the gpu scheduler
   gpu_scheduler_ptr_t _gpu_scheduler;
