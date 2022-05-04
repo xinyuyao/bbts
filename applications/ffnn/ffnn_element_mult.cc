@@ -68,7 +68,7 @@ void bbts::ffnn_element_mult::mult(const bbts::ud_impl_t::tensor_params_t &param
   // present during the debug build
   assert(m_a.num_rows == m_b.num_rows);
   assert(m_a.num_cols == m_b.num_cols);
-  assert(m_a.has_bias == m_b.has_bias);
+  // assert(m_a.has_bias == m_b.has_bias);
 
   // set the new meta data
   m_out = {.num_rows = m_a.num_rows, 

@@ -1,0 +1,54 @@
+delete_all_tables
+load library
+createTR from M/x.npy s 10 s 10 t dense -> x
+createTR from M/y.npy s 10 s 1 t dense -> y
+createTR from M/w1.npy s 10 s 10 t dense -> w1
+createTR from M/w2.npy s 10 s 1 t dense -> w2
+
+join x w1 on 1 = 0 using ffnn_mult -> j1
+materialize j1
+aggregate j1 on 0,2 using ffnn_add -> agg1
+materialize agg1
+transform agg1 using ffnn_relu -> a1
+materialize a1
+
+join a1 w2 on 1 = 0 using ffnn_mult -> j2
+materialize j2
+aggregate j2 on 0,2 using ffnn_add -> agg2
+materialize agg2
+transform agg2 using ffnn_sigmoid -> a2
+materialize a2
+
+join a2 y on 0,1 = 0,1 using ffnn_subtract -> delta_a2
+materialize delta_a2
+
+join a1 delta_a2 on 0 = 0 using ffnn_mat_mul_lhs_transpose -> j4
+materialize j4
+aggregate j4 on 0,2 using ffnn_add -> delta_w2
+materialize delta_w2
+
+join delta_a2 w2 on 1 = 1 using ffnn_mat_mul_rhs_transpose -> j5
+materialize j5
+aggregate j5 on 0,2 using ffnn_add -> delta_a1_1
+materialize delta_a1_1
+
+transform a1 using ffnn_relu_diff -> t6
+materialize t6
+join t6 delta_a1_1 on 0,1 = 0,1 using ffnn_element_mult -> delta_a1_2
+materialize delta_a1_2
+
+join x delta_a1_2 on 0 = 0 using ffnn_mat_mul_lhs_transpose -> j7
+materialize j7
+aggregate j7 on 0,2 using ffnn_add -> delta_w1
+materialize delta_w1
+
+
+transform delta_w2 using ffnn_scale_mul -> t8
+materialize t8
+join w2 t8 on 0,1 = 0,1 using ffnn_subtract -> w2_i_plus_1
+materialize w2_i_plus_1
+
+transform delta_w1 using ffnn_scale_mul -> t9
+materialize t9
+join w1 t9 on 0,1 = 0,1 using ffnn_subtract -> w1_i_plus_1
+materialize w1_i_plus_1

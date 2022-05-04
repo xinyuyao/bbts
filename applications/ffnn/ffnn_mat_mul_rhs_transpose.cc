@@ -80,31 +80,31 @@ void bbts::ffnn_mat_mul_rhs_transpose::mult(const bbts::ud_impl_t::tensor_params
   auto &m_out = out.meta().m();
 
   // get the sizes
-  uint32_t I = !params.get_bool_or_default<0>(false) ? m_a.num_rows : m_a.num_cols;
-  uint32_t J = !params.get_bool_or_default<1>(false) ? m_b.num_cols : m_b.num_rows;
+  uint32_t I = m_a.num_rows;
+  uint32_t J = m_b.num_rows;
 
   // get the indices
-  uint32_t row_idx = !params.get_bool_or_default<0>(false) ? m_a.row_idx : m_a.col_idx;
-  uint32_t col_idx = !params.get_bool_or_default<1>(false) ? m_b.col_idx : m_b.row_idx;
+  uint32_t row_idx = m_a.row_idx;
+  uint32_t col_idx = m_b.row_idx;
 
   // get the inner dimensions
-  uint32_t K1 = !params.get_bool_or_default<0>(false) ? m_a.num_cols : m_a.num_rows;
-  uint32_t K2 = !params.get_bool_or_default<1>(false) ? m_a.num_rows : m_a.num_cols;
+  uint32_t K1 = m_a.num_cols;
+  uint32_t K2 = m_b.num_cols;
 
   // make sure the matrix size matches, this is only present during the debug build
-  assert(K1 == K2);
+  // assert(K1 == K2);
+  if(K1 != K2){
+    std::cout << "Inner dimension does not match.\n";
+    return;
+  }
 
   // get the ptrs
   float *outData = out.data();
   float *in1Data = a.data();
   float *in2Data = b.data();
 
-  // figure out if we need to transpose
-  CBLAS_TRANSPOSE l_trans = CblasNoTrans;
-  CBLAS_TRANSPOSE r_trans = CblasTrans;
-
   // do the multiply
-  cblas_sgemm(CblasRowMajor, l_trans, r_trans, I, J, K1, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, I, J, K1, 1.0f, in1Data, m_a.num_cols, in2Data, m_b.num_cols, 0.0f, outData, J);
 
   // set the new meta data
   m_out = {.num_rows = I, 

@@ -121,7 +121,7 @@ void bbts::ffnn_relu_diff::sigmoid(ffnn_dense_t &_out) {
   for (auto row = 0; row < num_rows; ++row) {
     for (auto col = 0; col < num_cols; ++col) {
       auto v = out[row * num_cols + col];
-      out[row * num_cols + col] = 1 / (1.0f + std::exp(v));
+      out[row * num_cols + col] = 1 / (1.0f + std::exp(- v));
     }
   }
 }

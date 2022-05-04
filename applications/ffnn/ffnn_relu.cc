@@ -57,7 +57,6 @@ void bbts::ffnn_relu::get_out_meta(
 void bbts::ffnn_relu::apply_relu(const bbts::ud_impl_t::tensor_params_t &params,
                          const bbts::ud_impl_t::tensor_args_t &_in,
                          bbts::ud_impl_t::tensor_args_t &_out) {
-  std::cout << "Hit me please!!!\n";
   // get the number of
   auto num_to_reduce = params.get_int_or_default<0>(-1);
   auto elementwise_op = (elementwise_fn_type)params.get_int_or_default<1>(
@@ -123,7 +122,7 @@ void bbts::ffnn_relu::sigmoid(ffnn_dense_t &_out) {
   for (auto row = 0; row < num_rows; ++row) {
     for (auto col = 0; col < num_cols; ++col) {
       auto v = out[row * num_cols + col];
-      out[row * num_cols + col] = 1 / (1.0f + std::exp(v));
+      out[row * num_cols + col] = 1 / (1.0f + std::exp(-v));
     }
   }
 }

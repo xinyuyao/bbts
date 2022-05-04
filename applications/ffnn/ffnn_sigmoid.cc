@@ -92,7 +92,7 @@ void bbts::ffnn_sigmoid::apply_sigmoid(const bbts::ud_impl_t::tensor_params_t &p
       auto tmp_a = a.data()[row * m_a.num_cols + col];
   
 
-      out_data[row * m_a.num_cols + col] = 1 / (1.0f + std::exp(tmp_a));
+      out_data[row * m_a.num_cols + col] = 1 / (1.0f + std::exp(-tmp_a));
     }
   }
 
@@ -121,7 +121,7 @@ void bbts::ffnn_sigmoid::sigmoid(ffnn_dense_t &_out) {
   for (auto row = 0; row < num_rows; ++row) {
     for (auto col = 0; col < num_cols; ++col) {
       auto v = out[row * num_cols + col];
-      out[row * num_cols + col] = 1 / (1.0f + std::exp(v));
+      out[row * num_cols + col] = 1 / (1.0f + std::exp(-v));
     }
   }
 }

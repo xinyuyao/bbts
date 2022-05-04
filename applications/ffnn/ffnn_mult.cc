@@ -11,8 +11,8 @@ bbts::ffnn_mult::ffnn_mult() {
   ud_name = "ffnn_mult";
 
   // set the input and output types
-  inputTypes = {"ffnn_dense", "ffnn_dense"}; // inputTypes = {"lineageTree", "lineageTree"};
-  outputTypes = {"ffnn_dense"};//outputTypes = {"lineageTree"};
+  inputTypes = {"ffnn_dense", "ffnn_dense"};
+  outputTypes = {"ffnn_dense"};
 
   // both inputs zero and one can be used as the inplace output
   inputInplace = {};
@@ -83,16 +83,23 @@ void bbts::ffnn_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
   uint32_t I = !params.get_bool_or_default<0>(false) ? m_a.num_rows : m_a.num_cols;
   uint32_t J = !params.get_bool_or_default<1>(false) ? m_b.num_cols : m_b.num_rows;
 
+
   // get the indices
   uint32_t row_idx = !params.get_bool_or_default<0>(false) ? m_a.row_idx : m_a.col_idx;
   uint32_t col_idx = !params.get_bool_or_default<1>(false) ? m_b.col_idx : m_b.row_idx;
 
+
   // get the inner dimensions
   uint32_t K1 = !params.get_bool_or_default<0>(false) ? m_a.num_cols : m_a.num_rows;
-  uint32_t K2 = !params.get_bool_or_default<1>(false) ? m_a.num_rows : m_a.num_cols;
+  uint32_t K2 = !params.get_bool_or_default<1>(false) ? m_b.num_rows : m_b.num_cols;
+  
 
   // make sure the matrix size matches, this is only present during the debug build
-  assert(K1 == K2);
+  // assert(K1 == K2);
+  if(K1 != K2){
+    std::cout << "Inner dimension does not match.\n";
+    return;
+  }
 
   // get the ptrs
   float *outData = out.data();

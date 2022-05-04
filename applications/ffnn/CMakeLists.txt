@@ -29,7 +29,7 @@ add_library(ffnn_lib SHARED ${app_dir}/ffnn_lib_init.cc
                             ${app_dir}/ffnn_mat_mul_rhs_transpose.cc
                             ${app_dir}/ffnn_relu.cc
                             ${app_dir}/ffnn_relu_diff.cc
-                            ${app_dir}/ffnn_sigmoid.cc)
+                            ${app_dir}/ffnn_sigmoid.cc
                             ${app_dir}/ffnn_scale_mul.cc)
 
 

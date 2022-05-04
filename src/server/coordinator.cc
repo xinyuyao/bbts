@@ -163,7 +163,7 @@ std::tuple<bool, std::string> bbts::coordinator_t::compile_commands(float gpu_tr
     auto compiled_cmds = compiler.compile(cmds, locations);
 
 
-    std::cout << "The numer is " << compiled_cmds.size() << '\n';
+    std::cout << "The compiled command number is " << compiled_cmds.size() << '\n';
     // std::stringstream ss2;
     // for(auto &c : compiled_cmds) {
     //   c->print(ss2);

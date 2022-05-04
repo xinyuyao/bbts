@@ -64,7 +64,7 @@ void bbts::dense_matrix_sigmoid_t::sigmoid(const bbts::ud_impl_t::tensor_params_
   for (auto row = 0; row < m_a.num_rows; ++row) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
       auto v = a_data[row * m_a.num_cols + col];
-      out_data[row * m_a.num_cols + col] = 1 / (1.0f + std::exp(v));
+      out_data[row * m_a.num_cols + col] = 1 / (1.0f + std::exp(-v));
     }
   }
 

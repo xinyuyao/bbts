@@ -86,7 +86,6 @@ void bbts::ffnn_add::add(const bbts::ud_impl_t::tensor_params_t &params,
   assert(m_a.num_cols == m_b.num_cols);
   assert(m_a.has_bias == m_b.has_bias);
 
-/************************** switching the operation calculating here to collecting linearge ******************/
   // add a and b
   for (auto row = 0; row < m_a.num_rows; ++row) {
     for (auto col = 0; col < m_a.num_cols; ++col) {
@@ -126,7 +125,7 @@ void bbts::ffnn_add::sigmoid(ffnn_dense_t &_out) {
   for (auto row = 0; row < num_rows; ++row) {
     for (auto col = 0; col < num_cols; ++col) {
       auto v = out[row * num_cols + col];
-      out[row * num_cols + col] = 1 / (1.0f + std::exp(v));
+      out[row * num_cols + col] = 1 / (1.0f + std::exp(-v));
     }
   }
 }

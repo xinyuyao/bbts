@@ -1,13 +1,13 @@
-#include "ffnn_back_mult.h"
+#include "ffnn_mat_mul_lhs_transpose.h"
 #include "ffnn_types.h"
 #include <mkl/mkl.h>
 #include <mkl/mkl_cblas.h>
 
-bbts::ffnn_back_mult::ffnn_back_mult() {
+bbts::ffnn_mat_mul_lhs_transpose::ffnn_mat_mul_lhs_transpose() {
 
   // set the names
-  impl_name = "ffnn_back_mult_cpu";
-  ud_name = "ffnn_back_mult";
+  impl_name = "ffnn_mat_mul_lhs_transpose_cpu";
+  ud_name = "ffnn_mat_mul_lhs_transpose";
 
   // set the input and output types
   inputTypes = {"ffnn_dense", "ffnn_dense"};
@@ -20,10 +20,10 @@ bbts::ffnn_back_mult::ffnn_back_mult() {
   is_gpu = false;
 
   // set the function that actually performs the add
-  fn = &ffnn_back_mult::mult;
+  fn = &ffnn_mat_mul_lhs_transpose::mult;
 }
 
-size_t bbts::ffnn_back_mult::get_complexity_hint(
+size_t bbts::ffnn_mat_mul_lhs_transpose::get_complexity_hint(
     const bbts::ud_impl_t::tensor_params_t &params,
     const bbts::ud_impl_t::meta_args_t &_in) {
 
@@ -35,7 +35,7 @@ size_t bbts::ffnn_back_mult::get_complexity_hint(
   return 1.45838e-11 * m_a.num_cols * m_b.num_cols * m_a.num_rows;
 }
 
-void bbts::ffnn_back_mult::get_out_meta(
+void bbts::ffnn_mat_mul_lhs_transpose::get_out_meta(
     const bbts::ud_impl_t::tensor_params_t &params,
     const bbts::ud_impl_t::meta_args_t &_in,
     bbts::ud_impl_t::meta_args_t &_out) const {
@@ -58,7 +58,7 @@ void bbts::ffnn_back_mult::get_out_meta(
            .num_aggregated = 1};
 }
 
-void bbts::ffnn_back_mult::mult(const bbts::ud_impl_t::tensor_params_t &params,
+void bbts::ffnn_mat_mul_lhs_transpose::mult(const bbts::ud_impl_t::tensor_params_t &params,
                                 const bbts::ud_impl_t::tensor_args_t &_in,
                                 bbts::ud_impl_t::tensor_args_t &_out) {
 

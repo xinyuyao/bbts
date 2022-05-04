@@ -82,9 +82,9 @@ tensor_t *memory_storage_t::_allocate_tensor(size_t num_bytes) {
   #else
     // we can not do this
     ts = (tensor_t*) malloc(num_bytes); 
-    if(mlock(ts, num_bytes) == -1) {
-      throw std::runtime_error("Failed to lock the memory.");
-    }
+    // if(mlock(ts, num_bytes) == -1) {
+    //   throw std::runtime_error("Failed to lock the memory.");
+    // }
   #endif
 
   return ts;
