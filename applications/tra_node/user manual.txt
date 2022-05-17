@@ -1,7 +1,7 @@
 Example of 2 layer ffnn:
 
 delete_all_tables
-load library
+load library libraries/libffnn_lib.so
 createTR from M/x.npy size 60 7 tf dense -> x
 createTR from M/y.npy size 60 10 tf dense -> y
 createTR from M/w1.npy num 10 10 tf dense -> w1
@@ -9,61 +9,51 @@ createTR from M/w2.npy num 10 1 tf dense -> w2
 
 
 join x w1 on 1 = 0 using ffnn_mult -> j1
-materialize j1
 aggregate j1 on 0,2 using ffnn_add -> agg1
-materialize agg1
 transform agg1 using ffnn_relu -> a1
-materialize a1
+materialize a1 true
 
 
 join a1 w2 on 1 = 0 using ffnn_mult -> j2
-materialize j2
 aggregate j2 on 0,2 using ffnn_add -> agg2
-materialize agg2
 transform agg2 using ffnn_sigmoid -> a2
-materialize a2
+materialize a2 true
 
 
 join a2 y on 0,1 = 0,1 using ffnn_subtract -> delta_a2
-materialize delta_a2
+materialize delta_a2 false
 
 
 join a1 delta_a2 on 0 = 0 using ffnn_mat_mul_lhs_transpose -> j4
-materialize j4
 aggregate j4 on 0,2 using ffnn_add -> delta_w2
-materialize delta_w2
+materialize delta_w2 false
 
 
 join delta_a2 w2 on 1 = 1 using ffnn_mat_mul_rhs_transpose -> j5
-materialize j5
 aggregate j5 on 0,2 using ffnn_add -> delta_a1_1
-materialize delta_a1_1
+materialize delta_a1_1 false
 
 
 
 
 transform a1 using ffnn_relu_diff -> t6
-materialize t6
 join t6 delta_a1_1 on 0,1 = 0,1 using ffnn_element_mult -> delta_a1_2
-materialize delta_a1_2
+materialize delta_a1_2 false
 
 
 join x delta_a1_2 on 0 = 0 using ffnn_mat_mul_lhs_transpose -> j7
-materialize j7
 aggregate j7 on 0,2 using ffnn_add -> delta_w1
-materialize delta_w1
+materialize delta_w1 false
 
 
 transform delta_w2 using ffnn_scale_mul -> t8
-materialize t8
 join w2 t8 on 0,1 = 0,1 using ffnn_subtract -> w2_i_plus_1
-materialize w2_i_plus_1
+materialize w2_i_plus_1 false
 
 
 transform delta_w1 using ffnn_scale_mul -> t9
-materialize t9
 join w1 t9 on 0,1 = 0,1 using ffnn_subtract -> w1_i_plus_1
-materialize w1_i_plus_1
+materialize w1_i_plus_1 false
 
 
 
@@ -81,3 +71,8 @@ display p
 
 filter p <1> = <0> % 2
 display p
+
+rekey p <0,0,1>
+display p
+
+
