@@ -1750,41 +1750,52 @@ void run_commands(std::ostream &out, bbts::node_t &node) {
   }
 }
 
-void materialize_commands(std::ostream &out, bbts::node_t &node,
-                          const std::string &tr_name, const std::string &db, bool materialize_intermediate_step){
+struct{
+  bool operator()(std::string v1, std::string v2) const {return stored_R.find(v1)->second.second.size() > stored_R.find(v2)->second.second.size();}
+} imterdiate_relation_size_comparator;
 
-  std::string file_path = tr_name + ".sbbts";
-  if(!std::filesystem::exists(file_path)){
-    out << file_path << "  does not exist.\n";
-    return;
-  }
-  std::vector<std::string> input_relation_list = stored_R.find(tr_name)->second.second;
-  input_relation_list.push_back(tr_name);
-  std::vector<std::string> intermediate_relation;
-  for(int i = 0; i < input_relation_list.size(); i++){
-    file_path = input_relation_list[i] + ".sbbts";
-    if(std::filesystem::exists(file_path)){
-      out << "materializing " << input_relation_list[i] << "\n";
-      //compile commands
-      compile_commands(out, node, file_path);
-      //run commands
-      run_commands(out, node);
-      std::remove(file_path.c_str());
-      // intermediate_relation includes all relations except the beginning input and the final output
-      if(stored_R.find(input_relation_list[i])->second.second.size() != 0 && input_relation_list[i].compare(tr_name) != 0) intermediate_relation.push_back(input_relation_list[i]);
-      std::vector<std::string> new_input_relation_list;
-      stored_R.find(tr_name)->second.second = new_input_relation_list;
-      if(materialize_intermediate_step) create_id_table(out, node, db, stored_R.find(input_relation_list[i])->second.first, input_relation_list[i]);
+void materialize_commands(std::ostream &out, bbts::node_t &node,
+                          const std::string &tr_names, const std::string &db){
+
+  std::vector<std::string> tr_name_list = split(tr_names, ",");
+  std::sort(tr_name_list.begin(), tr_name_list.end(), imterdiate_relation_size_comparator);
+  for(int i = 0; i < tr_name_list.size(); i++) out << tr_name_list[i] << " ";
+  out << "\n";
+  while(tr_name_list.size() != 0){
+    std::vector<std::string> input_relation_list = stored_R.find(tr_name_list[0])->second.second;
+    input_relation_list.push_back(tr_name_list[0]);
+    std::vector<std::string> erase_relation;
+    for(int i = 0; i < input_relation_list.size(); i++){
+      std::string file_path = input_relation_list[i] + ".sbbts";
+      if(!std::filesystem::exists(file_path)){
+        // for the relation that has input_relation_list[i])->second.second.size()=0 is the original data relation
+        if(stored_R.find(input_relation_list[i])->second.second.size() != 0){
+          out << file_path << "  does not exist.\n";
+          return;
+        }
+      }
+      else{
+        //compile commands
+        compile_commands(out, node, file_path);
+        //run commands
+        run_commands(out, node);
+        std::remove(file_path.c_str());
+        // check if we need to stored any intermediate relatioin result
+        std::vector<std::string>::iterator it = std::find(tr_name_list.begin(), tr_name_list.end(),input_relation_list[i]);
+        if(it != tr_name_list.end()){
+          create_id_table(out, node, db, stored_R.find(input_relation_list[i])->second.first, input_relation_list[i]);
+          tr_name_list.erase(it);
+          std::vector<std::string> new_input_relation_list;
+          stored_R.find(input_relation_list[i])->second.second = new_input_relation_list;
+        }
+        else{
+          stored_R.erase(input_relation_list[i]);
+        }
+      }
+      // stored each intermediate relation 
     }
-    // stored each intermediate relation 
   }
   
-  if(!materialize_intermediate_step){
-    for(int i = 0; i < intermediate_relation.size(); i++){
-      stored_R.erase(intermediate_relation[i]);
-    }
-    create_id_table(out, node, db, stored_R.find(tr_name)->second.first, tr_name);
-  }
 }
 
 void delete_tensor_from_cluster(std::ostream &out, bbts::node_t &node, std::vector<bbts::tid_t> id_list, const std::string &file_path, bool &relation_exist_flag){
@@ -2344,13 +2355,13 @@ void prompt(bbts::node_t &node) {
   
   },"Generate and run commands for aggregation. Usage : aggregate <TR Name> on <dimensions> using <kernel_name> -> <stored TR name>\n");
 
-  rootMenu->Insert("materialize",[&](std::ostream &out, const std::string &tr_name, bool store_intermediate_step) {
+  rootMenu->Insert("materialize",[&](std::ostream &out, const std::string &tr_name_list) {
 
     const std::string &db = "tra.db";
 
-    materialize_commands(out, node, tr_name, db, store_intermediate_step);
+    materialize_commands(out, node, tr_name_list, db);
     
-  },"Materialize commands. Usage : materialize <TR name>\n");
+  },"Materialize commands. Usage : materialize <TR name list>\n");
 
   /*************************************   join  **********************************************/
   rootMenu->Insert("join",[&](std::ostream &out, const std::string &tr_name_l, const std::string &tr_name_r, std::string on_clause, 
